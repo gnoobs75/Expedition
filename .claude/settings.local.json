@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(start-server.bat)",
+      "Bash(python -m http.server:*)",
+      "Bash(curl:*)",
+      "Bash(start http://localhost:8080?debug=true)",
+      "WebSearch",
+      "Bash(dir /s /b *.ts *.tsx *.js *.jsx *.html)",
+      "Bash(find:*)",
+      "Bash(powershell -Command \"Get-ChildItem -Recurse -Include ''*.ts'', ''*.tsx'', ''*.js'', ''*.jsx'' | Select-Object -ExpandProperty FullName | head -100\")",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

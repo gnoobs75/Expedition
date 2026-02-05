@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expedition - Space Exploration</title>
+    <link rel="stylesheet" href="css/ui.css">
+</head>
+<body>
+    <!-- Three.js Canvas Container -->
+    <div id="game-container"></div>
+
+    <!-- UI Overlay -->
+    <div id="ui-overlay">
+        <!-- Top Bar: Ship Status -->
+        <div id="top-bar">
+            <div id="ship-status">
+                <div class="status-group">
+                    <label>SHIELD</label>
+                    <div class="bar-container">
+                        <div id="shield-bar" class="status-bar shield"></div>
+                        <span id="shield-text">100%</span>
+                    </div>
+                </div>
+                <div class="status-group">
+                    <label>ARMOR</label>
+                    <div class="bar-container">
+                        <div id="armor-bar" class="status-bar armor"></div>
+                        <span id="armor-text">100%</span>
+                    </div>
+                </div>
+                <div class="status-group">
+                    <label>HULL</label>
+                    <div class="bar-container">
+                        <div id="hull-bar" class="status-bar hull"></div>
+                        <span id="hull-text">100%</span>
+                    </div>
+                </div>
+                <div class="status-group">
+                    <label>CAPACITOR</label>
+                    <div class="bar-container">
+                        <div id="capacitor-bar" class="status-bar capacitor"></div>
+                        <span id="capacitor-text">100%</span>
+                    </div>
+                </div>
+            </div>
+            <div id="speed-display">
+                <span id="speed-value">0</span>
+                <span class="unit">m/s</span>
+            </div>
+            <div id="credits-display">
+                <span class="label">ISK</span>
+                <span id="credits-value">10,000</span>
+            </div>
+            <div id="cargo-display">
+                <span class="label">CARGO</span>
+                <div class="cargo-bar-container">
+                    <div id="cargo-bar" class="cargo-bar"></div>
+                    <span id="cargo-text">0 / 200 m³</span>
+                </div>
+            </div>
+            <button id="settings-btn" title="Settings (Esc)">&#9881;</button>
+        </div>
+
+        <!-- Left Panel: Target Info -->
+        <div id="target-panel" class="panel hidden">
+            <div class="panel-header">
+                <span class="panel-title">TARGET</span>
+                <button class="panel-close">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="target-name" class="target-name">No Target</div>
+                <div id="target-type" class="target-type"></div>
+                <div id="target-distance" class="target-distance"></div>
+                <div id="target-health-bars">
+                    <div class="mini-bar-group">
+                        <div id="target-shield-bar" class="mini-bar shield"></div>
+                    </div>
+                    <div class="mini-bar-group">
+                        <div id="target-armor-bar" class="mini-bar armor"></div>
+                    </div>
+                    <div class="mini-bar-group">
+                        <div id="target-hull-bar" class="mini-bar hull"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Locked Targets Display -->
+        <div id="locked-targets-container" class="panel">
+            <div class="panel-header locked-targets-header">
+                <span class="panel-title">LOCKED</span>
+            </div>
+            <div class="locked-targets-content">
+                <!-- Dynamically populated with locked target icons -->
+            </div>
+        </div>
+
+        <!-- Right Panel: Overview (docked to right side) -->
+        <div id="overview-panel" class="panel docked">
+            <div class="panel-header">
+                <span class="panel-title">OVERVIEW</span>
+                <div id="overview-filters">
+                    <button class="filter-btn active" data-filter="all" title="All">ALL</button>
+                    <button class="filter-btn" data-filter="ships" title="Ships">&#9650;</button>
+                    <button class="filter-btn" data-filter="stations" title="Stations">&#9632;</button>
+                    <button class="filter-btn" data-filter="asteroids" title="Asteroids">&#9671;</button>
+                    <button class="filter-btn" data-filter="gates" title="Gates">&#10070;</button>
+                </div>
+            </div>
+            <div class="panel-content">
+                <table id="overview-table">
+                    <thead>
+                        <tr>
+                            <th class="col-icon">Icon</th>
+                            <th class="col-name">Name</th>
+                            <th class="col-type">Type</th>
+                            <th class="col-dist">Distance</th>
+                            <th class="col-vel">Velocity</th>
+                            <th class="col-ang">Angular</th>
+                        </tr>
+                    </thead>
+                    <tbody id="overview-body">
+                        <!-- Dynamically populated -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Bottom Panel: Module Rack -->
+        <div id="module-rack">
+            <div class="module-section">
+                <div class="section-label">HIGH</div>
+                <div class="module-slots" id="high-slots">
+                    <div class="module-slot" data-slot="high-1">
+                        <div class="module-icon">&#9889;</div>
+                        <div class="module-cooldown"></div>
+                    </div>
+                    <div class="module-slot" data-slot="high-2">
+                        <div class="module-icon">&#9889;</div>
+                        <div class="module-cooldown"></div>
+                    </div>
+                    <div class="module-slot" data-slot="high-3">
+                        <div class="module-icon">&#9874;</div>
+                        <div class="module-cooldown"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="module-section">
+                <div class="section-label">MID</div>
+                <div class="module-slots" id="mid-slots">
+                    <div class="module-slot" data-slot="mid-1">
+                        <div class="module-icon">&#9211;</div>
+                        <div class="module-cooldown"></div>
+                    </div>
+                    <div class="module-slot" data-slot="mid-2">
+                        <div class="module-icon">&#10148;</div>
+                        <div class="module-cooldown"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="module-section">
+                <div class="section-label">LOW</div>
+                <div class="module-slots" id="low-slots">
+                    <div class="module-slot" data-slot="low-1">
+                        <div class="module-icon">&#9881;</div>
+                        <div class="module-cooldown"></div>
+                    </div>
+                    <div class="module-slot" data-slot="low-2">
+                        <div class="module-icon">&#9881;</div>
+                        <div class="module-cooldown"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Left: Event Log -->
+        <div id="event-log" class="panel">
+            <div class="panel-header">
+                <span class="panel-title">EVENT LOG</span>
+            </div>
+            <div class="panel-content">
+                <div id="log-messages">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Ship Status Indicator -->
+        <div id="ship-indicator" class="panel">
+            <div class="panel-header ship-indicator-header">
+                <span class="panel-title">SHIP</span>
+            </div>
+            <div class="ship-indicator-content">
+                <div class="ship-indicator-rings">
+                    <div class="ship-ring shield"></div>
+                    <div class="ship-ring armor"></div>
+                    <div class="ship-ring hull"></div>
+                    <div class="ship-indicator-icon">&#9650;</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drone Quick Action Bar -->
+        <div id="drone-bar" class="panel hidden">
+            <div class="panel-header drone-bar-header">
+                <span class="panel-title">DRONES</span>
+                <span class="drone-count">0/0</span>
+            </div>
+            <div class="drone-bar-content">
+                <div class="drone-commands">
+                    <button class="drone-cmd-btn" data-cmd="orbit" title="Orbit Target">&#8635;</button>
+                    <button class="drone-cmd-btn" data-cmd="attack" title="Attack Target">&#9876;</button>
+                    <button class="drone-cmd-btn" data-cmd="mine" title="Mine Target">&#9874;</button>
+                    <button class="drone-cmd-btn" data-cmd="return" title="Return to Bay">&#8617;</button>
+                </div>
+                <div class="drone-status">Idle</div>
+            </div>
+        </div>
+
+        <!-- Context Menu -->
+        <div id="context-menu" class="hidden">
+            <div class="menu-item" data-action="approach">Approach</div>
+            <div class="menu-item has-submenu">
+                <span class="submenu-arrow">&#9666;</span>
+                Orbit
+                <div class="submenu">
+                    <div class="submenu-item" data-action="orbit-100">100 m</div>
+                    <div class="submenu-item" data-action="orbit-500">500 m</div>
+                    <div class="submenu-item" data-action="orbit-1000">1,000 m</div>
+                    <div class="submenu-item" data-action="orbit-2500">2,500 m</div>
+                    <div class="submenu-item" data-action="orbit-5000">5,000 m</div>
+                </div>
+            </div>
+            <div class="menu-item has-submenu">
+                <span class="submenu-arrow">&#9666;</span>
+                Keep at Range
+                <div class="submenu">
+                    <div class="submenu-item" data-action="keep-range-100">100 m</div>
+                    <div class="submenu-item" data-action="keep-range-500">500 m</div>
+                    <div class="submenu-item" data-action="keep-range-1000">1,000 m</div>
+                    <div class="submenu-item" data-action="keep-range-2500">2,500 m</div>
+                    <div class="submenu-item" data-action="keep-range-5000">5,000 m</div>
+                </div>
+            </div>
+            <div class="menu-separator"></div>
+            <div class="menu-item" data-action="lock">Lock Target</div>
+            <div class="menu-item" data-action="look-at">Look At</div>
+            <div class="menu-separator"></div>
+            <div class="menu-item" data-action="warp">Warp To</div>
+            <div class="menu-item" data-action="dock">Dock</div>
+            <div class="menu-item" data-action="bookmark">Save Location</div>
+        </div>
+
+        <!-- Warp Tunnel Overlay -->
+        <div id="warp-tunnel" class="hidden">
+            <div class="warp-lines"></div>
+            <div class="warp-text">WARPING...</div>
+        </div>
+
+        <!-- Station Panel (Modal) -->
+        <div id="station-panel" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span id="station-name">Station Name</span>
+                    <button class="modal-close" id="undock-btn">UNDOCK</button>
+                </div>
+                <div class="modal-tabs">
+                    <button class="tab-btn active" data-tab="hangar">HANGAR</button>
+                    <button class="tab-btn" data-tab="market">MARKET</button>
+                    <button class="tab-btn" data-tab="fitting">FITTING</button>
+                    <button class="tab-btn" data-tab="repair">REPAIR</button>
+                    <button class="tab-btn" data-tab="refinery">REFINERY</button>
+                </div>
+                <div class="modal-body">
+                    <div id="tab-hangar" class="tab-content active">
+                        <h3>Your Ships</h3>
+                        <div id="hangar-ships"></div>
+                        <h3>Cargo Hold</h3>
+                        <div id="cargo-contents"></div>
+                    </div>
+                    <div id="tab-market" class="tab-content">
+                        <h3>Ships for Sale</h3>
+                        <div id="market-ships"></div>
+                        <h3>Modules for Sale</h3>
+                        <div id="market-modules"></div>
+                    </div>
+                    <div id="tab-fitting" class="tab-content">
+                        <div id="fitting-display"></div>
+                    </div>
+                    <div id="tab-repair" class="tab-content">
+                        <div id="repair-options"></div>
+                    </div>
+                    <div id="tab-refinery" class="tab-content">
+                        <h3>Sell Ore</h3>
+                        <div id="refinery-ore-list"></div>
+                        <div id="refinery-total"></div>
+                        <button id="sell-all-ore-btn" class="buy-btn">SELL ALL ORE</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- D-Scan Panel -->
+        <div id="dscan-panel" class="panel hidden">
+            <div class="panel-header">
+                <span class="panel-title">DIRECTIONAL SCANNER</span>
+                <button class="panel-close">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="dscan-controls">
+                    <label>Range: <input type="range" id="dscan-range" min="1000" max="15000" value="10000"></label>
+                    <label>Angle: <input type="range" id="dscan-angle" min="5" max="360" value="60"></label>
+                    <button id="dscan-scan">SCAN</button>
+                </div>
+                <div id="dscan-results"></div>
+            </div>
+        </div>
+
+        <!-- Bookmarks Panel -->
+        <div id="bookmarks-panel" class="panel hidden">
+            <div class="panel-header">
+                <span class="panel-title">BOOKMARKS</span>
+                <button class="panel-close">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="bookmark-list"></div>
+            </div>
+        </div>
+
+        <!-- Object Viewer Panel -->
+        <div id="object-viewer" class="panel hidden">
+            <div class="panel-header">
+                <span class="panel-title">OBJECT VIEWER</span>
+                <button class="panel-close">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="object-viewer-content">
+                    <div class="viewer-placeholder">
+                        Select an object to view details
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Panel (Modal) -->
+        <div id="settings-panel" class="modal hidden">
+            <div class="modal-content settings-modal">
+                <div class="modal-header">
+                    <span>SETTINGS</span>
+                    <button class="modal-close" id="settings-close">&times;</button>
+                </div>
+                <div class="modal-tabs">
+                    <button class="tab-btn active" data-tab="keybindings">KEY BINDINGS</button>
+                    <button class="tab-btn" data-tab="audio">AUDIO</button>
+                    <button class="tab-btn" data-tab="graphics">GRAPHICS</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Keybindings Tab -->
+                    <div id="tab-keybindings" class="tab-content active">
+                        <div class="keybindings-header">
+                            <p>Click on a key binding to change it. Press the new key to assign.</p>
+                            <div class="keybindings-actions">
+                                <button id="reset-all-bindings" class="settings-btn">Reset All to Default</button>
+                            </div>
+                        </div>
+                        <div id="keybindings-list">
+                            <!-- Dynamically populated -->
+                        </div>
+                    </div>
+
+                    <!-- Audio Tab -->
+                    <div id="tab-audio" class="tab-content">
+                        <div class="settings-row">
+                            <label>Master Volume</label>
+                            <input type="range" id="master-volume" min="0" max="100" value="50">
+                            <span id="volume-value">50%</span>
+                        </div>
+                        <div class="settings-row">
+                            <label>Sound Effects</label>
+                            <input type="checkbox" id="sfx-enabled" checked>
+                        </div>
+                    </div>
+
+                    <!-- Graphics Tab -->
+                    <div id="tab-graphics" class="tab-content">
+                        <div class="settings-row">
+                            <label>Show Scanlines</label>
+                            <input type="checkbox" id="scanlines-enabled">
+                        </div>
+                        <div class="settings-row">
+                            <label>Particle Density</label>
+                            <select id="particle-density">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Rebind Overlay -->
+        <div id="rebind-overlay" class="hidden">
+            <div class="rebind-dialog">
+                <div class="rebind-title">Press a key for:</div>
+                <div id="rebind-action-name"></div>
+                <div class="rebind-hint">Press Escape to cancel</div>
+            </div>
+        </div>
+
+        <!-- Ship Menu Modal -->
+        <div id="ship-menu-modal" class="modal hidden">
+            <div class="modal-content ship-menu-modal">
+                <div class="modal-header">
+                    <span>SHIP MENU</span>
+                    <button class="modal-close" id="ship-menu-close">&times;</button>
+                </div>
+                <div class="modal-tabs">
+                    <button class="tab-btn active" data-tab="stats">STATS</button>
+                    <button class="tab-btn" data-tab="inventory">INVENTORY</button>
+                    <button class="tab-btn" data-tab="drones">DRONES</button>
+                </div>
+                <div class="modal-body">
+                    <div id="ship-tab-stats" class="tab-content active">
+                        <div class="ship-stats-layout">
+                            <div class="ship-viewer-container">
+                                <canvas id="ship-viewer-canvas"></canvas>
+                                <div id="ship-menu-name" class="ship-viewer-name">Your Ship</div>
+                            </div>
+                            <div class="ship-info-columns">
+                                <div class="ship-stats-column">
+                                    <div id="ship-stats-content"></div>
+                                </div>
+                                <div class="ship-modules-column">
+                                    <h3>FITTED MODULES</h3>
+                                    <div id="ship-modules-content"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="ship-tab-inventory" class="tab-content">
+                        <h3>CARGO HOLD</h3>
+                        <div id="ship-inventory-content"></div>
+                    </div>
+                    <div id="ship-tab-drones" class="tab-content">
+                        <!-- Populated dynamically by ShipMenuManager -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sector Map Modal -->
+        <div id="sector-map-modal" class="modal hidden">
+            <div class="modal-content map-modal">
+                <div class="modal-header">
+                    <span>SECTOR MAP</span>
+                    <button class="modal-close" id="sector-map-close">&times;</button>
+                </div>
+                <div class="modal-tabs">
+                    <button class="tab-btn active" data-tab="local">LOCAL</button>
+                    <button class="tab-btn" data-tab="universe">UNIVERSE</button>
+                </div>
+                <div class="modal-body map-modal-body">
+                    <div id="map-tab-local" class="tab-content active">
+                        <div class="map-canvas-container">
+                            <canvas id="local-map-canvas"></canvas>
+                        </div>
+                        <div class="map-controls">
+                            <button id="local-zoom-in" class="map-control-btn" title="Zoom In">+</button>
+                            <button id="local-zoom-out" class="map-control-btn" title="Zoom Out">-</button>
+                            <button id="local-center" class="map-control-btn" title="Center on Ship">&#8982;</button>
+                        </div>
+                    </div>
+                    <div id="map-tab-universe" class="tab-content">
+                        <div class="map-canvas-container">
+                            <canvas id="universe-map-canvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Game Scripts -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

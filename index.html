@@ -12,54 +12,65 @@
 
     <!-- UI Overlay -->
     <div id="ui-overlay">
-        <!-- Top Bar: Ship Status -->
-        <div id="top-bar">
-            <div id="ship-status">
-                <div class="status-group">
-                    <label>SHIELD</label>
-                    <div class="bar-container">
-                        <div id="shield-bar" class="status-bar shield"></div>
-                        <span id="shield-text">100%</span>
-                    </div>
+        <!-- Bottom Bar: Ship Status HUD -->
+        <div id="bottom-bar">
+            <!-- Left: Speed -->
+            <div class="left-section">
+                <div id="speed-display">
+                    <span id="speed-value">0</span>
+                    <span class="unit">m/s</span>
                 </div>
-                <div class="status-group">
-                    <label>ARMOR</label>
-                    <div class="bar-container">
-                        <div id="armor-bar" class="status-bar armor"></div>
-                        <span id="armor-text">100%</span>
+            </div>
+
+            <!-- Center: Ship Status Bars -->
+            <div class="center-section">
+                <div id="ship-status">
+                    <div class="status-group">
+                        <label>SHIELD</label>
+                        <div class="bar-container">
+                            <div id="shield-bar" class="status-bar shield"></div>
+                            <span id="shield-text">100%</span>
+                        </div>
                     </div>
-                </div>
-                <div class="status-group">
-                    <label>HULL</label>
-                    <div class="bar-container">
-                        <div id="hull-bar" class="status-bar hull"></div>
-                        <span id="hull-text">100%</span>
+                    <div class="status-group">
+                        <label>ARMOR</label>
+                        <div class="bar-container">
+                            <div id="armor-bar" class="status-bar armor"></div>
+                            <span id="armor-text">100%</span>
+                        </div>
                     </div>
-                </div>
-                <div class="status-group">
-                    <label>CAPACITOR</label>
-                    <div class="bar-container">
-                        <div id="capacitor-bar" class="status-bar capacitor"></div>
-                        <span id="capacitor-text">100%</span>
+                    <div class="status-group">
+                        <label>HULL</label>
+                        <div class="bar-container">
+                            <div id="hull-bar" class="status-bar hull"></div>
+                            <span id="hull-text">100%</span>
+                        </div>
+                    </div>
+                    <div class="status-group">
+                        <label>CAPACITOR</label>
+                        <div class="bar-container">
+                            <div id="capacitor-bar" class="status-bar capacitor"></div>
+                            <span id="capacitor-text">100%</span>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div id="speed-display">
-                <span id="speed-value">0</span>
-                <span class="unit">m/s</span>
-            </div>
-            <div id="credits-display">
-                <span class="label">ISK</span>
-                <span id="credits-value">10,000</span>
-            </div>
-            <div id="cargo-display">
-                <span class="label">CARGO</span>
-                <div class="cargo-bar-container">
-                    <div id="cargo-bar" class="cargo-bar"></div>
-                    <span id="cargo-text">0 / 200 m³</span>
+
+            <!-- Right: ISK, Cargo, Settings -->
+            <div class="right-section">
+                <div id="credits-display">
+                    <span class="label">ISK</span>
+                    <span id="credits-value">10,000</span>
                 </div>
+                <div id="cargo-display">
+                    <span class="label">CARGO</span>
+                    <div class="cargo-bar-container">
+                        <div id="cargo-bar" class="cargo-bar"></div>
+                        <span id="cargo-text">0 / 200 m³</span>
+                    </div>
+                </div>
+                <button id="settings-btn" title="Settings (Esc)">&#9881;</button>
             </div>
-            <button id="settings-btn" title="Settings (Esc)">&#9881;</button>
         </div>
 
         <!-- Left Panel: Target Info -->

@@ -414,13 +414,13 @@ export class Game {
      * Update game state
      */
     update(dt) {
-        // Update player
+        // Update autopilot FIRST (sets desiredSpeed/desiredRotation)
+        this.autopilot.update(dt);
+
+        // Update player (uses desiredSpeed/desiredRotation)
         if (this.player && this.player.alive) {
             this.player.update(dt);
         }
-
-        // Update autopilot
-        this.autopilot.update(dt);
 
         // Update current sector entities
         if (this.currentSector) {

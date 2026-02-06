@@ -92,6 +92,11 @@ export class Ship extends Entity {
     update(dt) {
         if (!this.alive) return;
 
+        // Debug: log desired vs current speed
+        if (this.isPlayer && this.desiredSpeed > 0 && Math.random() < 0.05) {
+            console.log('Ship.update - desiredSpeed:', this.desiredSpeed, 'currentSpeed:', this.currentSpeed, 'maxSpeed:', this.maxSpeed);
+        }
+
         // Regenerate capacitor
         this.capacitor = Math.min(this.maxCapacitor, this.capacitor + this.capacitorRegen * dt);
 

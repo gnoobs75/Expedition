@@ -118,7 +118,7 @@ export class InputManager {
     onMouseDown(e) {
         // Check if this is a game area interaction
         const isGameAreaClick = e.target.closest('#game-container') || e.target.tagName === 'CANVAS';
-        const isUIClick = e.target.closest('.panel, #module-rack, #top-bar, .modal, #context-menu, #ship-indicator, #drone-bar, #performance-monitor, #locked-targets-container');
+        const isUIClick = e.target.closest('.panel, #module-rack, #bottom-bar, .modal, #context-menu, #ship-indicator, #drone-bar, #performance-monitor, #locked-targets-container');
 
         if (e.button === 0) {
             this.mouse.down = true;
@@ -143,13 +143,16 @@ export class InputManager {
     }
 
     onClick(e) {
+        console.log('onClick - target:', e.target.tagName, e.target.id, e.target.className);
+
         // Don't select if we were dragging
         if (this.mouse.dragging) return;
 
         // Check if clicking on actual UI elements that should block clicks
-        const isUIClick = e.target.closest('.panel, #module-rack, #top-bar, .modal, #context-menu, #ship-indicator, #drone-bar, #performance-monitor, #locked-targets-container, button, .menu-item');
+        const isUIClick = e.target.closest('.panel, #module-rack, #bottom-bar, .modal, #context-menu, #ship-indicator, #drone-bar, #performance-monitor, #locked-targets-container, button, .menu-item');
 
         if (isUIClick) {
+            console.log('onClick - blocked by UI element');
             return;
         }
 
@@ -160,16 +163,21 @@ export class InputManager {
                                 e.target.tagName === 'CANVAS';
 
         if (!isGameAreaClick) {
+            console.log('onClick - not a game area click');
             return;
         }
+
+        console.log('onClick - valid game area click, finding entity...');
 
         // Find clicked entity
         const world = this.screenToWorld(e.clientX, e.clientY);
         const entity = this.findEntityAt(world.x, world.y);
 
         if (entity) {
+            console.log('onClick - found entity:', entity.name);
             this.game.selectTarget(entity);
         } else {
+            console.log('onClick - no entity at position');
             this.game.selectTarget(null);
         }
     }
@@ -178,24 +186,32 @@ export class InputManager {
      * Handle double-click for approach
      */
     onDoubleClick(e) {
+        console.log('onDoubleClick fired, target:', e.target.tagName, e.target.id, e.target.className);
+
         // Check if clicking on actual UI elements that should block the action
-        const blockedElements = '.panel, #module-rack, #top-bar, .modal, #context-menu, #ship-indicator, #drone-bar, #performance-monitor, #locked-targets-container, button, .menu-item, .submenu-item';
+        const blockedElements = '.panel, #module-rack, #bottom-bar, .modal, #context-menu, #ship-indicator, #drone-bar, #performance-monitor, #locked-targets-container, button, .menu-item, .submenu-item';
         if (e.target.closest(blockedElements)) {
+            console.log('Blocked by UI element');
             return;
         }
 
         // Get world position of double-click
         const world = this.screenToWorld(e.clientX, e.clientY);
+        console.log('Screen click:', e.clientX, e.clientY, 'Window center:', window.innerWidth/2, window.innerHeight/2);
+        console.log('Camera:', this.game.camera.x, this.game.camera.y, 'Zoom:', this.game.camera.zoom);
+        console.log('World position:', world.x, world.y);
 
         // Check if there's an entity at this position
         const entity = this.findEntityAt(world.x, world.y);
 
         if (entity) {
             // Double-click on entity = select and approach
+            console.log('Found entity:', entity.name);
             this.game.selectTarget(entity);
             this.game.autopilot?.approach(entity);
         } else {
             // Double-click on empty space = approach that location
+            console.log('Empty space, calling approachPosition');
             this.game.autopilot?.approachPosition(world.x, world.y);
         }
     }
@@ -234,7 +250,7 @@ export class InputManager {
      */
     showContextMenu(e) {
         // Don't show context menu on UI elements
-        if (e.target.closest('.panel, #module-rack, #top-bar, .modal, #context-menu, #drone-bar, #performance-monitor, #locked-targets-container, button')) {
+        if (e.target.closest('.panel, #module-rack, #bottom-bar, .modal, #context-menu, #drone-bar, #performance-monitor, #locked-targets-container, button')) {
             return;
         }
 

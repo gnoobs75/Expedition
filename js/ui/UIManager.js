@@ -976,14 +976,19 @@ export class UIManager {
     handleContextMenuAction(action) {
         const target = this.contextMenuTarget;
         const worldPos = this.contextMenuWorldPos;
+        console.log('handleContextMenuAction:', action, 'target:', target, 'worldPos:', worldPos);
         this.hideContextMenu();
 
         // Handle approach - works with or without target
         if (action === 'approach') {
             if (target) {
+                console.log('Approaching target:', target.name);
                 this.game.autopilot.approach(target);
             } else if (worldPos) {
+                console.log('Approaching worldPos:', worldPos.x, worldPos.y);
                 this.game.autopilot.approachPosition(worldPos.x, worldPos.y);
+            } else {
+                console.log('No target and no worldPos!');
             }
             this.game.audio?.play('click');
             return;

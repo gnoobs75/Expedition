@@ -31,6 +31,17 @@ export class AutopilotSystem {
         const player = this.game.player;
         if (!player || !player.alive) return;
 
+        // Debug: always log command state for first 3 seconds after command is set
+        if (this.command) {
+            if (!this._debugLogCount) this._debugLogCount = 0;
+            if (this._debugLogCount < 60) {
+                console.log('Autopilot.update - command:', this.command, 'targetPosition:', this.targetPosition);
+                this._debugLogCount++;
+            }
+        } else {
+            this._debugLogCount = 0;
+        }
+
         // Handle warping
         if (this.warping) {
             this.updateWarp(dt);
@@ -63,11 +74,13 @@ export class AutopilotSystem {
             }
         }
 
+        console.log('About to switch on command:', this.command);
         switch (this.command) {
             case 'approach':
                 this.updateApproach(player, dt);
                 break;
             case 'approachPosition':
+                console.log('Calling updateApproachPosition');
                 this.updateApproachPosition(player, dt);
                 break;
             case 'orbit':
@@ -115,6 +128,7 @@ export class AutopilotSystem {
      */
     updateApproachPosition(player, dt) {
         if (!this.targetPosition) {
+            console.log('updateApproachPosition: no targetPosition, stopping');
             this.stop();
             return;
         }
@@ -125,8 +139,9 @@ export class AutopilotSystem {
             CONFIG.SECTOR_SIZE
         );
 
-        // Stop when close enough
-        if (dist < 50) {
+        // Stop when very close to destination
+        const stopDistance = player.radius + 5;
+        if (dist < stopDistance) {
             player.stop();
             this.command = null;
             this.targetPosition = null;
@@ -142,6 +157,11 @@ export class AutopilotSystem {
 
         player.desiredRotation = angle;
         player.desiredSpeed = player.maxSpeed;
+
+        // Debug log occasionally
+        if (Math.random() < 0.05) {
+            console.log('updateApproachPosition: dist=', dist, 'angle=', angle, 'desiredSpeed=', player.desiredSpeed, 'currentSpeed=', player.currentSpeed);
+        }
     }
 
     /**
@@ -256,9 +276,19 @@ export class AutopilotSystem {
      * Approach a position in space (no target entity)
      */
     approachPosition(x, y) {
+        console.log('approachPosition called:', x, y);
         this.command = 'approachPosition';
         this.targetPosition = { x, y };
         this.target = null;
+
+        // ULTIMATE DEBUG: Just teleport the player 100 units to the right
+        const player = this.game.player;
+        if (player) {
+            console.log('BEFORE MOVE - player.x:', player.x);
+            player.x += 100;
+            console.log('AFTER MOVE - player.x:', player.x);
+        }
+
         this.game.ui?.log('Approaching location', 'system');
     }
 
@@ -501,8 +531,11 @@ export class AutopilotSystem {
      * Stop all autopilot
      */
     stop() {
+        console.log('AutopilotSystem.stop() called');
+        console.trace('stop() call stack');
         this.command = null;
         this.target = null;
+        this.targetPosition = null; // Also clear targetPosition
 
         if (this.game.player) {
             this.game.player.stop();

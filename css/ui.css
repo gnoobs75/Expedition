@@ -217,31 +217,32 @@ body {
    Top Bar - Ship Status HUD
    ============================================= */
 
-#top-bar {
+/* Bottom HUD Bar */
+#bottom-bar {
     position: absolute;
-    top: 0;
+    bottom: 0;
     left: 0;
     right: 0;
-    height: 60px;
+    height: 70px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     padding: 0 25px;
-    background: linear-gradient(180deg,
+    background: linear-gradient(0deg,
         rgba(0, 20, 40, 0.95) 0%,
         rgba(0, 15, 35, 0.9) 70%,
         rgba(0, 10, 30, 0.7) 100%);
-    border-bottom: 1px solid var(--panel-border);
+    border-top: 1px solid var(--panel-border);
     box-shadow:
-        0 2px 20px rgba(0, 0, 0, 0.5),
-        inset 0 -1px 0 rgba(0, 255, 255, 0.1);
+        0 -2px 20px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(0, 255, 255, 0.1);
 }
 
-/* Top bar subtle scan line */
-#top-bar::before {
+/* Bottom bar subtle scan line */
+#bottom-bar::before {
     content: '';
     position: absolute;
-    bottom: 0;
+    top: 0;
     left: 0;
     right: 0;
     height: 1px;
@@ -251,6 +252,31 @@ body {
         var(--primary-cyan) 80%,
         transparent 100%);
     opacity: 0.3;
+}
+
+/* Left section - Speed */
+#bottom-bar .left-section {
+    position: absolute;
+    left: 25px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Center section - Ship Status */
+#bottom-bar .center-section {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* Right section - ISK, Cargo, Settings */
+#bottom-bar .right-section {
+    position: absolute;
+    right: 25px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
 }
 
 #ship-status {
@@ -389,17 +415,18 @@ body {
 
 /* Speed Display */
 #speed-display {
-    font-size: 28px;
+    font-size: 32px;
     font-weight: bold;
     color: var(--text-primary);
     text-shadow:
         0 0 30px var(--glow-cyan),
         0 0 60px var(--glow-cyan-soft);
     letter-spacing: 2px;
+    min-width: 140px;
 }
 
 #speed-display .unit {
-    font-size: 12px;
+    font-size: 14px;
     color: var(--text-secondary);
     text-shadow: none;
     margin-left: 5px;
@@ -439,7 +466,7 @@ body {
     height: 44px;
     cursor: pointer;
     transition: all var(--transition-normal);
-    margin-left: 20px;
+    margin-left: 10px;
     border-radius: 4px;
     display: flex;
     align-items: center;
@@ -465,7 +492,7 @@ body {
 
 #target-panel {
     position: absolute;
-    top: 80px;
+    top: 20px;
     left: 20px;
     width: 280px;
 }
@@ -533,7 +560,7 @@ body {
 
 #overview-panel {
     position: absolute;
-    top: 80px;
+    top: 20px;
     right: 20px;
     width: 380px;
     max-height: calc(100vh - 220px);
@@ -664,7 +691,7 @@ body {
 
 #module-rack {
     position: absolute;
-    bottom: 25px;
+    bottom: 90px; /* Above the bottom bar (70px) + margin */
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -808,7 +835,7 @@ body {
 
 #event-log {
     position: absolute;
-    bottom: 110px;
+    bottom: 175px; /* Above the bottom bar and module rack */
     left: 20px;
     width: 380px;
     height: 160px;
@@ -1296,7 +1323,7 @@ body {
 
 #dscan-panel {
     position: absolute;
-    top: 80px;
+    top: 20px;
     left: 310px;
     width: 320px;
 }
@@ -1356,7 +1383,7 @@ body {
 
 #bookmarks-panel {
     position: absolute;
-    top: 80px;
+    top: 20px;
     left: 310px;
     width: 280px;
 }
@@ -1802,7 +1829,7 @@ select:focus-visible {
 
 #object-viewer {
     position: absolute;
-    top: 80px;
+    top: 20px;
     left: 310px;
     width: 300px;
     max-height: 450px;
@@ -1971,7 +1998,7 @@ select:focus-visible {
 /* Move mode indicator */
 #move-mode-indicator {
     position: fixed;
-    top: 70px;
+    top: 20px;
     left: 50%;
     transform: translateX(-50%);
     background: linear-gradient(180deg, rgba(255, 170, 0, 0.3) 0%, rgba(255, 170, 0, 0.1) 100%);
@@ -2089,7 +2116,7 @@ select:focus-visible {
 
 #locked-targets-container {
     position: absolute;
-    top: 80px;
+    top: 20px;
     left: 320px;
     z-index: 20;
     min-width: 100px;
@@ -2244,7 +2271,7 @@ select:focus-visible {
 
 #ship-indicator {
     position: absolute;
-    bottom: 120px;
+    bottom: 185px; /* Above the bottom bar */
     left: 20px;
     z-index: 20;
     width: 100px;
@@ -2330,7 +2357,7 @@ select:focus-visible {
 
 #drone-bar {
     position: absolute;
-    bottom: 120px;
+    bottom: 185px; /* Above the bottom bar */
     left: 140px;
     z-index: 20;
     min-width: 150px;
@@ -2407,7 +2434,7 @@ select:focus-visible {
 
 #performance-monitor {
     position: absolute;
-    top: 80px;
+    top: 20px;
     right: 20px;
     z-index: 30;
     width: 200px;

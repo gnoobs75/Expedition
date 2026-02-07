@@ -462,11 +462,16 @@ export class Drone extends Entity {
         shape.lineTo(0, -size * 0.6);
         shape.closePath();
 
-        const geometry = new THREE.ShapeGeometry(shape);
-        const material = new THREE.MeshBasicMaterial({
+        const geometry = new THREE.ExtrudeGeometry(shape, { depth: size * 0.08, bevelEnabled: true, bevelThickness: size * 0.02, bevelSize: size * 0.01, bevelSegments: 1 });
+        geometry.center();
+        const material = new THREE.MeshStandardMaterial({
             color: this.color,
+            emissive: this.color,
+            emissiveIntensity: 0.15,
             transparent: true,
             opacity: 0.9,
+            roughness: 0.4,
+            metalness: 0.4,
         });
 
         this.mesh = new THREE.Mesh(geometry, material);

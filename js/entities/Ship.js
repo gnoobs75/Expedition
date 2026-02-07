@@ -849,11 +849,24 @@ export class Ship extends Entity {
         shape.lineTo(-size * 0.7, -size * 0.5);
         shape.closePath();
 
-        const geometry = new THREE.ShapeGeometry(shape);
-        const material = new THREE.MeshBasicMaterial({
+        // Extrude for 3D depth — cap to prevent thick dark side faces on large ships
+        const extrudeSettings = {
+            depth: Math.min(size * 0.1, 6),
+            bevelEnabled: true,
+            bevelThickness: Math.min(size * 0.02, 1.5),
+            bevelSize: Math.min(size * 0.015, 1),
+            bevelSegments: 1,
+        };
+        const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        geometry.center();
+        const material = new THREE.MeshStandardMaterial({
             color: this.color,
+            emissive: this.color,
+            emissiveIntensity: 0.15,
             transparent: true,
             opacity: 0.9,
+            roughness: 0.6,
+            metalness: 0.3,
         });
 
         this.mesh = new THREE.Mesh(geometry, material);

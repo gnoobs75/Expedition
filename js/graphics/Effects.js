@@ -6,9 +6,10 @@
 import { CONFIG } from '../config.js';
 
 export class Effects {
-    constructor(game, group) {
+    constructor(game, group, lightPool = null) {
         this.game = game;
         this.group = group;
+        this.lightPool = lightPool;
 
         // Active effects
         this.effects = [];
@@ -98,6 +99,9 @@ export class Effects {
         const color = options.color || 0xff6600;
         const size = options.size || 1;
 
+        // Dynamic light for explosion illumination
+        this.lightPool?.spawn(x, y, color, 2.0 * size, 0.5, 500 * size);
+
         for (let i = 0; i < count; i++) {
             const particle = this.getParticle();
             if (!particle) break;
@@ -169,6 +173,9 @@ export class Effects {
         const count = options.count || 5;
         const color = options.color || 0xffaa00;
 
+        // Dynamic light for impact flash
+        this.lightPool?.spawn(x, y, color, 0.8, 0.2, 200);
+
         for (let i = 0; i < count; i++) {
             const particle = this.getParticle();
             if (!particle) break;
@@ -197,6 +204,9 @@ export class Effects {
      * Spawn shield hit effect (ring ripple)
      */
     spawnShieldHit(x, y, options = {}) {
+        // Dynamic light for shield flash
+        this.lightPool?.spawn(x, y, 0x00aaff, 1.2, 0.3, 250);
+
         const effect = {
             type: 'shield-ripple',
             x, y,
@@ -312,6 +322,9 @@ export class Effects {
     spawnLaserEffect(x, y, options = {}) {
         const target = options.target;
         if (!target) return;
+
+        // Dynamic light at muzzle point
+        this.lightPool?.spawn(x, y, options.color || 0x00ffff, 0.6, 0.15, 150);
 
         const effect = {
             type: 'laser',

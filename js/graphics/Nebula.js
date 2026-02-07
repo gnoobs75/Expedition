@@ -80,7 +80,8 @@ export class Nebula {
             });
 
             const blob = new THREE.Mesh(geometry, material);
-            blob.position.set(x, y, -60 - i * 0.5);
+            // Vary z-depth more dramatically for parallax depth feel
+            blob.position.set(x, y, -55 - i * 1.5 - phaseOffset * 20);
 
             group.add(blob);
         }

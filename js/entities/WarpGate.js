@@ -72,16 +72,25 @@ export class WarpGate extends Entity {
     createMesh() {
         const group = new THREE.Group();
 
-        // Outer ring structure
-        const outerRingGeometry = new THREE.RingGeometry(
-            this.radius * 0.9,
-            this.radius,
-            6
-        );
-        const outerRingMaterial = new THREE.MeshBasicMaterial({
+        // Outer ring structure - extruded for 3D depth
+        const ringShape = new THREE.Shape();
+        const ringOuter = this.radius;
+        const ringInner = this.radius * 0.9;
+        ringShape.absarc(0, 0, ringOuter, 0, Math.PI * 2, false);
+        const ringHole = new THREE.Path();
+        ringHole.absarc(0, 0, ringInner, 0, Math.PI * 2, true);
+        ringShape.holes.push(ringHole);
+        const outerRingGeometry = new THREE.ExtrudeGeometry(ringShape, {
+            depth: Math.min(this.radius * 0.06, 6),
+            bevelEnabled: false,
+        });
+        outerRingGeometry.center();
+        const outerRingMaterial = new THREE.MeshStandardMaterial({
             color: 0x445566,
-            transparent: true,
-            opacity: 0.9,
+            emissive: 0x445566,
+            emissiveIntensity: 0.1,
+            roughness: 0.4,
+            metalness: 0.6,
         });
         const outerRing = new THREE.Mesh(outerRingGeometry, outerRingMaterial);
         group.add(outerRing);

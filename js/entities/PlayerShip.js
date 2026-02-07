@@ -170,8 +170,9 @@ export class PlayerShip extends Ship {
         hullShape.lineTo(-size * 0.6, -size * 0.6);
         hullShape.closePath();
 
-        const geo = new THREE.ShapeGeometry(hullShape);
-        const mat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.9 });
+        const geo = new THREE.ExtrudeGeometry(hullShape, { depth: Math.min(size * 0.1, 6), bevelEnabled: true, bevelThickness: Math.min(size * 0.02, 1.5), bevelSize: Math.min(size * 0.015, 1), bevelSegments: 1 });
+        geo.center();
+        const mat = new THREE.MeshStandardMaterial({ color: 0x00aaff, emissive: 0x00aaff, emissiveIntensity: 0.15, transparent: true, opacity: 0.9, roughness: 0.5, metalness: 0.3 });
         group.add(new THREE.Mesh(geo, mat));
         this.engineMeshes = null;
         return group;

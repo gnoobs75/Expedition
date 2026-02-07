@@ -1,12 +1,17 @@
 // =============================================
 // Three.js Renderer
 // Handles all rendering with orthographic camera
+// 3D-enhanced with camera tilt, dynamic lights, and shadows
 // =============================================
 
 import { CONFIG } from '../config.js';
 import { StarField } from './StarField.js';
 import { Nebula } from './Nebula.js';
 import { Effects } from './Effects.js';
+import { LightPool } from './LightPool.js';
+
+// Camera tilt angle in radians (~12 degrees)
+const CAMERA_TILT = 0.21;
 
 export class Renderer {
     constructor(game) {
@@ -27,9 +32,13 @@ export class Renderer {
         this.starField = null;
         this.nebula = null;
         this.effects = null;
+        this.lightPool = null;
 
         // Entity mesh tracking
         this.entityMeshes = new Map();
+
+        // Shadow tracking
+        this.entityShadows = new Map();
 
         // Selection indicator
         this.selectionMesh = null;
@@ -38,14 +47,16 @@ export class Renderer {
         // Lighting
         this.hemisphereLight = null;
         this.directionalLight = null;
+
+        // Raycaster for tilted coordinate conversion
+        this._raycaster = null;
+        this._groundPlane = null;
     }
 
     /**
      * Initialize the renderer
      */
     async init() {
-        // Initialize Three.js renderer
-
         // Create scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x000811);
@@ -63,6 +74,12 @@ export class Renderer {
             1000
         );
         this.camera.position.z = 100;
+        // Apply slight downward tilt to reveal 3D geometry
+        this.camera.rotation.x = -CAMERA_TILT;
+
+        // Setup raycaster and ground plane for tilted coordinate conversion
+        this._raycaster = new THREE.Raycaster();
+        this._groundPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 
         // Create WebGL renderer
         this.renderer = new THREE.WebGLRenderer({
@@ -71,6 +88,11 @@ export class Renderer {
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // Color space for correct output — NO tone mapping since this scene mixes
+        // MeshBasicMaterial (nebula, particles, UI) with MeshStandardMaterial (ships, stations).
+        // ACES tone mapping washes out the BasicMaterial colors.
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
 
         // Add to DOM
         const container = document.getElementById('game-container');
@@ -87,6 +109,9 @@ export class Renderer {
         this.scene.add(this.effectsGroup);
         this.scene.add(this.uiGroup);
 
+        // Counter-rotate background so stars/nebula stay "flat" behind the action
+        this.backgroundGroup.rotation.x = CAMERA_TILT;
+
         // Create starfield
         this.starField = new StarField(this.game);
         this.backgroundGroup.add(this.starField.mesh);
@@ -95,19 +120,23 @@ export class Renderer {
         this.nebula = new Nebula(this.game);
         this.backgroundGroup.add(this.nebula.mesh);
 
-        // Create effects manager
-        this.effects = new Effects(this.game, this.effectsGroup);
+        // Create dynamic light pool
+        this.lightPool = new LightPool(this.scene);
+
+        // Create effects manager (pass lightPool for dynamic illumination)
+        this.effects = new Effects(this.game, this.effectsGroup, this.lightPool);
 
         // Create selection indicators
         this.createSelectionIndicators();
 
-        // Setup lighting for 3D asteroids
+        // Setup lighting for 3D objects
         this.setupLighting();
+
+        // Create vignette overlay
+        this.createVignette();
 
         // Handle window resize
         window.addEventListener('resize', this.onResize.bind(this));
-
-        // Renderer ready
     }
 
     /**
@@ -164,25 +193,58 @@ export class Renderer {
     }
 
     /**
-     * Setup lighting for 3D objects (asteroids)
+     * Setup lighting for 3D objects
      */
     setupLighting() {
-        // Hemisphere light for ambient fill (sky color / ground color)
-        this.hemisphereLight = new THREE.HemisphereLight(0x8888ff, 0x222244, 0.6);
+        // Hemisphere light for ambient base — moderate so MeshStandardMaterial
+        // colors stay close to their assigned hex values
+        this.hemisphereLight = new THREE.HemisphereLight(0x8888ff, 0x222244, 0.4);
         this.scene.add(this.hemisphereLight);
 
-        // Directional light for shadows and depth (positioned above/in front)
-        this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        this.directionalLight.position.set(0, 0, 500);
+        // Directional light from above — creates depth shading on extruded faces
+        this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        this.directionalLight.position.set(100, 200, 800);
         this.scene.add(this.directionalLight);
+    }
+
+    /**
+     * Create vignette overlay mesh (darkened edges for atmospheric depth)
+     */
+    createVignette() {
+        // Use a screen-space quad with radial gradient texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+
+        const gradient = ctx.createRadialGradient(256, 256, 100, 256, 256, 360);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(0.6, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(0.85, 'rgba(0, 4, 12, 0.3)');
+        gradient.addColorStop(1.0, 'rgba(0, 4, 12, 0.6)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 512, 512);
+
+        this._vignetteTexture = new THREE.CanvasTexture(canvas);
+
+        // Use a CSS overlay instead — cheaper and resolution-independent
+        const vignetteEl = document.createElement('div');
+        vignetteEl.id = 'vignette-overlay';
+        vignetteEl.style.cssText = `
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            box-shadow: inset 0 0 250px 80px rgba(0, 4, 12, 0.5);
+            z-index: 1;
+        `;
+        document.getElementById('game-container').appendChild(vignetteEl);
     }
 
     /**
      * Load a sector's entities into the scene
      */
     loadSector(sector) {
-        // Load sector entities into renderer
-
         // Update nebula for this sector
         this.nebula.setSeed(sector.seed);
 
@@ -208,8 +270,17 @@ export class Renderer {
         }
         this.entityMeshes.clear();
 
-        // Clear effects
+        // Remove all shadows
+        for (const [entity, shadow] of this.entityShadows) {
+            this.entityGroup.remove(shadow);
+            shadow.geometry.dispose();
+            shadow.material.dispose();
+        }
+        this.entityShadows.clear();
+
+        // Clear effects and lights
         this.effects.clear();
+        this.lightPool.clear();
     }
 
     /**
@@ -222,7 +293,33 @@ export class Renderer {
         if (mesh) {
             this.entityGroup.add(mesh);
             this.entityMeshes.set(entity, mesh);
+
+            // Create shadow for ships, stations, and asteroids
+            this.createEntityShadow(entity);
         }
+    }
+
+    /**
+     * Create a shadow beneath an entity
+     */
+    createEntityShadow(entity) {
+        if (this.entityShadows.has(entity)) return;
+
+        const r = entity.radius || 20;
+        // Elliptical shadow - wider than tall to match tilt perspective
+        const shadowGeo = new THREE.CircleGeometry(r * 1.2, 16);
+        const shadowMat = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.25,
+            depthWrite: false,
+        });
+        const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+        shadow.position.set(entity.x, entity.y - r * 0.15, -0.5);
+        shadow.scale.y = 0.6; // Squash vertically for perspective shadow
+        shadow.renderOrder = -1;
+        this.entityGroup.add(shadow);
+        this.entityShadows.set(entity, shadow);
     }
 
     /**
@@ -234,6 +331,15 @@ export class Renderer {
             this.entityGroup.remove(mesh);
             this.disposeMesh(mesh);
             this.entityMeshes.delete(entity);
+        }
+
+        // Remove shadow too
+        const shadow = this.entityShadows.get(entity);
+        if (shadow) {
+            this.entityGroup.remove(shadow);
+            shadow.geometry.dispose();
+            shadow.material.dispose();
+            this.entityShadows.delete(entity);
         }
     }
 
@@ -263,6 +369,9 @@ export class Renderer {
         // Update entity meshes
         this.updateEntityMeshes();
 
+        // Update entity shadows
+        this.updateEntityShadows();
+
         // Update selection indicators
         this.updateSelectionIndicators();
 
@@ -274,6 +383,9 @@ export class Renderer {
 
         // Update effects
         this.effects.update(1 / 60);
+
+        // Update dynamic lights
+        this.lightPool.update(1 / 60);
 
         // Render the scene
         this.renderer.render(this.scene, this.camera);
@@ -291,10 +403,6 @@ export class Renderer {
         const aspect = window.innerWidth / window.innerHeight;
 
         // Update orthographic frustum based on zoom
-        // Higher zoom = smaller view (more zoomed in)
-        // At zoom=500 (default), view is ~2000 units tall - good for local combat
-        // At zoom=50 (zoomed out), view is ~20000 units - full sector view
-        // At zoom=8000 (zoomed in), view is ~125 units - close tactical
         const viewHeight = 1000000 / zoom;
         const viewWidth = viewHeight * aspect;
 
@@ -330,6 +438,19 @@ export class Renderer {
                     this.addEntityMesh(entity);
                 }
             }
+        }
+    }
+
+    /**
+     * Update shadow positions to follow entities
+     */
+    updateEntityShadows() {
+        for (const [entity, shadow] of this.entityShadows) {
+            if (!entity.alive) continue;
+            const r = entity.radius || 20;
+            // Shadow offset slightly below entity to simulate light from upper-front
+            shadow.position.set(entity.x, entity.y - r * 0.15, -0.5);
+            shadow.visible = entity.visible && entity.alive;
         }
     }
 
@@ -404,15 +525,25 @@ export class Renderer {
 
     /**
      * Convert screen coordinates to world coordinates
+     * Accounts for camera tilt by ray-plane intersection
      */
     screenToWorld(screenX, screenY) {
         const rect = this.renderer.domElement.getBoundingClientRect();
-        const x = ((screenX - rect.left) / rect.width) * 2 - 1;
-        const y = -((screenY - rect.top) / rect.height) * 2 + 1;
+        const ndcX = ((screenX - rect.left) / rect.width) * 2 - 1;
+        const ndcY = -((screenY - rect.top) / rect.height) * 2 + 1;
 
-        const vector = new THREE.Vector3(x, y, 0);
+        // For tilted orthographic camera, cast a ray and intersect with z=0 plane
+        this._raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+        const intersection = new THREE.Vector3();
+        const result = this._raycaster.ray.intersectPlane(this._groundPlane, intersection);
+
+        if (result) {
+            return { x: intersection.x, y: intersection.y };
+        }
+
+        // Fallback: untilted projection
+        const vector = new THREE.Vector3(ndcX, ndcY, 0);
         vector.unproject(this.camera);
-
         return { x: vector.x, y: vector.y };
     }
 

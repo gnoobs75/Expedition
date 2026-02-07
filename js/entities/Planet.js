@@ -96,12 +96,14 @@ export class Planet extends Entity {
     createMesh() {
         const group = new THREE.Group();
 
-        // Main planet body
-        const planetGeometry = new THREE.CircleGeometry(this.radius, 32);
-        const planetMaterial = new THREE.MeshBasicMaterial({
+        // Main planet body - flat disc with PBR material for subtle 3D shading
+        // SphereGeometry can't be used: planets have radius up to 2000,
+        // which would extend far beyond the camera at z=100
+        const planetGeometry = new THREE.CircleGeometry(this.radius, 64);
+        const planetMaterial = new THREE.MeshStandardMaterial({
             color: this.planetColor,
-            transparent: true,
-            opacity: 0.9,
+            roughness: 0.8,
+            metalness: 0.1,
         });
         const planet = new THREE.Mesh(planetGeometry, planetMaterial);
         group.add(planet);

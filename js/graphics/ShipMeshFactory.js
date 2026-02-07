@@ -228,26 +228,30 @@ class ShipMeshFactory {
                 shape.closePath();
         }
 
-        // Base hull layer
+        // Base hull layer - always extruded for 3D depth
+        // Cap extrusion depth so large ships don't have overly thick dark side faces
         let geometry;
-        if (detailLevel === 'high') {
-            const extrudeSettings = {
-                depth: s * 0.2,
-                bevelEnabled: true,
-                bevelThickness: s * 0.05,
-                bevelSize: s * 0.03,
-                bevelSegments: 2,
-            };
-            geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-            geometry.center();
-        } else {
-            geometry = new THREE.ShapeGeometry(shape);
-        }
+        const extrudeDepth = Math.min(s * 0.12, 8);
+        const bevelThick = Math.min(s * 0.03, 2);
+        const bevelSize = Math.min(s * 0.02, 1.5);
+        const extrudeSettings = {
+            depth: extrudeDepth,
+            bevelEnabled: true,
+            bevelThickness: bevelThick,
+            bevelSize: bevelSize,
+            bevelSegments: 1,
+        };
+        geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        geometry.center();
 
-        const material = new THREE.MeshBasicMaterial({
+        const material = new THREE.MeshStandardMaterial({
             color: palette.primary,
+            emissive: palette.primary,
+            emissiveIntensity: 0.15,
             transparent: true,
             opacity: 0.92,
+            roughness: 0.55,
+            metalness: 0.35,
         });
 
         const hull = new THREE.Mesh(geometry, material);
@@ -256,13 +260,17 @@ class ShipMeshFactory {
 
         // Inner hull plating (slightly smaller, different shade)
         const innerShape = this.scaleShape(shape, 0.8);
-        const innerGeo = detailLevel === 'high'
-            ? (() => { const g = new THREE.ExtrudeGeometry(innerShape, { depth: s * 0.22, bevelEnabled: false }); g.center(); return g; })()
-            : new THREE.ShapeGeometry(innerShape);
-        const innerMat = new THREE.MeshBasicMaterial({
+        const innerExtSettings = { depth: Math.min(s * 0.14, 9), bevelEnabled: false };
+        const innerGeo = new THREE.ExtrudeGeometry(innerShape, innerExtSettings);
+        innerGeo.center();
+        const innerMat = new THREE.MeshStandardMaterial({
             color: palette.secondary,
+            emissive: palette.secondary,
+            emissiveIntensity: 0.1,
             transparent: true,
             opacity: 0.65,
+            roughness: 0.5,
+            metalness: 0.3,
         });
         const innerHull = new THREE.Mesh(innerGeo, innerMat);
         innerHull.position.z = 0.02;

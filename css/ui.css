@@ -560,39 +560,16 @@ body {
 
 #overview-panel {
     position: absolute;
-    top: 20px;
-    right: 20px;
+    top: 10px;
+    right: 10px;
     width: 380px;
-    max-height: calc(100vh - 220px);
+    height: calc(100vh - 220px);
+    min-width: 280px;
+    min-height: 200px;
     display: flex;
     flex-direction: column;
-}
-
-/* Docked Overview Panel - Fixed to right side full height */
-#overview-panel.docked {
-    position: fixed !important;
-    right: 0 !important;
-    top: 60px !important;
-    bottom: 0 !important;
-    left: auto !important;
-    width: 320px;
-    max-height: none;
-    height: auto;
-    margin: 0;
-    border-radius: 0;
-    border-right: none;
-    border-top: none;
-    border-bottom: none;
-}
-
-#overview-panel.docked .panel-header {
-    cursor: default;
-}
-
-#overview-panel.docked .panel-content {
-    flex: 1;
-    max-height: none;
-    height: calc(100vh - 110px);
+    resize: both;
+    overflow: hidden;
 }
 
 #overview-filters {
@@ -629,6 +606,7 @@ body {
 #overview-panel .panel-content {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 0;
 }
 
@@ -678,6 +656,7 @@ body {
 
 #overview-table tr.hostile td { color: var(--hostile-color); }
 #overview-table tr.friendly td { color: var(--friendly-color); }
+#overview-table tr.neutral td { color: #88aacc; }
 
 .overview-icon {
     width: 20px;
@@ -839,11 +818,18 @@ body {
     left: 20px;
     width: 380px;
     height: 160px;
+    min-width: 250px;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    resize: both;
+    overflow: hidden;
 }
 
 #event-log .panel-content {
-    height: calc(100% - 40px);
+    flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 8px 12px;
 }
 
@@ -2050,6 +2036,25 @@ select:focus-visible {
     box-shadow:
         0 0 50px rgba(255, 170, 0, 0.5),
         0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Panel resize handle */
+#overview-panel::-webkit-resizebar,
+#event-log::-webkit-resizebar {
+    background: var(--panel-border);
+}
+
+#overview-panel::after,
+#event-log::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 10px;
+    height: 10px;
+    border-right: 2px solid rgba(0, 255, 255, 0.3);
+    border-bottom: 2px solid rgba(0, 255, 255, 0.3);
+    pointer-events: none;
 }
 
 /* =============================================
@@ -3321,4 +3326,100 @@ select:focus-visible {
 
 .map-control-btn:active {
     transform: scale(0.95);
+}
+
+/* =============================================
+   Miss Indicator
+   ============================================= */
+
+.damage-number.miss {
+    color: #888888;
+    font-style: italic;
+    font-size: 14px;
+    text-shadow: 0 0 6px rgba(136, 136, 136, 0.5);
+}
+
+/* =============================================
+   Toast Notifications
+   ============================================= */
+
+#toast-container {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.toast {
+    background: var(--panel-bg-solid);
+    border: 1px solid var(--panel-border);
+    border-left: 3px solid var(--primary-cyan);
+    padding: 10px 16px;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    max-width: 300px;
+    animation: toast-in 0.3s ease-out, toast-out 0.3s ease-in 2.7s forwards;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 255, 255, 0.05);
+}
+
+.toast.warning {
+    border-left-color: var(--armor-color);
+    color: var(--armor-color);
+}
+
+.toast.error {
+    border-left-color: var(--hull-color);
+    color: var(--hull-color);
+}
+
+.toast.success {
+    border-left-color: var(--friendly-color);
+    color: var(--friendly-color);
+}
+
+@keyframes toast-in {
+    0% {
+        opacity: 0;
+        transform: translateX(40px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes toast-out {
+    0% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(40px);
+    }
+}
+
+/* =============================================
+   Context Menu Animation
+   ============================================= */
+
+#context-menu:not(.hidden) {
+    animation: context-menu-in 0.12s ease-out;
+}
+
+@keyframes context-menu-in {
+    0% {
+        opacity: 0;
+        transform: scale(0.95) translateY(-4px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
 }

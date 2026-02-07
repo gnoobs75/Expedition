@@ -173,5 +173,13 @@ export class Asteroid extends Entity {
 
         // Slow rotation on Y axis for visual interest
         this.mesh.rotation.y += this.rotationSpeed * 0.016;
+
+        // Visual depletion — shrink and dim as ore is mined
+        const orePercent = this.ore / this.maxOre;
+        const scaleFactor = 0.4 + orePercent * 0.6; // 40% to 100% of original size
+        this.mesh.scale.setScalar(scaleFactor);
+        if (this.mesh.material) {
+            this.mesh.material.opacity = 0.4 + orePercent * 0.6;
+        }
     }
 }

@@ -45,8 +45,8 @@ export class InputManager {
         window.addEventListener('mousedown', this.onMouseDown.bind(this));
         window.addEventListener('mouseup', this.onMouseUp.bind(this));
 
-        // Wheel on game container for zooming
-        gameContainer.addEventListener('wheel', this.onWheel.bind(this));
+        // Wheel on window for zooming (game container may be behind overlay)
+        window.addEventListener('wheel', this.onWheel.bind(this), { passive: false });
 
         // Click on window for selection (will filter UI elements in handler)
         window.addEventListener('click', this.onClick.bind(this));
@@ -72,27 +72,35 @@ export class InputManager {
 
     /**
      * Convert screen coordinates to world coordinates
+     * Must match Renderer.updateCamera frustum: viewHeight = 1000000 / zoom
      */
     screenToWorld(screenX, screenY) {
         const camera = this.game.camera;
         if (!camera) return { x: screenX, y: screenY };
 
+        const viewHeight = 1000000 / camera.zoom;
+        const viewWidth = viewHeight * (window.innerWidth / window.innerHeight);
+
         return {
-            x: (screenX - window.innerWidth / 2) / camera.zoom + camera.x,
-            y: (screenY - window.innerHeight / 2) / camera.zoom + camera.y,
+            x: ((screenX - window.innerWidth / 2) / window.innerWidth) * viewWidth + camera.x,
+            y: -((screenY - window.innerHeight / 2) / window.innerHeight) * viewHeight + camera.y,
         };
     }
 
     /**
      * Convert world coordinates to screen coordinates
+     * Inverse of screenToWorld
      */
     worldToScreen(worldX, worldY) {
         const camera = this.game.camera;
         if (!camera) return { x: worldX, y: worldY };
 
+        const viewHeight = 1000000 / camera.zoom;
+        const viewWidth = viewHeight * (window.innerWidth / window.innerHeight);
+
         return {
-            x: (worldX - camera.x) * camera.zoom + window.innerWidth / 2,
-            y: (worldY - camera.y) * camera.zoom + window.innerHeight / 2,
+            x: ((worldX - camera.x) / viewWidth) * window.innerWidth + window.innerWidth / 2,
+            y: -((worldY - camera.y) / viewHeight) * window.innerHeight + window.innerHeight / 2,
         };
     }
 
@@ -116,18 +124,14 @@ export class InputManager {
     }
 
     onMouseDown(e) {
-        // Check if this is a game area interaction
-        const isGameAreaClick = e.target.closest('#game-container') || e.target.tagName === 'CANVAS';
-        const isUIClick = e.target.closest('.panel, #module-rack, #bottom-bar, .modal, #context-menu, #ship-indicator, #drone-bar, #performance-monitor, #locked-targets-container');
-
         if (e.button === 0) {
             this.mouse.down = true;
             this.mouse.dragStart.x = e.clientX;
             this.mouse.dragStart.y = e.clientY;
         } else if (e.button === 2) {
             this.mouse.rightDown = true;
-            // Only show context menu for game area right-clicks
-            if (isGameAreaClick && !isUIClick) {
+            // Only show context menu if not clicking on UI
+            if (!this.isClickOnUI(e)) {
                 this.showContextMenu(e);
             }
         }
@@ -142,42 +146,27 @@ export class InputManager {
         }
     }
 
-    onClick(e) {
-        console.log('onClick - target:', e.target.tagName, e.target.id, e.target.className);
+    /**
+     * Check if a click event is on an interactive UI element (not game world)
+     */
+    isClickOnUI(e) {
+        return !!e.target.closest('.panel:not(.hidden), #module-rack, #bottom-bar, .modal:not(.hidden), #context-menu:not(.hidden), #ship-indicator, #drone-bar:not(.hidden), #performance-monitor, #locked-targets-container, button, .menu-item');
+    }
 
+    onClick(e) {
         // Don't select if we were dragging
         if (this.mouse.dragging) return;
 
-        // Check if clicking on actual UI elements that should block clicks
-        const isUIClick = e.target.closest('.panel, #module-rack, #bottom-bar, .modal, #context-menu, #ship-indicator, #drone-bar, #performance-monitor, #locked-targets-container, button, .menu-item');
-
-        if (isUIClick) {
-            console.log('onClick - blocked by UI element');
-            return;
-        }
-
-        // If we're clicking on ui-overlay itself (empty space) or game-container/canvas, it's a game click
-        const isGameAreaClick = e.target.id === 'ui-overlay' ||
-                                e.target.id === 'game-container' ||
-                                e.target.closest('#game-container') ||
-                                e.target.tagName === 'CANVAS';
-
-        if (!isGameAreaClick) {
-            console.log('onClick - not a game area click');
-            return;
-        }
-
-        console.log('onClick - valid game area click, finding entity...');
+        // Block clicks on interactive UI elements
+        if (this.isClickOnUI(e)) return;
 
         // Find clicked entity
         const world = this.screenToWorld(e.clientX, e.clientY);
         const entity = this.findEntityAt(world.x, world.y);
 
         if (entity) {
-            console.log('onClick - found entity:', entity.name);
             this.game.selectTarget(entity);
         } else {
-            console.log('onClick - no entity at position');
             this.game.selectTarget(null);
         }
     }
@@ -186,32 +175,19 @@ export class InputManager {
      * Handle double-click for approach
      */
     onDoubleClick(e) {
-        console.log('onDoubleClick fired, target:', e.target.tagName, e.target.id, e.target.className);
-
-        // Check if clicking on actual UI elements that should block the action
-        const blockedElements = '.panel, #module-rack, #bottom-bar, .modal, #context-menu, #ship-indicator, #drone-bar, #performance-monitor, #locked-targets-container, button, .menu-item, .submenu-item';
-        if (e.target.closest(blockedElements)) {
-            console.log('Blocked by UI element');
-            return;
-        }
+        // Block on interactive UI elements
+        if (this.isClickOnUI(e)) return;
 
         // Get world position of double-click
         const world = this.screenToWorld(e.clientX, e.clientY);
-        console.log('Screen click:', e.clientX, e.clientY, 'Window center:', window.innerWidth/2, window.innerHeight/2);
-        console.log('Camera:', this.game.camera.x, this.game.camera.y, 'Zoom:', this.game.camera.zoom);
-        console.log('World position:', world.x, world.y);
 
         // Check if there's an entity at this position
         const entity = this.findEntityAt(world.x, world.y);
 
         if (entity) {
-            // Double-click on entity = select and approach
-            console.log('Found entity:', entity.name);
             this.game.selectTarget(entity);
             this.game.autopilot?.approach(entity);
         } else {
-            // Double-click on empty space = approach that location
-            console.log('Empty space, calling approachPosition');
             this.game.autopilot?.approachPosition(world.x, world.y);
         }
     }
@@ -223,8 +199,10 @@ export class InputManager {
         const entities = this.game.getVisibleEntities();
         const camera = this.game.camera;
 
-        // Calculate click radius based on zoom
-        const clickRadius = 30 / camera.zoom;
+        // Calculate click radius in world units (30 screen pixels)
+        const viewHeight = 1000000 / camera.zoom;
+        const pixelToWorld = viewHeight / window.innerHeight;
+        const clickRadius = 30 * pixelToWorld;
 
         let closest = null;
         let closestDist = Infinity;
@@ -249,10 +227,7 @@ export class InputManager {
      * Show context menu for right-click
      */
     showContextMenu(e) {
-        // Don't show context menu on UI elements
-        if (e.target.closest('.panel, #module-rack, #bottom-bar, .modal, #context-menu, #drone-bar, #performance-monitor, #locked-targets-container, button')) {
-            return;
-        }
+        // Already filtered by onMouseDown via isClickOnUI
 
         // Find entity under cursor
         const world = this.screenToWorld(e.clientX, e.clientY);
@@ -268,6 +243,9 @@ export class InputManager {
     }
 
     onWheel(e) {
+        // Don't zoom when scrolling inside UI panels
+        if (this.isClickOnUI(e)) return;
+
         e.preventDefault();
 
         const zoomDelta = e.deltaY > 0 ? -1 : 1;
@@ -363,14 +341,18 @@ export class InputManager {
         const action = keyBindings.getAction(keyStr);
 
         if (!action) {
-            // Check for Escape to toggle settings
+            // Check for Escape to close context menu, settings, or deselect
             if (e.code === 'Escape') {
-                if (settingsOpen) {
+                // Priority: context menu > settings > deselect
+                const contextMenu = document.getElementById('context-menu');
+                const contextMenuOpen = contextMenu && !contextMenu.classList.contains('hidden');
+
+                if (contextMenuOpen) {
+                    this.game.ui?.hideContextMenu();
+                } else if (settingsOpen) {
                     this.game.ui?.hideSettings();
                 } else {
-                    // Regular escape behavior - deselect
                     this.game.selectTarget(null);
-                    this.game.ui?.hideContextMenu();
                 }
             }
             return;

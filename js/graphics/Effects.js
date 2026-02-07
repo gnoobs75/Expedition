@@ -139,6 +139,27 @@ export class Effects {
             flash.userData.shrink = true;
             flash.userData.startScale = size * 5;
         }
+
+        // Add expanding shockwave ring
+        const ringEffect = {
+            type: 'shockwave',
+            x, y,
+            life: 0,
+            maxLife: 0.5,
+            size: size,
+            mesh: null,
+        };
+        const ringGeo = new THREE.RingGeometry(size * 5, size * 5 + 4, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.6,
+            side: THREE.DoubleSide,
+        });
+        ringEffect.mesh = new THREE.Mesh(ringGeo, ringMat);
+        ringEffect.mesh.position.set(x, y, 10);
+        this.group.add(ringEffect.mesh);
+        this.effects.push(ringEffect);
     }
 
     /**
@@ -382,6 +403,15 @@ export class Effects {
                 case 'laser':
                     if (effect.mesh) {
                         effect.mesh.material.opacity = 0.9 * (1 - progress);
+                    }
+                    break;
+
+                case 'shockwave':
+                    if (effect.mesh) {
+                        // Expand rapidly and fade
+                        const expandScale = 1 + progress * 8;
+                        effect.mesh.scale.setScalar(expandScale);
+                        effect.mesh.material.opacity = 0.6 * (1 - progress);
                     }
                     break;
             }

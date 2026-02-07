@@ -253,6 +253,29 @@ export const CONFIG = {
         deadly: { enemyCount: 15, asteroidDensity: 0.2, name: 'Deadly Zone' },
     },
 
+    // NPC Ecosystem
+    NPC_MINERS: {
+        hub: { count: 7, shipClass: 'frigate', droneCount: 2 },
+        safe: { count: 5, shipClass: 'frigate', droneCount: 2 },
+        normal: { count: 3, shipClass: 'frigate', droneCount: 2 },
+        dangerous: { count: 1, shipClass: 'frigate', droneCount: 1 },
+        deadly: { count: 0, shipClass: 'frigate', droneCount: 0 },
+    },
+    NPC_SECURITY: {
+        hub: { count: 3, shipClass: 'cruiser' },
+        safe: { count: 2, shipClass: 'cruiser' },
+        normal: { count: 2, shipClass: 'frigate' },
+        dangerous: { count: 1, shipClass: 'frigate' },
+        deadly: { count: 0, shipClass: 'frigate' },
+    },
+    NPC_PIRATE_RAIDS: {
+        hub: { chance: 0, interval: 999, maxPirates: 0 },
+        safe: { chance: 0.15, interval: 180, maxPirates: 1 },
+        normal: { chance: 0.3, interval: 180, maxPirates: 2 },
+        dangerous: { chance: 0.5, interval: 180, maxPirates: 3 },
+        deadly: { chance: 0.7, interval: 180, maxPirates: 3 },
+    },
+
     // Colors
     COLORS: {
         primary: 0x00ffff,
@@ -260,6 +283,8 @@ export const CONFIG = {
         hostile: 0xff4444,
         friendly: 0x44ff44,
         neutral: 0x888888,
+        miner: 0x88aacc,
+        security: 0x4488ff,
         shield: 0x00aaff,
         armor: 0xffaa00,
         hull: 0xff4444,

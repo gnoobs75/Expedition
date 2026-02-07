@@ -44,11 +44,11 @@ export class Renderer {
      * Initialize the renderer
      */
     async init() {
-        console.log('Initializing Three.js renderer...');
+        // Initialize Three.js renderer
 
         // Create scene
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x001133); // Slightly brighter for debug
+        this.scene.background = new THREE.Color(0x000811);
 
         // Create orthographic camera
         const aspect = window.innerWidth / window.innerHeight;
@@ -107,7 +107,7 @@ export class Renderer {
         // Handle window resize
         window.addEventListener('resize', this.onResize.bind(this));
 
-        console.log('Renderer initialized');
+        // Renderer ready
     }
 
     /**
@@ -181,8 +181,7 @@ export class Renderer {
      * Load a sector's entities into the scene
      */
     loadSector(sector) {
-        console.log(`Loading sector ${sector.name} into renderer...`);
-        console.log(`[Renderer] Sector has ${sector.entities.length} entities`);
+        // Load sector entities into renderer
 
         // Update nebula for this sector
         this.nebula.setSeed(sector.seed);
@@ -195,11 +194,7 @@ export class Renderer {
         // Add player mesh
         if (this.game.player) {
             this.addEntityMesh(this.game.player);
-            console.log(`[Renderer] Player added at (${this.game.player.x}, ${this.game.player.y})`);
         }
-
-        console.log(`[Renderer] Total entity meshes: ${this.entityMeshes.size}`);
-        console.log(`[Renderer] Entity group children: ${this.entityGroup.children.length}`);
     }
 
     /**
@@ -244,31 +239,6 @@ export class Renderer {
      * Main render function
      */
     render() {
-        // Debug: log once after camera update
-        if (!this._debugLogged) {
-            this._debugLogged = true;
-
-            // Force camera update first
-            this.updateCamera();
-
-            console.log('[Renderer] === DEBUG INFO ===');
-            console.log('[Renderer] Scene children:', this.scene.children.length);
-            console.log('[Renderer] Entity meshes:', this.entityMeshes.size);
-            console.log('[Renderer] Camera position:', this.camera.position.x, this.camera.position.y, this.camera.position.z);
-            console.log('[Renderer] Camera frustum L/R/T/B:', this.camera.left, this.camera.right, this.camera.top, this.camera.bottom);
-            console.log('[Renderer] Canvas size:', this.renderer.domElement.width, this.renderer.domElement.height);
-            console.log('[Renderer] Test mesh position:', this.testMesh?.position.x, this.testMesh?.position.y, this.testMesh?.position.z);
-            console.log('[Renderer] Game camera zoom:', this.game.camera?.zoom);
-
-            // Log first few entity positions
-            let i = 0;
-            for (const [entity, mesh] of this.entityMeshes) {
-                if (i++ < 3) {
-                    console.log(`[Renderer] Entity "${entity.name}" mesh at:`, mesh.position.x, mesh.position.y, mesh.position.z);
-                }
-            }
-        }
-
         // Update camera from game camera
         this.updateCamera();
 
@@ -280,6 +250,9 @@ export class Renderer {
 
         // Update starfield parallax
         this.starField.update(this.game.camera);
+
+        // Update nebula animation
+        this.nebula.update(1 / 60);
 
         // Update effects
         this.effects.update(1 / 60);
@@ -346,15 +319,25 @@ export class Renderer {
      * Update selection and lock indicators
      */
     updateSelectionIndicators() {
+        // Track animation time
+        this._animTime = (this._animTime || 0) + 0.016;
+
         // Selection brackets
         const selected = this.game.selectedTarget;
         if (selected && selected.alive) {
             this.selectionMesh.visible = true;
             this.selectionMesh.position.set(selected.x, selected.y, 5);
 
-            // Scale based on entity radius
-            const scale = (selected.radius || 30) / 30;
-            this.selectionMesh.scale.setScalar(scale);
+            // Scale with breathing pulse
+            const baseScale = (selected.radius || 30) / 30;
+            const pulse = 1.0 + Math.sin(this._animTime * 3) * 0.08;
+            this.selectionMesh.scale.setScalar(baseScale * pulse);
+
+            // Pulsing opacity
+            const bracketOpacity = 0.6 + Math.sin(this._animTime * 3) * 0.3;
+            this.selectionMesh.children.forEach(child => {
+                if (child.material) child.material.opacity = bracketOpacity;
+            });
 
             // Rotate slowly
             this.selectionMesh.rotation.z += 0.01;
@@ -368,9 +351,13 @@ export class Renderer {
             this.lockMesh.visible = true;
             this.lockMesh.position.set(locked.x, locked.y, 5);
 
-            // Scale based on entity radius
-            const scale = (locked.radius || 30) / 30;
-            this.lockMesh.scale.setScalar(scale);
+            // Scale with pulse
+            const baseScale = (locked.radius || 30) / 30;
+            const lockPulse = 1.0 + Math.sin(this._animTime * 4) * 0.05;
+            this.lockMesh.scale.setScalar(baseScale * lockPulse);
+
+            // Pulsing opacity
+            this.lockMesh.material.opacity = 0.6 + Math.sin(this._animTime * 4) * 0.3;
 
             // Rotate
             this.lockMesh.rotation.z -= 0.03;

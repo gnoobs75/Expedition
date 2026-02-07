@@ -156,21 +156,18 @@ export class UIManager {
             });
         });
 
-        // Context menu items (including submenu items)
-        document.querySelectorAll('.menu-item, .submenu-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent bubbling to parent items or document
+        // Context menu - event delegation (handles dynamically built menus)
+        this.elements.contextMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const item = e.target.closest('.menu-item, .submenu-item');
+            if (!item) return;
+            if (item.classList.contains('has-submenu')) return;
+            if (item.classList.contains('disabled')) return;
 
-                // Don't trigger action for submenu parent items
-                if (item.classList.contains('has-submenu')) {
-                    return;
-                }
-
-                const action = item.dataset.action;
-                if (action) {
-                    this.handleContextMenuAction(action);
-                }
-            });
+            const action = item.dataset.action;
+            if (action) {
+                this.handleContextMenuAction(action);
+            }
         });
 
         // Close context menu on click elsewhere
@@ -233,6 +230,7 @@ export class UIManager {
             if (row && row.dataset.entityId) {
                 const entity = this.findEntityById(parseInt(row.dataset.entityId));
                 if (entity) {
+                    this.game.selectTarget(entity);
                     this.showContextMenu(e.clientX, e.clientY, entity);
                 }
             }
@@ -307,6 +305,13 @@ export class UIManager {
             e.preventDefault();
             this.showShipIndicatorContextMenu(e.clientX, e.clientY);
         });
+
+        // Ship indicator left-click to select own ship
+        document.getElementById('ship-indicator')?.addEventListener('click', () => {
+            if (this.game.player) {
+                this.game.selectTarget(this.game.player);
+            }
+        });
     }
 
     /**
@@ -349,26 +354,14 @@ export class UIManager {
             menuHtml = `<div class="menu-item disabled">No Drones Available</div>`;
         }
 
-        // Show menu
+        // Show menu using shared context menu (delegation handles clicks)
         const menu = this.elements.contextMenu;
+        this.contextMenuTarget = null;
+        this.contextMenuWorldPos = null;
         menu.innerHTML = menuHtml;
         menu.style.left = `${x}px`;
         menu.style.top = `${y}px`;
         menu.classList.remove('hidden');
-
-        // Set up click handlers
-        menu.querySelectorAll('.menu-item:not(.disabled)').forEach(item => {
-            item.addEventListener('click', () => {
-                const action = item.dataset.action;
-                if (action === 'launch-drones') {
-                    player.launchAllDrones();
-                } else if (action === 'recall-drones') {
-                    player.recallAllDrones();
-                }
-                this.hideContextMenu();
-                this.game.audio?.play('click');
-            }, { once: true });
-        });
     }
 
     /**
@@ -589,7 +582,7 @@ export class UIManager {
 
         this.elements.targetPanel.classList.remove('hidden');
         this.elements.targetName.textContent = target.name;
-        this.elements.targetType.textContent = target.type.toUpperCase();
+        this.elements.targetType.textContent = (target.type === 'npc' ? target.role : target.type).toUpperCase();
 
         // Distance
         const dist = this.game.player?.distanceTo(target) || 0;
@@ -681,7 +674,7 @@ export class UIManager {
 
         if (filter !== 'all') {
             const typeMap = {
-                ships: ['enemy', 'ship'],
+                ships: ['enemy', 'ship', 'npc'],
                 stations: ['station'],
                 asteroids: ['asteroid'],
                 gates: ['gate'],
@@ -734,7 +727,7 @@ export class UIManager {
                 <tr class="${hostility} ${selected}" data-entity-id="${entity.id}">
                     <td class="col-icon overview-icon">${icon}</td>
                     <td class="col-name">${entity.name}</td>
-                    <td class="col-type">${entity.type}</td>
+                    <td class="col-type">${entity.type === 'npc' ? entity.role : entity.type}</td>
                     <td class="col-dist">${dist}</td>
                     <td class="col-vel">${velocity}</td>
                     <td class="col-ang">${angularVel}</td>
@@ -752,6 +745,7 @@ export class UIManager {
         const icons = {
             enemy: '&#9650;',    // Triangle
             ship: '&#9650;',
+            npc: '&#9650;',      // Triangle (same as ship)
             station: '&#9632;',  // Square
             asteroid: '&#9671;', // Diamond
             gate: '&#10070;',    // Star
@@ -910,55 +904,97 @@ export class UIManager {
     }
 
     /**
-     * Show context menu
+     * Show context menu - dynamically builds menu based on target
      */
     showContextMenu(x, y, entity, worldPos = null) {
         const menu = this.elements.contextMenu;
         this.contextMenuTarget = entity;
-        this.contextMenuWorldPos = worldPos; // Store world position for location-based actions
+        this.contextMenuWorldPos = worldPos;
+
+        // Build menu HTML dynamically
+        menu.innerHTML = this.buildContextMenuHTML(entity);
 
         // Position menu
         menu.style.left = `${x}px`;
         menu.style.top = `${y}px`;
         menu.classList.remove('hidden');
 
-        // Update menu items based on target
-        this.updateContextMenuItems(entity);
+        // Keep menu on screen
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) {
+                menu.style.left = `${window.innerWidth - rect.width - 5}px`;
+            }
+            if (rect.bottom > window.innerHeight) {
+                menu.style.top = `${window.innerHeight - rect.height - 5}px`;
+            }
+        });
     }
 
     /**
-     * Update context menu items based on target
+     * Build context menu HTML based on entity
      */
-    updateContextMenuItems(entity) {
-        const menu = this.elements.contextMenu;
+    buildContextMenuHTML(entity) {
+        const items = [];
 
-        // Items that require a target
-        const targetRequiredItems = [
-            '.has-submenu', // Orbit and Keep at Range submenus
-            '[data-action="lock"]',
-            '[data-action="look-at"]',
-        ];
+        // Approach - always available
+        items.push(`<div class="menu-item" data-action="approach">Approach</div>`);
 
-        // Show/hide target-required items
-        targetRequiredItems.forEach(selector => {
-            menu.querySelectorAll(selector).forEach(item => {
-                item.style.display = entity ? 'block' : 'none';
-            });
-        });
+        if (entity) {
+            // Orbit submenu
+            items.push(`
+                <div class="menu-item has-submenu">
+                    <span class="submenu-arrow">&#9666;</span>
+                    Orbit
+                    <div class="submenu">
+                        <div class="submenu-item" data-action="orbit-100">100 m</div>
+                        <div class="submenu-item" data-action="orbit-500">500 m</div>
+                        <div class="submenu-item" data-action="orbit-1000">1,000 m</div>
+                        <div class="submenu-item" data-action="orbit-2500">2,500 m</div>
+                        <div class="submenu-item" data-action="orbit-5000">5,000 m</div>
+                    </div>
+                </div>`);
 
-        // Show/hide separators based on whether target exists
-        menu.querySelectorAll('.menu-separator').forEach(sep => {
-            sep.style.display = entity ? 'block' : 'none';
-        });
+            // Keep at Range submenu
+            items.push(`
+                <div class="menu-item has-submenu">
+                    <span class="submenu-arrow">&#9666;</span>
+                    Keep at Range
+                    <div class="submenu">
+                        <div class="submenu-item" data-action="keep-range-100">100 m</div>
+                        <div class="submenu-item" data-action="keep-range-500">500 m</div>
+                        <div class="submenu-item" data-action="keep-range-1000">1,000 m</div>
+                        <div class="submenu-item" data-action="keep-range-2500">2,500 m</div>
+                        <div class="submenu-item" data-action="keep-range-5000">5,000 m</div>
+                    </div>
+                </div>`);
 
-        // Show/hide dock option (only for stations)
-        const dockItem = menu.querySelector('[data-action="dock"]');
-        dockItem.style.display = entity?.type === 'station' ? 'block' : 'none';
+            items.push(`<div class="menu-separator"></div>`);
 
-        // Show/hide warp option (only if far enough)
-        const warpItem = menu.querySelector('[data-action="warp"]');
-        const dist = (entity && this.game.player) ? this.game.player.distanceTo(entity) : 0;
-        warpItem.style.display = dist > 1000 ? 'block' : 'none';
+            // Lock target
+            items.push(`<div class="menu-item" data-action="lock">Lock Target</div>`);
+            items.push(`<div class="menu-item" data-action="look-at">Look At</div>`);
+
+            // Warp (only if far enough)
+            const dist = this.game.player ? this.game.player.distanceTo(entity) : 0;
+            if (dist > 1000) {
+                items.push(`<div class="menu-separator"></div>`);
+                items.push(`<div class="menu-item" data-action="warp">Warp To</div>`);
+            }
+
+            // Dock (only for stations)
+            if (entity.type === 'station') {
+                const canDock = entity.canDock?.(this.game.player);
+                const dockClass = canDock ? '' : ' disabled';
+                items.push(`<div class="menu-item${dockClass}" data-action="dock">Dock</div>`);
+            }
+        }
+
+        // Bookmark - always available
+        items.push(`<div class="menu-separator"></div>`);
+        items.push(`<div class="menu-item" data-action="bookmark">Save Location</div>`);
+
+        return items.join('');
     }
 
     /**
@@ -976,20 +1012,34 @@ export class UIManager {
     handleContextMenuAction(action) {
         const target = this.contextMenuTarget;
         const worldPos = this.contextMenuWorldPos;
-        console.log('handleContextMenuAction:', action, 'target:', target, 'worldPos:', worldPos);
         this.hideContextMenu();
 
         // Handle approach - works with or without target
         if (action === 'approach') {
             if (target) {
-                console.log('Approaching target:', target.name);
                 this.game.autopilot.approach(target);
             } else if (worldPos) {
-                console.log('Approaching worldPos:', worldPos.x, worldPos.y);
                 this.game.autopilot.approachPosition(worldPos.x, worldPos.y);
-            } else {
-                console.log('No target and no worldPos!');
             }
+            this.game.audio?.play('click');
+            return;
+        }
+
+        // Drone actions (from ship indicator menu)
+        if (action === 'launch-drones') {
+            this.game.player?.launchAllDrones();
+            this.game.audio?.play('click');
+            return;
+        }
+        if (action === 'recall-drones') {
+            this.game.player?.recallAllDrones();
+            this.game.audio?.play('click');
+            return;
+        }
+
+        // Bookmark works with or without target
+        if (action === 'bookmark') {
+            this.game.addBookmark(target ? `Near ${target.name}` : 'Bookmark');
             this.game.audio?.play('click');
             return;
         }
@@ -1029,10 +1079,8 @@ export class UIManager {
                     this.game.dockAtStation(target);
                 } else {
                     this.log('Too far to dock', 'system');
+                    this.toast('Too far to dock - approach the station first', 'warning');
                 }
-                break;
-            case 'bookmark':
-                this.game.addBookmark(`Near ${target.name}`);
                 break;
         }
 
@@ -1226,6 +1274,7 @@ export class UIManager {
 
         // Log and feedback
         this.log(`Sold ${totalUnits.toLocaleString()} units of ore for ${formatCredits(totalValue)} ISK`, 'mining');
+        this.toast(`Sold ore for ${formatCredits(totalValue)} ISK`, 'success');
         this.game.audio?.play('buy');
 
         // Update display
@@ -1592,6 +1641,38 @@ export class UIManager {
             `;
         }
 
+        // NPC info
+        if (entity.type === 'npc') {
+            const roleLabel = entity.role === 'miner' ? 'Mining Vessel' : 'Security Patrol';
+            const stateLabel = {
+                mining: 'Mining',
+                returning: 'Returning to Station',
+                docked: 'Docked',
+                fleeing: 'Fleeing',
+                patrol: 'Patrolling',
+                responding: 'Responding to Threat',
+                engaging: 'Engaging Hostile',
+                idle: 'Idle',
+            }[entity.aiState] || entity.aiState;
+            html += `
+                <div class="viewer-section">
+                    <div class="viewer-section-title">NPC Information</div>
+                    <div class="viewer-stat">
+                        <span class="viewer-stat-label">Role</span>
+                        <span class="viewer-stat-value">${roleLabel}</span>
+                    </div>
+                    <div class="viewer-stat">
+                        <span class="viewer-stat-label">Activity</span>
+                        <span class="viewer-stat-value">${stateLabel}</span>
+                    </div>
+                    <div class="viewer-stat">
+                        <span class="viewer-stat-label">Hostility</span>
+                        <span class="viewer-stat-value friendly">NEUTRAL</span>
+                    </div>
+                </div>
+            `;
+        }
+
         // Asteroid composition (if asteroid)
         if (entity.type === 'asteroid') {
             const oreType = entity.oreType || 'Veldspar';
@@ -1670,6 +1751,27 @@ export class UIManager {
         `;
 
         return html;
+    }
+
+    /**
+     * Show a toast notification
+     */
+    toast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+
+        // Auto-remove after animation
+        setTimeout(() => toast.remove(), 3000);
+
+        // Limit visible toasts
+        while (container.children.length > 5) {
+            container.removeChild(container.firstChild);
+        }
     }
 
     /**

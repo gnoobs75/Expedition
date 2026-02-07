@@ -305,6 +305,13 @@ export class Sector {
     }
 
     /**
+     * Get all NPCs in this sector
+     */
+    getNPCs() {
+        return this.entities.filter(e => e.type === 'npc');
+    }
+
+    /**
      * Get entities by type
      */
     getEntitiesByType(type) {

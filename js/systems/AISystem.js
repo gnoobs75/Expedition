@@ -49,6 +49,9 @@ export class AISystem {
         // Get distance to player
         const distToPlayer = playerValid ? enemy.distanceTo(player) : Infinity;
 
+        // If enemy already has an NPC target from raid spawn, keep tracking it
+        const currentTarget = enemy.aiTarget;
+
         // State machine
         switch (enemy.aiState) {
             case 'idle':
@@ -77,12 +80,45 @@ export class AISystem {
     }
 
     /**
+     * Find the best target for an enemy (player or NPC)
+     */
+    findBestTarget(enemy, player, distToPlayer) {
+        // If already chasing an NPC target from raid, keep it
+        if (enemy.aiTarget && enemy.aiTarget.alive && enemy.aiTarget !== player) {
+            return enemy.aiTarget;
+        }
+
+        // Check if player is in aggro range
+        if (player && player.alive && distToPlayer < enemy.aggroRange && Math.random() < enemy.aggression) {
+            return player;
+        }
+
+        // Look for nearby NPC miners to attack
+        const entities = this.game.currentSector?.entities || [];
+        let closestNPC = null;
+        let closestDist = enemy.aggroRange;
+
+        for (const e of entities) {
+            if (!e.alive || e.type !== 'npc') continue;
+            if (e.role !== 'miner') continue;
+            const d = enemy.distanceTo(e);
+            if (d < closestDist) {
+                closestNPC = e;
+                closestDist = d;
+            }
+        }
+
+        return closestNPC;
+    }
+
+    /**
      * Handle idle state
      */
     handleIdleState(enemy, player, distToPlayer) {
-        // Check for player in aggro range
-        if (distToPlayer < enemy.aggroRange && Math.random() < enemy.aggression) {
-            enemy.setAIState('chase', player);
+        // Check for any target (player or NPC)
+        const target = this.findBestTarget(enemy, player, distToPlayer);
+        if (target) {
+            enemy.setAIState('chase', target);
             return;
         }
 
@@ -97,9 +133,10 @@ export class AISystem {
      * Handle patrol state
      */
     handlePatrolState(enemy, player, distToPlayer) {
-        // Check for player in aggro range
-        if (distToPlayer < enemy.aggroRange && Math.random() < enemy.aggression) {
-            enemy.setAIState('chase', player);
+        // Check for any target
+        const target = this.findBestTarget(enemy, player, distToPlayer);
+        if (target) {
+            enemy.setAIState('chase', target);
             return;
         }
 
@@ -130,65 +167,86 @@ export class AISystem {
      * Handle chase state
      */
     handleChaseState(enemy, player, distToPlayer) {
+        const target = enemy.aiTarget;
+
         // Check if should flee
         if (enemy.hull < enemy.maxHull * enemy.fleeThreshold) {
-            enemy.setAIState('flee', player);
+            enemy.setAIState('flee', target);
             return;
         }
 
-        // Check if player out of range
-        if (distToPlayer > enemy.aggroRange * 1.5) {
+        // Validate target
+        if (!target || !target.alive) {
+            enemy.setAIState('patrol');
+            this.setNewPatrolPoint(enemy);
+            return;
+        }
+
+        const distToTarget = enemy.distanceTo(target);
+
+        // Check if target out of range
+        if (distToTarget > enemy.aggroRange * 1.5) {
             enemy.setAIState('patrol');
             this.setNewPatrolPoint(enemy);
             return;
         }
 
         // Check if in attack range
-        if (distToPlayer < enemy.attackRange) {
-            enemy.setAIState('attack', player);
+        if (distToTarget < enemy.attackRange) {
+            enemy.setAIState('attack', target);
             return;
         }
 
-        // Chase player
-        if (player && player.alive) {
-            enemy.setDestination(player.x, player.y);
-        }
+        // Chase target
+        enemy.setDestination(target.x, target.y);
     }
 
     /**
      * Handle attack state
      */
     handleAttackState(enemy, player, distToPlayer) {
+        const target = enemy.aiTarget;
+
         // Check if should flee
         if (enemy.hull < enemy.maxHull * enemy.fleeThreshold) {
-            enemy.setAIState('flee', player);
+            enemy.setAIState('flee', target);
             return;
         }
 
-        // Check if player out of range
-        if (distToPlayer > enemy.attackRange * 1.2) {
-            enemy.setAIState('chase', player);
+        // Validate target
+        if (!target || !target.alive) {
+            enemy.aiTarget = null;
+            enemy.setAIState('patrol');
+            this.setNewPatrolPoint(enemy);
+            enemy.deactivateModule('high-1');
+            enemy.target = null;
+            return;
+        }
+
+        const distToTarget = enemy.distanceTo(target);
+
+        // Check if target out of range
+        if (distToTarget > enemy.attackRange * 1.2) {
+            enemy.setAIState('chase', target);
             return;
         }
 
         // Lock and fire
-        if (player && player.alive) {
-            enemy.target = player;
+        enemy.target = target;
 
-            // Orbit the player
-            const orbitAngle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
-            const orbitDist = enemy.attackRange * 0.7;
+        // Orbit the target
+        const orbitAngle = Math.atan2(enemy.y - target.y, enemy.x - target.x);
+        const orbitDist = enemy.attackRange * 0.7;
 
-            const targetX = player.x + Math.cos(orbitAngle + 0.1) * orbitDist;
-            const targetY = player.y + Math.sin(orbitAngle + 0.1) * orbitDist;
+        const targetX = target.x + Math.cos(orbitAngle + 0.1) * orbitDist;
+        const targetY = target.y + Math.sin(orbitAngle + 0.1) * orbitDist;
 
-            enemy.setDestination(targetX, targetY);
-            enemy.desiredSpeed = enemy.maxSpeed * 0.5;
+        enemy.setDestination(targetX, targetY);
+        enemy.desiredSpeed = enemy.maxSpeed * 0.5;
 
-            // Activate weapons if not already
-            if (!enemy.activeModules.has('high-1')) {
-                enemy.activateModule('high-1');
-            }
+        // Activate weapons if not already
+        if (!enemy.activeModules.has('high-1')) {
+            enemy.activateModule('high-1');
         }
     }
 
@@ -200,23 +258,30 @@ export class AISystem {
         enemy.deactivateModule('high-1');
         enemy.target = null;
 
+        // Find what to flee from
+        const fleeFrom = enemy.aiTarget || player;
+
         // Check if safe
-        if (distToPlayer > enemy.aggroRange * 2 || enemy.hull > enemy.maxHull * 0.5) {
+        if (!fleeFrom || !fleeFrom.alive) {
             enemy.setAIState('idle');
             return;
         }
 
-        // Run away from player
-        if (player && player.alive) {
-            const fleeAngle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
-            const fleeDist = 1000;
-
-            enemy.setDestination(
-                enemy.x + Math.cos(fleeAngle) * fleeDist,
-                enemy.y + Math.sin(fleeAngle) * fleeDist
-            );
-            enemy.desiredSpeed = enemy.maxSpeed;
+        const distToThreat = enemy.distanceTo(fleeFrom);
+        if (distToThreat > enemy.aggroRange * 2 || enemy.hull > enemy.maxHull * 0.5) {
+            enemy.setAIState('idle');
+            return;
         }
+
+        // Run away
+        const fleeAngle = Math.atan2(enemy.y - fleeFrom.y, enemy.x - fleeFrom.x);
+        const fleeDist = 1000;
+
+        enemy.setDestination(
+            enemy.x + Math.cos(fleeAngle) * fleeDist,
+            enemy.y + Math.sin(fleeAngle) * fleeDist
+        );
+        enemy.desiredSpeed = enemy.maxSpeed;
     }
 
     /**

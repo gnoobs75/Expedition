@@ -47,15 +47,39 @@ export class CombatSystem {
             return;
         }
 
-        // Create laser effect
+        // Calculate hit chance
+        const hitChance = this.calculateHitChance(source, target, range);
+        const hits = Math.random() < hitChance;
+
+        // Determine laser color based on source type
+        let laserColor = 0xff4444; // Default hostile red
+        if (source.isPlayer) {
+            laserColor = 0x00ffff; // Player cyan
+        } else if (source.type === 'npc' && source.role === 'security') {
+            laserColor = 0x4488ff; // Security blue
+        }
+
+        // Create laser effect (always shows beam even on miss)
         this.game.renderer.effects.spawn('laser', source.x, source.y, {
             target: target,
-            color: source.isPlayer ? 0x00ffff : 0xff4444,
+            color: laserColor,
+        });
+
+        // Muzzle flash at source
+        this.game.renderer.effects.spawn('hit', source.x, source.y, {
+            count: 3,
+            color: laserColor,
         });
 
         // Apply damage with slight delay (for visual sync)
         setTimeout(() => {
             if (target.alive) {
+                // Miss handling
+                if (!hits) {
+                    this.showMissIndicator(target.x, target.y);
+                    return;
+                }
+
                 // Determine damage type for visual
                 let damageType = 'hull';
                 if (target.shield > 0) {
@@ -79,6 +103,13 @@ export class CombatSystem {
                 // Camera shake for player hit
                 if (target === this.game.player) {
                     this.game.camera.shake(5, 0.2);
+                }
+
+                // Flag player as aggressive if attacking neutral NPCs
+                if (source.isPlayer && target.type === 'npc' && target.hostility === 'neutral') {
+                    this.game.playerAggressive = true;
+                    this.game.ui?.log('Security forces alerted!', 'combat');
+                    this.game.ui?.toast('You are now flagged as hostile!', 'error');
                 }
             }
         }, 100);
@@ -144,6 +175,20 @@ export class CombatSystem {
 
         const dist = source.distanceTo(target);
         return dist <= range;
+    }
+
+    /**
+     * Show miss indicator floating text
+     */
+    showMissIndicator(x, y) {
+        const screen = this.game.input.worldToScreen(x, y);
+        const element = document.createElement('div');
+        element.className = 'damage-number miss';
+        element.textContent = 'MISS';
+        element.style.left = `${screen.x + (Math.random() - 0.5) * 40}px`;
+        element.style.top = `${screen.y}px`;
+        document.getElementById('ui-overlay').appendChild(element);
+        setTimeout(() => element.remove(), 1500);
     }
 
     /**

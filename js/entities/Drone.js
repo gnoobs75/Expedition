@@ -308,7 +308,7 @@ export class Drone extends Entity {
 
         if (added > 0) {
             const oreName = CONFIG.ASTEROID_TYPES[oreType]?.name || oreType;
-            this.game.ui?.log(`Drone deposited ${added} ${oreName} ore`, 'mining');
+            if (this.owner?.isPlayer) this.game.ui?.log(`Drone deposited ${added} ${oreName} ore`, 'mining');
         }
 
         // Clear drone cargo
@@ -379,12 +379,12 @@ export class Drone extends Entity {
             });
 
             // Play mining sound
-            this.game.audio?.play('mining');
+            if (this.owner?.isPlayer) this.game.audio?.play('mining');
         }
 
         // Check if asteroid depleted
         if (!this.target.alive) {
-            this.game.ui?.log('Asteroid depleted', 'mining');
+            if (this.owner?.isPlayer) this.game.ui?.log('Asteroid depleted', 'mining');
             this.target = null;
         }
     }

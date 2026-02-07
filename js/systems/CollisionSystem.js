@@ -12,16 +12,26 @@ export class CollisionSystem {
 
     /**
      * Update collision detection
-     * Only central planet collision is enabled - instant death
      */
     update(dt) {
         const player = this.game.player;
         if (!player || !player.alive) return;
 
-        // Check collision with central planet (the only lethal collision)
         const sector = this.game.currentSector;
-        if (sector?.centralPlanet) {
+        if (!sector) return;
+
+        // Check collision with central planet (lethal)
+        if (sector.centralPlanet) {
             this.checkPlanetCollision(player, sector.centralPlanet);
+        }
+
+        // Check collision with asteroids and other entities
+        for (const entity of sector.entities) {
+            if (!entity.alive || entity === player) continue;
+
+            if (this.checkCollision(player, entity)) {
+                this.handleCollision(player, entity);
+            }
         }
     }
 
@@ -33,6 +43,19 @@ export class CollisionSystem {
 
         const dist = player.distanceTo(planet);
         const killRadius = CONFIG.CENTRAL_PLANET?.killRadius || (planet.radius + 50);
+        const warningRadius = killRadius + 500;
+
+        // Danger zone warning
+        if (dist < warningRadius && dist >= killRadius) {
+            if (!this._planetWarned) {
+                this._planetWarned = true;
+                this.game.ui?.log('WARNING: Gravitational pull detected! Steer clear of the planet!', 'combat');
+                this.game.audio?.play('warning');
+                this.game.camera.shake(3, 0.3);
+            }
+        } else {
+            this._planetWarned = false;
+        }
 
         if (dist < killRadius) {
             // Instant death - player crashed into the planet
@@ -75,6 +98,7 @@ export class CollisionSystem {
                 break;
 
             case 'enemy':
+            case 'npc':
                 // Ram damage
                 this.handleShipCollision(player, entity);
                 break;

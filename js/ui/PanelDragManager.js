@@ -44,6 +44,33 @@ export class PanelDragManager {
         // Set up global mouse listeners for drag operations
         document.addEventListener('mousemove', this.handleMouseMove);
         document.addEventListener('mouseup', this.handleMouseUp);
+
+        // Keep panels in bounds on window resize
+        window.addEventListener('resize', () => this.constrainAllPanels());
+    }
+
+    /**
+     * Constrain all panels to viewport bounds
+     */
+    constrainAllPanels() {
+        for (const [panelId, panelData] of this.panels) {
+            const panel = panelData.element;
+            if (!panel || panel.classList.contains('hidden')) continue;
+
+            const rect = panel.getBoundingClientRect();
+            let changed = false;
+
+            if (rect.right > window.innerWidth) {
+                panel.style.left = `${Math.max(0, window.innerWidth - rect.width)}px`;
+                panel.style.right = 'auto';
+                changed = true;
+            }
+            if (rect.bottom > window.innerHeight) {
+                panel.style.top = `${Math.max(0, window.innerHeight - rect.height)}px`;
+                panel.style.bottom = 'auto';
+                changed = true;
+            }
+        }
     }
 
     /**
@@ -57,10 +84,7 @@ export class PanelDragManager {
         }
 
         // Skip docked panels - they should not be draggable
-        if (panel.classList.contains('docked')) {
-            console.log(`[PanelDragManager] Skipping docked panel: ${panelId}`);
-            return;
-        }
+        if (panel.classList.contains('docked')) return;
 
         // Store panel reference (header will be set below)
         const panelData = {

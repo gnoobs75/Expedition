@@ -61,7 +61,7 @@ export class MiningSystem {
         // Check range
         const dist = ship.distanceTo(asteroid);
         if (dist > CONFIG.MINING_RANGE * 1.2) {
-            this.game.ui?.log('Target out of mining range', 'system');
+            if (ship.isPlayer) this.game.ui?.log('Target out of mining range', 'system');
             return;
         }
 
@@ -90,7 +90,11 @@ export class MiningSystem {
                 // Warn if cargo is full
                 if (added < extracted.units) {
                     this.game.ui?.log('Cargo hold full!', 'warning');
+                    this.game.ui?.toast('Cargo hold full - dock at a station to sell ore', 'warning');
                 }
+            } else if (ship.type === 'npc') {
+                // NPC ships also add ore to their cargo
+                ship.addOre(extracted.type, extracted.units, extracted.volume);
             }
 
             // Track active mining for visual effects
@@ -100,14 +104,18 @@ export class MiningSystem {
                 effectTimer: 0,
             });
 
-            // Play mining sound
-            this.game.audio?.play('mining');
+            // Play mining sound (only if near player)
+            if (ship.isPlayer) {
+                this.game.audio?.play('mining');
+            }
         }
 
         // Check if asteroid depleted
         if (!asteroid.alive) {
             this.activeMining.delete(ship);
-            this.game.ui?.log('Asteroid depleted', 'mining');
+            if (ship.isPlayer) {
+                this.game.ui?.log('Asteroid depleted', 'mining');
+            }
         }
     }
 

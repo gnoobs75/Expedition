@@ -52,6 +52,7 @@ export class PlayerShip extends Ship {
             if (!this.lowShieldWarned) {
                 this.game.audio?.play('shield-low');
                 this.game.ui?.log('Warning: Shields critical!', 'combat');
+                this.game.ui?.toast('Shields critical!', 'error');
                 this.lowShieldWarned = true;
             }
         } else {

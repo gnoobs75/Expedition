@@ -145,7 +145,21 @@ export class Nebula {
      * Update nebula (subtle animation)
      */
     update(dt) {
-        // Subtle drift animation could be added here
-        // For performance, we keep it static
+        this._time = (this._time || 0) + dt;
+
+        // Subtle drift and scale pulsing for each cloud layer
+        for (let i = 0; i < this.mesh.children.length; i++) {
+            const cloud = this.mesh.children[i];
+            const offset = i * 1.7; // Stagger animation per layer
+            const speed = 0.05 + i * 0.02;
+
+            // Very slow drift
+            cloud.position.x += Math.sin(this._time * speed + offset) * 0.3;
+            cloud.position.y += Math.cos(this._time * speed * 0.7 + offset) * 0.2;
+
+            // Subtle scale breathing
+            const breathe = 1.0 + Math.sin(this._time * 0.1 + offset) * 0.02;
+            cloud.scale.setScalar(breathe);
+        }
     }
 }

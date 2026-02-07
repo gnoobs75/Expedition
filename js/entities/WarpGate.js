@@ -112,6 +112,18 @@ export class WarpGate extends Entity {
         portal.position.z = 0.05;
         group.add(portal);
 
+        // Swirl overlay for portal animation
+        const swirlGeometry = new THREE.RingGeometry(this.radius * 0.15, this.radius * 0.55, 32, 1, 0, Math.PI * 1.2);
+        const swirlMaterial = new THREE.MeshBasicMaterial({
+            color: 0x4488ff,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide,
+        });
+        const swirl = new THREE.Mesh(swirlGeometry, swirlMaterial);
+        swirl.position.z = 0.08;
+        group.add(swirl);
+
         // Central glow
         const glowGeometry = new THREE.CircleGeometry(this.radius * 0.3, 16);
         const glowMaterial = new THREE.MeshBasicMaterial({
@@ -155,6 +167,7 @@ export class WarpGate extends Entity {
         // Store for animation
         this.innerRing = innerRing;
         this.glow = glow;
+        this.swirl = swirl;
 
         return this.mesh;
     }
@@ -179,6 +192,12 @@ export class WarpGate extends Entity {
                 const pulse = 0.6 + Math.sin(this.pulsePhase * 1.5) * 0.3;
                 this.glow.material.opacity = pulse;
                 this.glow.scale.setScalar(0.9 + Math.sin(this.pulsePhase) * 0.1);
+            }
+
+            // Rotate the swirl overlay
+            if (this.swirl) {
+                this.swirl.rotation.z += 0.02;
+                this.swirl.material.opacity = 0.2 + Math.sin(this.pulsePhase * 0.8) * 0.15;
             }
         }
     }

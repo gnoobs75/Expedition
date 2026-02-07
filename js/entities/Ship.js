@@ -92,11 +92,6 @@ export class Ship extends Entity {
     update(dt) {
         if (!this.alive) return;
 
-        // Debug: log desired vs current speed
-        if (this.isPlayer && this.desiredSpeed > 0 && Math.random() < 0.05) {
-            console.log('Ship.update - desiredSpeed:', this.desiredSpeed, 'currentSpeed:', this.currentSpeed, 'maxSpeed:', this.maxSpeed);
-        }
-
         // Regenerate capacitor
         this.capacitor = Math.min(this.maxCapacitor, this.capacitor + this.capacitorRegen * dt);
 
@@ -281,25 +276,25 @@ export class Ship extends Entity {
         // Check capacitor for cycle-based modules
         if (moduleConfig.cycleTime && moduleConfig.capacitorUse) {
             if (this.capacitor < moduleConfig.capacitorUse) {
-                this.game.ui?.log('Not enough capacitor', 'system');
+                if (this.isPlayer) this.game.ui?.log('Not enough capacitor', 'system');
                 return false;
             }
         }
 
         // Weapons need a locked target
         if (moduleConfig.damage && !this.target) {
-            this.game.ui?.log('No target locked', 'system');
+            if (this.isPlayer) this.game.ui?.log('No target locked', 'system');
             return false;
         }
 
         // Mining laser needs target
         if (moduleConfig.miningYield && !this.target) {
-            this.game.ui?.log('No target locked', 'system');
+            if (this.isPlayer) this.game.ui?.log('No target locked', 'system');
             return false;
         }
 
         this.activeModules.add(slotId);
-        this.game.audio?.play('module-activate');
+        if (this.isPlayer) this.game.audio?.play('module-activate');
 
         // For cycle-based modules, trigger the effect immediately
         if (moduleConfig.cycleTime) {
@@ -317,7 +312,7 @@ export class Ship extends Entity {
         if (!this.activeModules.has(slotId)) return false;
 
         this.activeModules.delete(slotId);
-        this.game.audio?.play('module-deactivate');
+        if (this.isPlayer) this.game.audio?.play('module-deactivate');
 
         const [slotType, slotIndex] = this.parseSlotId(slotId);
         const moduleId = this.modules[slotType][slotIndex];
@@ -385,7 +380,7 @@ export class Ship extends Entity {
         // Check range
         const dist = this.distanceTo(this.target);
         if (dist > moduleConfig.range) {
-            this.game.ui?.log('Target out of range', 'system');
+            if (this.isPlayer) this.game.ui?.log('Target out of range', 'system');
             return;
         }
 
@@ -402,7 +397,7 @@ export class Ship extends Entity {
 
         // Fire!
         this.game.combat.fireAt(this, this.target, damage, moduleConfig.range);
-        this.game.audio?.play('laser');
+        if (this.isPlayer) this.game.audio?.play('laser');
     }
 
     /**
@@ -417,7 +412,7 @@ export class Ship extends Entity {
         // Check range
         const dist = this.distanceTo(this.target);
         if (dist > moduleConfig.range) {
-            this.game.ui?.log('Target out of range', 'system');
+            if (this.isPlayer) this.game.ui?.log('Target out of range', 'system');
             return;
         }
 
@@ -669,7 +664,7 @@ export class Ship extends Entity {
 
             this.game.currentSector?.addEntity(drone);
             this.droneBay.deployed.set(index, drone);
-            this.game.ui?.log(`Launched ${droneConfig.name}`, 'system');
+            if (this.isPlayer) this.game.ui?.log(`Launched ${droneConfig.name}`, 'system');
         });
     }
 
@@ -700,7 +695,7 @@ export class Ship extends Entity {
 
             // Remove from sector
             droneEntity.destroy();
-            this.game.ui?.log(`Recalled ${droneEntity.name}`, 'system');
+            if (this.isPlayer) this.game.ui?.log(`Recalled ${droneEntity.name}`, 'system');
         }
     }
 
@@ -736,7 +731,7 @@ export class Ship extends Entity {
             'mine': 'Mining',
             'return': 'Returning'
         };
-        this.game.ui?.log(`Drones: ${commandNames[command] || command}`, 'system');
+        if (this.isPlayer) this.game.ui?.log(`Drones: ${commandNames[command] || command}`, 'system');
 
         // If return command, recall when they get close
         if (command === 'return') {

@@ -1,0 +1,673 @@
+// =============================================
+// NPC System
+// Manages NPC miners, security patrols, and pirate raids
+// =============================================
+
+import { CONFIG } from '../config.js';
+import { NPCShip } from '../entities/NPCShip.js';
+import { EnemyShip } from '../entities/EnemyShip.js';
+
+export class NPCSystem {
+    constructor(game) {
+        this.game = game;
+
+        // AI decision throttling
+        this.decisionInterval = 0.5;
+        this.decisionTimer = 0;
+
+        // Pirate raid timer
+        this.raidTimer = 0;
+        this.raidActive = false;
+
+        // Track NPC ships for this sector
+        this.miners = [];
+        this.security = [];
+
+        // Track which sectors have had NPCs spawned
+        this.spawnedSectors = new Set();
+    }
+
+    /**
+     * Called when entering a new sector - spawn NPCs
+     */
+    onSectorEnter(sector) {
+        this.miners = [];
+        this.security = [];
+        this.raidTimer = 0;
+        this.raidActive = false;
+
+        // Only spawn NPCs once per sector
+        if (!this.spawnedSectors.has(sector.id)) {
+            this.spawnedSectors.add(sector.id);
+            this.spawnMiners(sector);
+            this.spawnSecurity(sector);
+        } else {
+            // Re-entering sector - find existing NPCs
+            for (const entity of sector.entities) {
+                if (entity.type === 'npc' && entity.alive) {
+                    if (entity.role === 'miner') this.miners.push(entity);
+                    if (entity.role === 'security') this.security.push(entity);
+                }
+            }
+        }
+    }
+
+    /**
+     * Spawn miner NPCs for the sector
+     */
+    spawnMiners(sector) {
+        const config = CONFIG.NPC_MINERS[sector.difficulty];
+        if (!config || config.count === 0) return;
+
+        const station = sector.getStation();
+        const asteroids = sector.getAsteroids();
+        if (asteroids.length === 0) return;
+
+        for (let i = 0; i < config.count; i++) {
+            // Pick a random asteroid field to start near
+            const targetAsteroid = asteroids[Math.floor(Math.random() * asteroids.length)];
+
+            const miner = new NPCShip(this.game, {
+                x: targetAsteroid.x + (Math.random() - 0.5) * 500,
+                y: targetAsteroid.y + (Math.random() - 0.5) * 500,
+                role: 'miner',
+                shipClass: config.shipClass,
+                droneCount: config.droneCount,
+                homeStation: station,
+                name: `Mining Vessel ${i + 1}`,
+            });
+
+            sector.addEntity(miner);
+            this.miners.push(miner);
+
+            // Start in mining state
+            miner.aiState = 'mining';
+        }
+    }
+
+    /**
+     * Spawn security patrol NPCs
+     */
+    spawnSecurity(sector) {
+        const config = CONFIG.NPC_SECURITY[sector.difficulty];
+        if (!config || config.count === 0) return;
+
+        const station = sector.getStation();
+        const centerX = CONFIG.SECTOR_SIZE / 2;
+        const centerY = CONFIG.SECTOR_SIZE / 2;
+
+        for (let i = 0; i < config.count; i++) {
+            // Spread security around the sector
+            const angle = (i / config.count) * Math.PI * 2 + Math.random() * 0.5;
+            const dist = 4000 + Math.random() * 4000;
+
+            const sec = new NPCShip(this.game, {
+                x: centerX + Math.cos(angle) * dist,
+                y: centerY + Math.sin(angle) * dist,
+                role: 'security',
+                shipClass: config.shipClass,
+                homeStation: station,
+                name: `Security ${i + 1}`,
+            });
+
+            // Set patrol center
+            sec.patrolCenter = { x: sec.x, y: sec.y };
+
+            sector.addEntity(sec);
+            this.security.push(sec);
+
+            // Start patrolling
+            sec.aiState = 'patrol';
+        }
+    }
+
+    /**
+     * Main update loop
+     */
+    update(dt) {
+        const sector = this.game.currentSector;
+        if (!sector) return;
+
+        // Clean dead NPCs
+        this.miners = this.miners.filter(m => m.alive);
+        this.security = this.security.filter(s => s.alive);
+
+        // Throttle decisions
+        this.decisionTimer += dt;
+        const makeDecision = this.decisionTimer >= this.decisionInterval;
+        if (makeDecision) {
+            this.decisionTimer = 0;
+        }
+
+        // Update miners
+        for (const miner of this.miners) {
+            if (!miner.alive) continue;
+            if (makeDecision) {
+                this.updateMinerAI(miner, dt);
+            }
+            this.updateMinerMovement(miner, dt);
+        }
+
+        // Update security
+        for (const sec of this.security) {
+            if (!sec.alive) continue;
+            if (makeDecision) {
+                this.updateSecurityAI(sec, dt);
+            }
+            this.updateNPCMovement(sec, dt);
+        }
+
+        // Pirate raid timer
+        this.updateRaidTimer(dt, sector);
+    }
+
+    // =========================================
+    // MINER AI
+    // =========================================
+
+    updateMinerAI(miner, dt) {
+        switch (miner.aiState) {
+            case 'mining':
+                this.minerMiningState(miner);
+                break;
+            case 'returning':
+                this.minerReturningState(miner);
+                break;
+            case 'docked':
+                this.minerDockedState(miner);
+                break;
+            case 'fleeing':
+                this.minerFleeingState(miner);
+                break;
+            case 'idle':
+            default:
+                miner.aiState = 'mining';
+                break;
+        }
+    }
+
+    /**
+     * Miner is looking for/mining asteroids
+     */
+    minerMiningState(miner) {
+        // Check for threats
+        if (this.checkMinerThreats(miner)) return;
+
+        // Launch drones if not already
+        if (!miner.dronesLaunched && miner.droneBay.drones.length > 0) {
+            miner.launchAllDrones();
+            miner.dronesLaunched = true;
+            // Command drones to mine
+            setTimeout(() => {
+                if (miner.alive) {
+                    miner.commandDrones('mine');
+                }
+            }, 500);
+        }
+
+        // Check if cargo is full - return to station
+        if (miner.cargoUsed >= miner.cargoCapacity * 0.9) {
+            miner.aiState = 'returning';
+            // Recall drones before heading back
+            miner.recallAllDrones();
+            miner.dronesLaunched = false;
+            return;
+        }
+
+        // Find an asteroid to mine
+        if (!miner.miningTarget || !miner.miningTarget.alive || miner.miningTarget.ore <= 0) {
+            const asteroids = this.game.currentSector?.getAsteroids() || [];
+            let closest = null;
+            let closestDist = Infinity;
+
+            for (const ast of asteroids) {
+                if (ast.ore <= 0) continue;
+                const d = miner.distanceTo(ast);
+                if (d < closestDist) {
+                    closest = ast;
+                    closestDist = d;
+                }
+            }
+
+            miner.miningTarget = closest;
+            if (!closest) {
+                // No asteroids - just idle
+                miner.aiState = 'idle';
+                return;
+            }
+        }
+
+        // Navigate to asteroid
+        const dist = miner.distanceTo(miner.miningTarget);
+        if (dist > CONFIG.MINING_RANGE) {
+            miner.setDestination(miner.miningTarget.x, miner.miningTarget.y);
+        } else {
+            // In range - slow down and mine
+            miner.desiredSpeed = 0;
+
+            // Lock target and activate mining laser
+            miner.target = miner.miningTarget;
+            if (!miner.activeModules.has('high-1')) {
+                miner.activateModule('high-1');
+            }
+        }
+    }
+
+    /**
+     * Miner is returning to station to sell ore
+     */
+    minerReturningState(miner) {
+        // Check for threats
+        if (this.checkMinerThreats(miner)) return;
+
+        const station = miner.homeStation;
+        if (!station || !station.alive) {
+            // No station - just clear cargo and resume mining
+            miner.clearCargo();
+            miner.aiState = 'mining';
+            return;
+        }
+
+        const dist = miner.distanceTo(station);
+
+        if (dist < station.dockingRange) {
+            // Arrived at station - "dock" (sell ore, repair)
+            miner.aiState = 'docked';
+            miner.dockingCooldown = 3 + Math.random() * 2; // 3-5s docked
+            miner.desiredSpeed = 0;
+
+            // Sell ore
+            const value = miner.getCargoValue();
+            if (value > 0) {
+                miner.clearCargo();
+            }
+
+            // Repair
+            miner.shield = miner.maxShield;
+            miner.armor = miner.maxArmor;
+            miner.hull = miner.maxHull;
+
+            // Make miner invisible while docked
+            miner.visible = false;
+        } else {
+            // Navigate to station
+            miner.setDestination(station.x, station.y);
+        }
+    }
+
+    /**
+     * Miner is docked at station (waiting to undock)
+     */
+    minerDockedState(miner) {
+        if (miner.dockingCooldown <= 0) {
+            // Undock and go back to mining
+            miner.visible = true;
+
+            // Position outside station
+            if (miner.homeStation) {
+                const angle = Math.random() * Math.PI * 2;
+                miner.x = miner.homeStation.x + Math.cos(angle) * (miner.homeStation.radius + 100);
+                miner.y = miner.homeStation.y + Math.sin(angle) * (miner.homeStation.radius + 100);
+            }
+
+            miner.miningTarget = null;
+            miner.aiState = 'mining';
+        }
+    }
+
+    /**
+     * Miner is fleeing from threats
+     */
+    minerFleeingState(miner) {
+        // Deactivate mining
+        miner.deactivateModule('high-1');
+        miner.target = null;
+
+        // Recall drones
+        if (miner.dronesLaunched) {
+            miner.recallAllDrones();
+            miner.dronesLaunched = false;
+        }
+
+        // Check if threat is gone
+        const threats = this.findThreatsNear(miner, 2000);
+        if (threats.length === 0) {
+            // Safe - return to mining
+            miner.aiState = 'mining';
+            return;
+        }
+
+        // Flee toward station
+        const station = miner.homeStation;
+        if (station && station.alive) {
+            miner.setDestination(station.x, station.y);
+            miner.desiredSpeed = miner.maxSpeed;
+
+            // If at station, dock
+            if (miner.distanceTo(station) < station.dockingRange) {
+                miner.aiState = 'returning';
+            }
+        } else {
+            // No station - flee away from threats
+            const threat = threats[0];
+            const fleeAngle = Math.atan2(miner.y - threat.y, miner.x - threat.x);
+            miner.setDestination(
+                miner.x + Math.cos(fleeAngle) * 2000,
+                miner.y + Math.sin(fleeAngle) * 2000
+            );
+            miner.desiredSpeed = miner.maxSpeed;
+        }
+    }
+
+    /**
+     * Check for threats near a miner, transition to fleeing if found
+     */
+    checkMinerThreats(miner) {
+        const threats = this.findThreatsNear(miner, 1200);
+        if (threats.length > 0) {
+            miner.aiState = 'fleeing';
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Update miner per-frame movement (engine trail, etc)
+     */
+    updateMinerMovement(miner, dt) {
+        if (miner.currentSpeed > 10 && Math.random() < 0.15) {
+            const trailX = miner.x - Math.cos(miner.rotation) * miner.radius;
+            const trailY = miner.y - Math.sin(miner.rotation) * miner.radius;
+            this.game.renderer?.effects.spawn('trail', trailX, trailY, {
+                color: 0x88ccff,
+                size: 1,
+                lifetime: 0.3,
+            });
+        }
+    }
+
+    // =========================================
+    // SECURITY AI
+    // =========================================
+
+    updateSecurityAI(sec, dt) {
+        switch (sec.aiState) {
+            case 'patrol':
+                this.securityPatrolState(sec);
+                break;
+            case 'responding':
+                this.securityRespondingState(sec);
+                break;
+            case 'engaging':
+                this.securityEngagingState(sec);
+                break;
+            case 'returning':
+                this.securityReturningState(sec);
+                break;
+            default:
+                sec.aiState = 'patrol';
+                break;
+        }
+    }
+
+    /**
+     * Security is patrolling its area
+     */
+    securityPatrolState(sec) {
+        // Scan for hostiles
+        const hostiles = this.findHostilesNear(sec, sec.aggroRange);
+        if (hostiles.length > 0) {
+            sec.aiTarget = hostiles[0];
+            sec.aiState = 'responding';
+            return;
+        }
+
+        // Check if player has attacked any NPCs (aggro check)
+        if (this.isPlayerAggressive(sec)) {
+            sec.aiTarget = this.game.player;
+            sec.aiState = 'responding';
+            return;
+        }
+
+        // Move along patrol route
+        if (!sec.patrolPoint || this.distSq(sec, sec.patrolPoint) < 10000) {
+            this.setSecurityPatrolPoint(sec);
+        }
+
+        sec.setDestination(sec.patrolPoint.x, sec.patrolPoint.y);
+    }
+
+    /**
+     * Security is responding to a threat (moving to engage)
+     */
+    securityRespondingState(sec) {
+        if (!sec.aiTarget || !sec.aiTarget.alive) {
+            sec.aiState = 'returning';
+            sec.aiTarget = null;
+            return;
+        }
+
+        const dist = sec.distanceTo(sec.aiTarget);
+
+        if (dist < sec.attackRange) {
+            sec.aiState = 'engaging';
+        } else {
+            sec.setDestination(sec.aiTarget.x, sec.aiTarget.y);
+            sec.desiredSpeed = sec.maxSpeed;
+        }
+    }
+
+    /**
+     * Security is actively engaging a hostile
+     */
+    securityEngagingState(sec) {
+        if (!sec.aiTarget || !sec.aiTarget.alive) {
+            sec.aiTarget = null;
+            sec.aiState = 'returning';
+            sec.deactivateModule('high-1');
+            sec.target = null;
+            return;
+        }
+
+        // Check if should flee
+        if (sec.hull < sec.maxHull * 0.15) {
+            sec.aiState = 'returning';
+            sec.deactivateModule('high-1');
+            sec.target = null;
+            return;
+        }
+
+        const dist = sec.distanceTo(sec.aiTarget);
+
+        if (dist > sec.attackRange * 1.5) {
+            // Chase
+            sec.aiState = 'responding';
+            return;
+        }
+
+        // Orbit and fire
+        sec.target = sec.aiTarget;
+        const orbitAngle = Math.atan2(sec.y - sec.aiTarget.y, sec.x - sec.aiTarget.x);
+        const orbitDist = sec.attackRange * 0.7;
+        sec.setDestination(
+            sec.aiTarget.x + Math.cos(orbitAngle + 0.1) * orbitDist,
+            sec.aiTarget.y + Math.sin(orbitAngle + 0.1) * orbitDist
+        );
+        sec.desiredSpeed = sec.maxSpeed * 0.5;
+
+        // Activate weapons
+        if (!sec.activeModules.has('high-1')) {
+            sec.activateModule('high-1');
+        }
+
+        // Activate shield booster when damaged
+        if (sec.shield < sec.maxShield * 0.7 && !sec.activeModules.has('mid-1')) {
+            sec.activateModule('mid-1');
+        }
+    }
+
+    /**
+     * Security is returning to patrol area after engagement
+     */
+    securityReturningState(sec) {
+        sec.deactivateModule('high-1');
+        sec.target = null;
+
+        // Check for new threats on the way back
+        const hostiles = this.findHostilesNear(sec, sec.aggroRange);
+        if (hostiles.length > 0) {
+            sec.aiTarget = hostiles[0];
+            sec.aiState = 'responding';
+            return;
+        }
+
+        // Head back to patrol center
+        const dist = this.distSq(sec, sec.patrolCenter);
+        if (dist < 250000) { // 500 units
+            sec.aiState = 'patrol';
+        } else {
+            sec.setDestination(sec.patrolCenter.x, sec.patrolCenter.y);
+        }
+    }
+
+    /**
+     * Update NPC movement per-frame (engine trails)
+     */
+    updateNPCMovement(npc, dt) {
+        if (npc.currentSpeed > 10 && Math.random() < 0.2) {
+            const trailX = npc.x - Math.cos(npc.rotation) * npc.radius;
+            const trailY = npc.y - Math.sin(npc.rotation) * npc.radius;
+            this.game.renderer?.effects.spawn('trail', trailX, trailY, {
+                color: npc.role === 'security' ? 0x4488ff : 0x88ccff,
+                size: 1,
+                lifetime: 0.3,
+            });
+        }
+    }
+
+    // =========================================
+    // PIRATE RAIDS
+    // =========================================
+
+    updateRaidTimer(dt, sector) {
+        const raidConfig = CONFIG.NPC_PIRATE_RAIDS[sector.difficulty];
+        if (!raidConfig || raidConfig.chance === 0) return;
+
+        this.raidTimer += dt;
+
+        if (this.raidTimer >= raidConfig.interval) {
+            this.raidTimer = 0;
+
+            // Chance-based raid spawn
+            if (Math.random() < raidConfig.chance) {
+                this.spawnPirateRaid(sector, raidConfig);
+            }
+        }
+    }
+
+    /**
+     * Spawn a pirate raid targeting miners
+     */
+    spawnPirateRaid(sector, raidConfig) {
+        const aliveMiners = this.miners.filter(m => m.alive && m.visible);
+        if (aliveMiners.length === 0) return;
+
+        // Pick a random miner as the target
+        const targetMiner = aliveMiners[Math.floor(Math.random() * aliveMiners.length)];
+
+        // Spawn 1-maxPirates pirates near the miner
+        const count = 1 + Math.floor(Math.random() * raidConfig.maxPirates);
+        const spawnAngle = Math.random() * Math.PI * 2;
+        const spawnDist = 2000 + Math.random() * 1000;
+
+        this.game.ui?.log(`Pirate activity detected on sensors!`, 'combat');
+
+        for (let i = 0; i < count; i++) {
+            const angle = spawnAngle + (i - count / 2) * 0.3;
+            const enemyType = Math.random() > 0.8 ? 'pirate-cruiser' : 'pirate-frigate';
+
+            const pirate = new EnemyShip(this.game, {
+                x: targetMiner.x + Math.cos(angle) * spawnDist,
+                y: targetMiner.y + Math.sin(angle) * spawnDist,
+                enemyType,
+                name: `Raider ${i + 1}`,
+            });
+
+            // Set AI to chase the miner (or player if nearby)
+            pirate.aiState = 'chase';
+            pirate.aiTarget = targetMiner;
+
+            sector.addEntity(pirate);
+        }
+    }
+
+    // =========================================
+    // HELPERS
+    // =========================================
+
+    /**
+     * Find hostile entities (pirates/enemies) near a position
+     */
+    findHostilesNear(entity, range) {
+        const entities = this.game.currentSector?.entities || [];
+        const rangeSq = range * range;
+        const hostiles = [];
+
+        for (const e of entities) {
+            if (!e.alive) continue;
+            if (e.type !== 'enemy') continue;
+            const dx = e.x - entity.x;
+            const dy = e.y - entity.y;
+            if (dx * dx + dy * dy < rangeSq) {
+                hostiles.push(e);
+            }
+        }
+
+        return hostiles;
+    }
+
+    /**
+     * Find threats (enemies) near an entity
+     */
+    findThreatsNear(entity, range) {
+        return this.findHostilesNear(entity, range);
+    }
+
+    /**
+     * Check if the player has recently attacked any NPC
+     * Uses a simple flag on the game object
+     */
+    isPlayerAggressive(sec) {
+        if (!this.game.playerAggressive) return false;
+        if (!this.game.player?.alive) return false;
+
+        const dist = sec.distanceTo(this.game.player);
+        return dist < sec.aggroRange;
+    }
+
+    /**
+     * Set a patrol point for security within their patrol radius
+     */
+    setSecurityPatrolPoint(sec) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * sec.patrolRadius;
+
+        sec.patrolPoint = {
+            x: sec.patrolCenter.x + Math.cos(angle) * dist,
+            y: sec.patrolCenter.y + Math.sin(angle) * dist,
+        };
+
+        // Clamp to sector bounds
+        sec.patrolPoint.x = Math.max(500, Math.min(CONFIG.SECTOR_SIZE - 500, sec.patrolPoint.x));
+        sec.patrolPoint.y = Math.max(500, Math.min(CONFIG.SECTOR_SIZE - 500, sec.patrolPoint.y));
+    }
+
+    /**
+     * Squared distance helper
+     */
+    distSq(a, b) {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        return dx * dx + dy * dy;
+    }
+}

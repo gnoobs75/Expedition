@@ -58,11 +58,14 @@ export class Camera {
         // Smooth zoom
         this.zoom = lerp(this.zoom, this.targetZoom, this.zoomSpeed * dt);
 
-        // Update shake
+        // Update shake — damped sine for cinematic feel
         if (this.shakeDuration > 0) {
             this.shakeDuration -= dt;
-            this.shakeOffsetX = (Math.random() - 0.5) * this.shakeIntensity;
-            this.shakeOffsetY = (Math.random() - 0.5) * this.shakeIntensity;
+            const decay = this.shakeDuration / (this.shakeDuration + dt); // Smooth decay
+            const freq = 15 + Math.random() * 10; // Varied frequency
+            const t = this.shakeDuration * freq;
+            this.shakeOffsetX = Math.sin(t) * this.shakeIntensity * decay;
+            this.shakeOffsetY = Math.cos(t * 1.3) * this.shakeIntensity * decay;
         } else {
             this.shakeOffsetX = 0;
             this.shakeOffsetY = 0;
@@ -113,11 +116,13 @@ export class Camera {
     }
 
     /**
-     * Move camera by offset (for panning)
+     * Move camera by offset in screen pixels
      */
     pan(dx, dy) {
-        this.targetX += dx / this.zoom;
-        this.targetY += dy / this.zoom;
+        const viewHeight = 1000000 / this.zoom;
+        const pixelToWorld = viewHeight / window.innerHeight;
+        this.targetX += dx * pixelToWorld;
+        this.targetY -= dy * pixelToWorld; // Screen Y is inverted vs world Y
     }
 
     /**
@@ -130,10 +135,13 @@ export class Camera {
 
     /**
      * Get view bounds (for culling)
+     * Uses same frustum formula as Renderer: viewHeight = 1000000 / zoom
      */
     getViewBounds() {
-        const halfWidth = (window.innerWidth / 2) / this.zoom;
-        const halfHeight = (window.innerHeight / 2) / this.zoom;
+        const viewHeight = 1000000 / this.zoom;
+        const aspect = window.innerWidth / window.innerHeight;
+        const halfWidth = (viewHeight * aspect) / 2;
+        const halfHeight = viewHeight / 2;
 
         return {
             left: this.x - halfWidth,

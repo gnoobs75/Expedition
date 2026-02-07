@@ -13,6 +13,7 @@ import { CombatSystem } from '../systems/CombatSystem.js';
 import { MiningSystem } from '../systems/MiningSystem.js';
 import { CollisionSystem } from '../systems/CollisionSystem.js';
 import { AISystem } from '../systems/AISystem.js';
+import { NPCSystem } from '../systems/NPCSystem.js';
 import { AutopilotSystem } from '../systems/AutopilotSystem.js';
 import { UIManager } from '../ui/UIManager.js';
 import { AudioManager } from './AudioManager.js';
@@ -50,7 +51,9 @@ export class Game {
         this.mining = null;
         this.collision = null;
         this.ai = null;
+        this.npcSystem = null;
         this.autopilot = null;
+        this.playerAggressive = false;
         this.ui = null;
         this.audio = null;
     }
@@ -86,6 +89,7 @@ export class Game {
         this.mining = new MiningSystem(this);
         this.collision = new CollisionSystem(this);
         this.ai = new AISystem(this);
+        this.npcSystem = new NPCSystem(this);
         this.autopilot = new AutopilotSystem(this);
 
         // Create UI manager (last, needs other systems)
@@ -231,12 +235,16 @@ export class Game {
         }
 
         this.currentSector = sector;
+        this.playerAggressive = false;
 
         // Generate sector content if not already done
         sector.generate();
 
         // Add sector entities to renderer
         this.renderer.loadSector(sector);
+
+        // Spawn NPCs for this sector
+        this.npcSystem.onSectorEnter(sector);
 
         // Fire event
         this.events.emit('sector:change', sectorId);
@@ -429,6 +437,7 @@ export class Game {
 
         // Update game systems
         this.ai.update(dt);
+        this.npcSystem.update(dt);
         this.combat.update(dt);
         this.mining.update(dt);
         this.collision.update(dt);

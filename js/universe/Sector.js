@@ -98,7 +98,7 @@ export class Sector {
      */
     generateAsteroidFields() {
         const density = this.difficultyConfig.asteroidDensity;
-        const fieldCount = Math.floor(3 + density * 4); // More fields for larger space
+        const fieldCount = Math.floor(6 + density * 8); // Double the fields
 
         const centerX = CONFIG.SECTOR_SIZE / 2;
         const centerY = CONFIG.SECTOR_SIZE / 2;
@@ -108,8 +108,10 @@ export class Sector {
         const maxDistFromCenter = CONFIG.SECTOR_SIZE / 2 - 2000;
 
         for (let f = 0; f < fieldCount; f++) {
-            // Position field at a distance from center (scattered around the planet)
-            const fieldAngle = this.random.angle();
+            // Distribute fields evenly around planet, with some randomness
+            // This ensures coverage on all sides including south
+            const baseAngle = (f / fieldCount) * Math.PI * 2;
+            const fieldAngle = baseAngle + this.random.float(-0.3, 0.3);
             const fieldDist = this.random.float(minDistFromCenter, maxDistFromCenter);
 
             const fieldX = centerX + Math.cos(fieldAngle) * fieldDist;

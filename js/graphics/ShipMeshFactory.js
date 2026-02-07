@@ -1,9 +1,13 @@
 // =============================================
 // Ship Mesh Factory
-// Procedural 3D mesh generation for all ship types
+// Procedural 3D mesh generation + GLB model loading for all ship types
 // =============================================
 
+import { CONFIG } from '../config.js';
 import { SHIP_DATABASE } from '../data/shipDatabase.js';
+
+// GLB model cache: path -> { scene: THREE.Group, loading: bool, callbacks: [] }
+const MODEL_CACHE = {};
 
 // Size configurations
 const SIZE_CONFIGS = {
@@ -615,6 +619,324 @@ class ShipMeshFactory {
         const mount = new THREE.Mesh(mountGeo, mountMat);
         mount.position.set(x, y, 0.05);
         group.add(mount);
+    }
+
+    // =============================================
+    // GLB MODEL LOADING
+    // =============================================
+
+    /**
+     * Get the model path for a ship, checking shipDatabase and CONFIG.SHIPS
+     */
+    getModelPath(shipId) {
+        const dbConfig = SHIP_DATABASE[shipId];
+        if (dbConfig?.modelPath) return dbConfig.modelPath;
+        const cfgConfig = CONFIG.SHIPS?.[shipId];
+        if (cfgConfig?.modelPath) return cfgConfig.modelPath;
+        return null;
+    }
+
+    /**
+     * Check if a GLB model is already loaded and cached for a ship
+     */
+    hasLoadedModel(shipId) {
+        const path = this.getModelPath(shipId);
+        return path && MODEL_CACHE[path]?.scene;
+    }
+
+    /**
+     * Get a cached GLB model clone (sync - returns null if not loaded yet)
+     */
+    getCachedModel(shipId, targetSize) {
+        const path = this.getModelPath(shipId);
+        if (!path || !MODEL_CACHE[path]?.scene) return null;
+
+        const clone = MODEL_CACHE[path].scene.clone();
+        this.normalizeModelSize(clone, targetSize);
+        this.applyOrientation(clone, path);
+        return clone;
+    }
+
+    /**
+     * Load a GLB model async. Returns a Promise that resolves to a THREE.Group clone.
+     * Uses cache so repeated calls for the same path don't re-fetch.
+     */
+    loadModel(shipId, targetSize = 40) {
+        const path = this.getModelPath(shipId);
+        if (!path) return Promise.resolve(null);
+
+        // Return cached clone immediately
+        if (MODEL_CACHE[path]?.scene) {
+            const clone = MODEL_CACHE[path].scene.clone();
+            this.normalizeModelSize(clone, targetSize);
+            this.applyOrientation(clone, path);
+            return Promise.resolve(clone);
+        }
+
+        // Already loading - queue a callback
+        if (MODEL_CACHE[path]?.loading) {
+            return new Promise((resolve) => {
+                MODEL_CACHE[path].callbacks.push((scene) => {
+                    if (scene) {
+                        const clone = scene.clone();
+                        this.normalizeModelSize(clone, targetSize);
+                        this.applyOrientation(clone, path);
+                        resolve(clone);
+                    } else {
+                        resolve(null);
+                    }
+                });
+            });
+        }
+
+        // Start loading
+        MODEL_CACHE[path] = { scene: null, loading: true, callbacks: [] };
+
+        return new Promise((resolve) => {
+            if (typeof THREE.GLTFLoader === 'undefined') {
+                console.warn('[ShipMeshFactory] GLTFLoader not available');
+                MODEL_CACHE[path].loading = false;
+                resolve(null);
+                return;
+            }
+
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                path,
+                (gltf) => {
+                    const scene = gltf.scene;
+
+                    // Upgrade materials for visibility in space
+                    scene.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material.side = THREE.DoubleSide;
+                            if (child.material.metalness !== undefined) {
+                                child.material.metalness = Math.min(child.material.metalness, 0.6);
+                                child.material.roughness = Math.max(child.material.roughness, 0.3);
+                            }
+                            // Add emissive glow based on base color so models are visible in dark space
+                            if (child.material.color && child.material.emissive !== undefined) {
+                                child.material.emissive = child.material.color.clone().multiplyScalar(0.3);
+                                child.material.emissiveIntensity = 1.0;
+                            }
+                        }
+                    });
+
+                    MODEL_CACHE[path].scene = scene;
+                    MODEL_CACHE[path].loading = false;
+
+                    // Resolve this promise
+                    const clone = scene.clone();
+                    this.normalizeModelSize(clone, targetSize);
+                    this.applyOrientation(clone, path);
+                    resolve(clone);
+
+                    // Resolve queued callbacks
+                    for (const cb of MODEL_CACHE[path].callbacks) {
+                        cb(scene);
+                    }
+                    MODEL_CACHE[path].callbacks = [];
+                },
+                undefined,
+                (error) => {
+                    console.warn(`[ShipMeshFactory] Failed to load ${path}:`, error);
+                    MODEL_CACHE[path].loading = false;
+                    resolve(null);
+                    for (const cb of MODEL_CACHE[path].callbacks) {
+                        cb(null);
+                    }
+                    MODEL_CACHE[path].callbacks = [];
+                }
+            );
+        });
+    }
+
+    /**
+     * Normalize a loaded model to fit within targetSize units.
+     * Centers the model and scales uniformly.
+     */
+    normalizeModelSize(group, targetSize) {
+        const box = new THREE.Box3().setFromObject(group);
+
+        // Center the model by offsetting children (not group.position)
+        // This ensures rotation works correctly around the model's center
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+        group.children.forEach(child => {
+            child.position.sub(center);
+        });
+
+        // Scale to target size
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        if (maxDim > 0) {
+            const scale = targetSize / maxDim;
+            group.scale.multiplyScalar(scale);
+        }
+    }
+
+    /**
+     * Generate mesh with GLB if available (async), falls back to procedural.
+     * Returns a Promise<THREE.Group>.
+     * Use this for 3D viewers where async is fine.
+     */
+    async generateShipMeshAsync(config) {
+        const { shipId, role, size, detailLevel = 'low' } = config;
+        const targetSize = detailLevel === 'high' ? 50 : 30;
+
+        // Try GLB first
+        const glbMesh = await this.loadModel(shipId, targetSize);
+        if (glbMesh) return glbMesh;
+
+        // Fallback to procedural
+        return this.generateShipMesh(config);
+    }
+
+    // =============================================
+    // ORIENTATION STORAGE & APPLICATION
+    // =============================================
+
+    /**
+     * Get saved orientation for a model path from localStorage
+     * @param {string} path - Model file path
+     * @returns {{ rx: number, ry: number, rz: number, scale: number } | null}
+     */
+    getModelOrientation(path) {
+        try {
+            const data = JSON.parse(localStorage.getItem('glb-orientations') || '{}');
+            return data[path] || null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Save orientation for a model path to localStorage
+     * @param {string} path - Model file path
+     * @param {{ rx: number, ry: number, rz: number, scale: number }} orientation
+     */
+    saveModelOrientation(path, orientation) {
+        try {
+            const data = JSON.parse(localStorage.getItem('glb-orientations') || '{}');
+            data[path] = orientation;
+            localStorage.setItem('glb-orientations', JSON.stringify(data));
+        } catch (e) {
+            console.warn('[ShipMeshFactory] Failed to save orientation:', e);
+        }
+    }
+
+    /**
+     * Apply saved orientation to a model group via a wrapper Group.
+     * Creates a wrapper, reparents all children into it, then applies rotation/scale.
+     * @param {THREE.Group} group - The model group (already normalized)
+     * @param {string} path - Model file path to look up orientation
+     * @returns {THREE.Group} The group (modified in place)
+     */
+    applyOrientation(group, path) {
+        const orientation = this.getModelOrientation(path);
+        if (!orientation) return group;
+
+        const wrapper = new THREE.Group();
+        wrapper.name = 'orientation-wrapper';
+
+        // Move all children into the wrapper
+        while (group.children.length > 0) {
+            wrapper.add(group.children[0]);
+        }
+
+        // Apply orientation
+        wrapper.rotation.x = (orientation.rx || 0) * Math.PI / 180;
+        wrapper.rotation.y = (orientation.ry || 0) * Math.PI / 180;
+        wrapper.rotation.z = (orientation.rz || 0) * Math.PI / 180;
+        if (orientation.scale && orientation.scale !== 1) {
+            wrapper.scale.multiplyScalar(orientation.scale);
+        }
+
+        group.add(wrapper);
+        return group;
+    }
+
+    /**
+     * Load a GLB model by path directly (for the model editor).
+     * Returns a Promise that resolves to a THREE.Group clone.
+     * Does NOT apply saved orientation (editor shows raw model).
+     */
+    loadModelByPath(path, targetSize = 40) {
+        if (!path) return Promise.resolve(null);
+
+        // Return cached clone immediately
+        if (MODEL_CACHE[path]?.scene) {
+            const clone = MODEL_CACHE[path].scene.clone();
+            this.normalizeModelSize(clone, targetSize);
+            return Promise.resolve(clone);
+        }
+
+        // Already loading - queue a callback
+        if (MODEL_CACHE[path]?.loading) {
+            return new Promise((resolve) => {
+                MODEL_CACHE[path].callbacks.push((scene) => {
+                    if (scene) {
+                        const clone = scene.clone();
+                        this.normalizeModelSize(clone, targetSize);
+                        resolve(clone);
+                    } else {
+                        resolve(null);
+                    }
+                });
+            });
+        }
+
+        // Start loading
+        MODEL_CACHE[path] = { scene: null, loading: true, callbacks: [] };
+
+        return new Promise((resolve) => {
+            if (typeof THREE.GLTFLoader === 'undefined') {
+                console.warn('[ShipMeshFactory] GLTFLoader not available');
+                MODEL_CACHE[path].loading = false;
+                resolve(null);
+                return;
+            }
+
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                path,
+                (gltf) => {
+                    const scene = gltf.scene;
+                    scene.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material.side = THREE.DoubleSide;
+                            if (child.material.metalness !== undefined) {
+                                child.material.metalness = Math.min(child.material.metalness, 0.8);
+                                child.material.roughness = Math.max(child.material.roughness, 0.2);
+                            }
+                        }
+                    });
+
+                    MODEL_CACHE[path].scene = scene;
+                    MODEL_CACHE[path].loading = false;
+
+                    const clone = scene.clone();
+                    this.normalizeModelSize(clone, targetSize);
+                    resolve(clone);
+
+                    for (const cb of MODEL_CACHE[path].callbacks) {
+                        cb(scene);
+                    }
+                    MODEL_CACHE[path].callbacks = [];
+                },
+                undefined,
+                (error) => {
+                    console.warn(`[ShipMeshFactory] Failed to load ${path}:`, error);
+                    MODEL_CACHE[path].loading = false;
+                    resolve(null);
+                    for (const cb of MODEL_CACHE[path].callbacks) {
+                        cb(null);
+                    }
+                    MODEL_CACHE[path].callbacks = [];
+                }
+            );
+        });
     }
 
     // =============================================

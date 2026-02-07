@@ -503,6 +503,13 @@ export class InputManager {
                 e.preventDefault();
                 this.game.ui?.togglePerformanceMonitor();
                 break;
+
+            case 'toggleModelEditor':
+                this.game.ui?.toggleModelEditor();
+                break;
+            case 'spawnBattleEvent':
+                this.game.npcSystem?.spawnBattleEvent();
+                break;
         }
     }
 

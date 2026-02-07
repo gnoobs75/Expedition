@@ -93,22 +93,28 @@ export class AISystem {
             return player;
         }
 
-        // Look for nearby NPC miners to attack
+        // Look for nearby NPCs to attack (prefer miners, but also target security)
         const entities = this.game.currentSector?.entities || [];
+        let closestMiner = null;
+        let closestMinerDist = enemy.aggroRange;
         let closestNPC = null;
-        let closestDist = enemy.aggroRange;
+        let closestNPCDist = enemy.aggroRange;
 
         for (const e of entities) {
             if (!e.alive || e.type !== 'npc') continue;
-            if (e.role !== 'miner') continue;
             const d = enemy.distanceTo(e);
-            if (d < closestDist) {
+            if (e.role === 'miner' && d < closestMinerDist) {
+                closestMiner = e;
+                closestMinerDist = d;
+            }
+            if (e.role === 'security' && d < closestNPCDist) {
                 closestNPC = e;
-                closestDist = d;
+                closestNPCDist = d;
             }
         }
 
-        return closestNPC;
+        // Prefer miners, fall back to security
+        return closestMiner || closestNPC;
     }
 
     /**

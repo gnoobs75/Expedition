@@ -41,6 +41,7 @@ export const SHIP_DATABASE = {
         description: 'Entry-level mining frigate with built-in ore hold bonus.',
         size: 'frigate',
         role: 'mining',
+        modelPath: 'assets/ships/Miner/Miner.glb',
         maxSpeed: 130,
         acceleration: 28,
         turnSpeed: 2.2,

@@ -63,6 +63,7 @@ export const CONFIG = {
             droneCapacity: 2,
             droneBandwidth: 20,
             price: 5000,
+            modelPath: 'assets/ships/Miner/Miner.glb',
         },
         cruiser: {
             name: 'Cruiser',
@@ -262,18 +263,18 @@ export const CONFIG = {
         deadly: { count: 0, shipClass: 'frigate', droneCount: 0 },
     },
     NPC_SECURITY: {
-        hub: { count: 3, shipClass: 'cruiser' },
-        safe: { count: 2, shipClass: 'cruiser' },
-        normal: { count: 2, shipClass: 'frigate' },
-        dangerous: { count: 1, shipClass: 'frigate' },
-        deadly: { count: 0, shipClass: 'frigate' },
+        hub: { count: 5, shipClass: 'cruiser' },
+        safe: { count: 4, shipClass: 'cruiser' },
+        normal: { count: 3, shipClass: 'frigate' },
+        dangerous: { count: 2, shipClass: 'frigate' },
+        deadly: { count: 1, shipClass: 'frigate' },
     },
     NPC_PIRATE_RAIDS: {
         hub: { chance: 0, interval: 999, maxPirates: 0 },
-        safe: { chance: 0.15, interval: 180, maxPirates: 1 },
-        normal: { chance: 0.3, interval: 180, maxPirates: 2 },
-        dangerous: { chance: 0.5, interval: 180, maxPirates: 3 },
-        deadly: { chance: 0.7, interval: 180, maxPirates: 3 },
+        safe: { chance: 0.25, interval: 120, maxPirates: 2 },
+        normal: { chance: 0.45, interval: 90, maxPirates: 3 },
+        dangerous: { chance: 0.6, interval: 60, maxPirates: 4 },
+        deadly: { chance: 0.8, interval: 45, maxPirates: 5 },
     },
 
     // Colors

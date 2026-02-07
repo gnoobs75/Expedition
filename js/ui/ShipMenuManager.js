@@ -4,6 +4,8 @@
 // =============================================
 
 import { CONFIG } from '../config.js';
+import { SHIP_DATABASE } from '../data/shipDatabase.js';
+import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
 import { formatDistance, formatCredits } from '../utils/math.js';
 
 export class ShipMenuManager {
@@ -108,17 +110,24 @@ export class ShipMenuManager {
         });
         this.renderer.setSize(width, height);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 2.5;
 
         // Add lighting
-        const ambientLight = new THREE.AmbientLight(0x404050, 0.6);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
         this.scene.add(ambientLight);
 
-        const mainLight = new THREE.DirectionalLight(0x00ffff, 1.0);
-        mainLight.position.set(5, 5, 5);
+        const mainLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        mainLight.position.set(5, 8, 5);
         this.scene.add(mainLight);
 
-        const backLight = new THREE.DirectionalLight(0x0066ff, 0.5);
-        backLight.position.set(-5, -3, -5);
+        const fillLight = new THREE.DirectionalLight(0x88bbff, 1.0);
+        fillLight.position.set(-5, 3, -4);
+        this.scene.add(fillLight);
+
+        const backLight = new THREE.DirectionalLight(0x00ccff, 0.6);
+        backLight.position.set(0, -5, -5);
         this.scene.add(backLight);
 
         // Add subtle grid for depth
@@ -138,16 +147,37 @@ export class ShipMenuManager {
     }
 
     /**
-     * Create or update the ship mesh in the viewer
+     * Create or update the ship mesh in the viewer (async GLB with procedural fallback)
      */
     createShipMesh() {
         const player = this.game.player;
         if (!player || !this.scene) return;
 
         // Remove existing ship mesh
+        this.removeShipMesh();
+
+        const shipConfig = SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
+
+        // Try async GLB loading
+        shipMeshFactory.generateShipMeshAsync({
+            shipId: player.shipClass,
+            role: shipConfig?.role || 'mercenary',
+            size: shipConfig?.size || 'small',
+            detailLevel: 'high',
+        }).then(mesh => {
+            if (!mesh || !this.visible) return;
+            this.removeShipMesh();
+            this.shipMesh = mesh;
+            this.scene.add(this.shipMesh);
+        });
+    }
+
+    /**
+     * Remove current ship mesh and dispose resources
+     */
+    removeShipMesh() {
         if (this.shipMesh) {
             this.scene.remove(this.shipMesh);
-            // Dispose of geometry and materials
             this.shipMesh.traverse(child => {
                 if (child.geometry) child.geometry.dispose();
                 if (child.material) {
@@ -158,94 +188,8 @@ export class ShipMenuManager {
                     }
                 }
             });
+            this.shipMesh = null;
         }
-
-        // Create ship mesh group
-        const group = new THREE.Group();
-        const size = 25; // Scale for viewer
-
-        // Main hull
-        const hullShape = new THREE.Shape();
-        hullShape.moveTo(size * 1.2, 0);
-        hullShape.lineTo(-size * 0.6, size * 0.6);
-        hullShape.lineTo(-size * 0.3, 0);
-        hullShape.lineTo(-size * 0.6, -size * 0.6);
-        hullShape.closePath();
-
-        const extrudeSettings = {
-            depth: 8,
-            bevelEnabled: true,
-            bevelThickness: 2,
-            bevelSize: 1,
-            bevelSegments: 2,
-        };
-
-        const hullGeometry = new THREE.ExtrudeGeometry(hullShape, extrudeSettings);
-        const hullMaterial = new THREE.MeshPhongMaterial({
-            color: 0x00aaff,
-            transparent: true,
-            opacity: 0.9,
-            shininess: 50,
-            specular: 0x00ffff,
-        });
-        const hull = new THREE.Mesh(hullGeometry, hullMaterial);
-        hull.position.z = -4;
-        group.add(hull);
-
-        // Cockpit
-        const cockpitGeometry = new THREE.SphereGeometry(size * 0.2, 16, 16);
-        const cockpitMaterial = new THREE.MeshPhongMaterial({
-            color: 0x00ffff,
-            transparent: true,
-            opacity: 0.8,
-            emissive: 0x003344,
-            emissiveIntensity: 0.5,
-        });
-        const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
-        cockpit.position.set(size * 0.2, 0, 0);
-        cockpit.scale.z = 0.5;
-        group.add(cockpit);
-
-        // Engine glows
-        const engineGeometry = new THREE.CylinderGeometry(size * 0.15, size * 0.1, 5, 16);
-        const engineMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00ffff,
-            transparent: true,
-            opacity: 0.7,
-        });
-
-        const engine1 = new THREE.Mesh(engineGeometry, engineMaterial);
-        engine1.rotation.z = Math.PI / 2;
-        engine1.position.set(-size * 0.55, size * 0.3, 0);
-        group.add(engine1);
-
-        const engine2 = engine1.clone();
-        engine2.position.set(-size * 0.55, -size * 0.3, 0);
-        group.add(engine2);
-
-        // Wing accents
-        const wingGeometry = new THREE.BoxGeometry(size * 0.1, size * 0.4, 3);
-        const wingMaterial = new THREE.MeshPhongMaterial({
-            color: 0x0066aa,
-            transparent: true,
-            opacity: 0.8,
-        });
-
-        const wing1 = new THREE.Mesh(wingGeometry, wingMaterial);
-        wing1.position.set(-size * 0.2, size * 0.5, 0);
-        wing1.rotation.z = 0.3;
-        group.add(wing1);
-
-        const wing2 = wing1.clone();
-        wing2.position.set(-size * 0.2, -size * 0.5, 0);
-        wing2.rotation.z = -0.3;
-        group.add(wing2);
-
-        // Center the model
-        group.position.set(0, 0, 0);
-
-        this.shipMesh = group;
-        this.scene.add(this.shipMesh);
     }
 
     /**
@@ -258,7 +202,7 @@ export class ShipMenuManager {
         }
 
         // Rotate ship
-        this.shipMesh.rotation.z += 0.005;
+        this.shipMesh.rotation.y += 0.005;
         this.shipMesh.rotation.x = Math.sin(Date.now() * 0.001) * 0.1;
 
         // Render

@@ -476,6 +476,69 @@
             </div>
         </div>
 
+        <!-- Model Editor Modal -->
+        <div id="model-editor-modal" class="modal hidden">
+            <div class="modal-content model-editor-modal">
+                <div class="modal-header">
+                    <span>MODEL EDITOR</span>
+                    <button class="modal-close" id="model-editor-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="model-editor-layout">
+                        <div class="model-editor-viewports">
+                            <div class="model-editor-viewport">
+                                <div class="viewport-label">3D PREVIEW <span class="viewport-hint">drag to rotate, scroll to zoom</span></div>
+                                <canvas id="model-editor-3d-canvas"></canvas>
+                            </div>
+                            <div class="model-editor-viewport">
+                                <div class="viewport-label">TOP-DOWN (GAME VIEW) <span class="viewport-hint">scroll to zoom</span></div>
+                                <canvas id="model-editor-topdown-canvas"></canvas>
+                            </div>
+                        </div>
+                        <div class="model-editor-controls">
+                            <div class="editor-control-group">
+                                <label>Model Path</label>
+                                <div class="editor-path-row">
+                                    <input type="text" id="editor-model-path" placeholder="assets/ships/...">
+                                    <button id="editor-load-btn" class="buy-btn">LOAD</button>
+                                </div>
+                                <div id="editor-model-list" class="editor-model-list"></div>
+                            </div>
+                            <div class="editor-control-group">
+                                <label>Rotation X: <span id="editor-rx-val">0</span>&deg;</label>
+                                <input type="range" id="editor-rx" min="-180" max="180" value="0" step="1">
+                            </div>
+                            <div class="editor-control-group">
+                                <label>Rotation Y: <span id="editor-ry-val">0</span>&deg;</label>
+                                <input type="range" id="editor-ry" min="-180" max="180" value="0" step="1">
+                            </div>
+                            <div class="editor-control-group">
+                                <label>Rotation Z: <span id="editor-rz-val">0</span>&deg;</label>
+                                <input type="range" id="editor-rz" min="-180" max="180" value="0" step="1">
+                            </div>
+                            <div class="editor-control-group">
+                                <label>Scale: <span id="editor-scale-val">1.0</span></label>
+                                <input type="range" id="editor-scale" min="0.1" max="5" value="1" step="0.1">
+                            </div>
+                            <div class="editor-control-group editor-brightness-group">
+                                <label>Brightness: <span id="editor-brightness-val">2.5</span></label>
+                                <input type="range" id="editor-brightness" min="0.5" max="6" value="2.5" step="0.1">
+                            </div>
+                            <div class="editor-control-group">
+                                <label>Assign to Ship</label>
+                                <select id="editor-ship-select" class="market-filter-select" style="width:100%"></select>
+                            </div>
+                            <div class="editor-buttons">
+                                <button id="editor-save-btn" class="buy-btn large">SAVE ORIENTATION</button>
+                                <button id="editor-assign-btn" class="buy-btn">ASSIGN TO SHIP</button>
+                                <button id="editor-reset-btn" class="buy-btn">RESET</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Sector Map Modal -->
         <div id="sector-map-modal" class="modal hidden">
             <div class="modal-content map-modal">
@@ -510,6 +573,7 @@
 
     <!-- Load Three.js from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
     <!-- Game Scripts -->
     <script type="module" src="js/main.js"></script>

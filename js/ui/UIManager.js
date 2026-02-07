@@ -13,6 +13,7 @@ import { PanelDragManager } from './PanelDragManager.js';
 import { ShipMenuManager } from './ShipMenuManager.js';
 import { SectorMapManager } from './SectorMapManager.js';
 import { StationVendorManager } from './StationVendorManager.js';
+import { ModelEditorManager } from './ModelEditorManager.js';
 import { PerformanceMonitor } from '../utils/PerformanceMonitor.js';
 
 export class UIManager {
@@ -44,6 +45,9 @@ export class UIManager {
 
         // Station vendor manager
         this.vendorManager = new StationVendorManager(game);
+
+        // Model editor manager (for G key)
+        this.modelEditorManager = new ModelEditorManager(game);
 
         // Performance monitor
         this.performanceMonitor = new PerformanceMonitor(game);
@@ -636,6 +640,7 @@ export class UIManager {
         }
 
         this.elements.targetPanel.classList.remove('hidden');
+        this.panelDragManager?.constrainPanel('target-panel');
         this.elements.targetName.textContent = target.name;
         this.elements.targetType.textContent = (target.type === 'npc' ? target.role : target.type).toUpperCase();
 
@@ -670,29 +675,24 @@ export class UIManager {
         this.shipViewerScene = new THREE.Scene();
         this.shipViewerScene.background = new THREE.Color(0x000a14);
 
-        this.shipViewerCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        this.shipViewerCamera.position.set(0, 50, 120);
+        this.shipViewerCamera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+        this.shipViewerCamera.position.set(0, 15, 70);
         this.shipViewerCamera.lookAt(0, 0, 0);
+        this.shipViewerAngle = 0;
 
         this.shipViewerRenderer = new THREE.WebGLRenderer({ canvas, antialias: true });
         this.shipViewerRenderer.setSize(width, height);
         this.shipViewerRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        // Lighting
-        const ambient = new THREE.AmbientLight(0x404050, 0.6);
+        // Lighting - moderate so model detail shows through
+        const ambient = new THREE.AmbientLight(0x334466, 0.8);
         this.shipViewerScene.add(ambient);
-        const mainLight = new THREE.DirectionalLight(0x00ffff, 1.0);
-        mainLight.position.set(5, 5, 5);
-        this.shipViewerScene.add(mainLight);
-        const backLight = new THREE.DirectionalLight(0x0066ff, 0.5);
-        backLight.position.set(-5, -3, -5);
-        this.shipViewerScene.add(backLight);
-
-        // Grid background
-        const grid = new THREE.GridHelper(200, 20, 0x003344, 0x001122);
-        grid.rotation.x = Math.PI / 2;
-        grid.position.z = -50;
-        this.shipViewerScene.add(grid);
+        const keyLight = new THREE.DirectionalLight(0x88ccff, 0.9);
+        keyLight.position.set(3, 5, 5);
+        this.shipViewerScene.add(keyLight);
+        const rimLight = new THREE.DirectionalLight(0x00aaff, 0.4);
+        rimLight.position.set(-3, -2, -3);
+        this.shipViewerScene.add(rimLight);
 
         this.shipViewerInitialized = true;
         this.updateShipViewerMesh();
@@ -704,8 +704,45 @@ export class UIManager {
     updateShipViewerMesh() {
         if (!this.shipViewerScene) return;
 
-        // Remove old mesh
-        if (this.shipViewerMesh) {
+        const player = this.game.player;
+        if (!player) return;
+
+        const shipConfig = SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
+        if (!shipConfig) return;
+
+        // Update name/class text immediately
+        if (this.elements.shipIndicatorName) {
+            this.elements.shipIndicatorName.textContent = shipConfig.name || 'Your Ship';
+        }
+        if (this.elements.shipIndicatorClass) {
+            const role = shipConfig.role ? shipConfig.role.toUpperCase() : '';
+            const size = shipConfig.size ? shipConfig.size.toUpperCase() : '';
+            this.elements.shipIndicatorClass.textContent = role && size ? `${role} - ${size}` : '';
+        }
+
+        // Load mesh async (GLB if available, procedural fallback)
+        shipMeshFactory.generateShipMeshAsync({
+            shipId: player.shipClass,
+            role: shipConfig.role || 'mercenary',
+            size: shipConfig.size || 'small',
+            detailLevel: 'high',
+        }).then(mesh => {
+            if (!mesh) return;
+            // Remove old mesh
+            this.removeShipViewerMesh();
+            // Stand the ship upright: rotate so top-down model faces camera nicely
+            // Game model lies flat in XY plane; rotate to stand up along Y
+            mesh.rotation.x = -Math.PI / 2;
+            this.shipViewerMesh = mesh;
+            this.shipViewerScene.add(this.shipViewerMesh);
+        });
+    }
+
+    /**
+     * Remove current ship viewer mesh and dispose resources
+     */
+    removeShipViewerMesh() {
+        if (this.shipViewerMesh && this.shipViewerScene) {
             this.shipViewerScene.remove(this.shipViewerMesh);
             this.shipViewerMesh.traverse(child => {
                 if (child.geometry) child.geometry.dispose();
@@ -718,36 +755,6 @@ export class UIManager {
                 }
             });
             this.shipViewerMesh = null;
-        }
-
-        const player = this.game.player;
-        if (!player) return;
-
-        const shipConfig = SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
-        if (!shipConfig) return;
-
-        // Generate mesh using ShipMeshFactory
-        try {
-            this.shipViewerMesh = shipMeshFactory.generateShipMesh({
-                shipId: player.shipClass,
-                role: shipConfig.role || 'mercenary',
-                size: shipConfig.size || 'small',
-                detailLevel: 'high',
-            });
-            this.shipViewerScene.add(this.shipViewerMesh);
-        } catch (e) {
-            // Fallback: create a simple ship shape
-            this.createFallbackShipMesh();
-        }
-
-        // Update name/class text
-        if (this.elements.shipIndicatorName) {
-            this.elements.shipIndicatorName.textContent = shipConfig.name || 'Your Ship';
-        }
-        if (this.elements.shipIndicatorClass) {
-            const role = shipConfig.role ? shipConfig.role.toUpperCase() : '';
-            const size = shipConfig.size ? shipConfig.size.toUpperCase() : '';
-            this.elements.shipIndicatorClass.textContent = role && size ? `${role} - ${size}` : '';
         }
     }
 
@@ -786,10 +793,16 @@ export class UIManager {
         if (this.elements.shipArmorBar) this.elements.shipArmorBar.style.width = `${health.armor}%`;
         if (this.elements.shipHullBar) this.elements.shipHullBar.style.width = `${health.hull}%`;
 
-        // Animate 3D viewer
+        // Animate 3D viewer - orbit camera around ship standing upright
         if (this.shipViewerMesh && this.shipViewerRenderer && this.shipViewerScene) {
-            this.shipViewerMesh.rotation.z += 0.005;
-            this.shipViewerMesh.rotation.x = Math.sin(Date.now() * 0.001) * 0.1;
+            this.shipViewerAngle += 0.006;
+            const r = 70;
+            this.shipViewerCamera.position.set(
+                r * Math.cos(this.shipViewerAngle),
+                15,
+                r * Math.sin(this.shipViewerAngle)
+            );
+            this.shipViewerCamera.lookAt(0, 0, 0);
             this.shipViewerRenderer.render(this.shipViewerScene, this.shipViewerCamera);
         }
     }
@@ -1211,8 +1224,12 @@ export class UIManager {
 
             items.push(`<div class="menu-separator"></div>`);
 
-            // Lock target
-            items.push(`<div class="menu-item" data-action="lock">Lock Target</div>`);
+            // Lock / Unlock target
+            if (entity === this.game.lockedTarget) {
+                items.push(`<div class="menu-item" data-action="unlock">Unlock Target</div>`);
+            } else {
+                items.push(`<div class="menu-item" data-action="lock">Lock Target</div>`);
+            }
             items.push(`<div class="menu-item" data-action="look-at">Look At</div>`);
 
             // Warp (only if far enough)
@@ -1306,6 +1323,9 @@ export class UIManager {
         switch (action) {
             case 'lock':
                 this.game.lockTarget(target);
+                break;
+            case 'unlock':
+                this.game.unlockTarget();
                 break;
             case 'look-at':
                 this.game.camera.lookAt(target);
@@ -1675,6 +1695,13 @@ export class UIManager {
      */
     togglePerformanceMonitor() {
         this.performanceMonitor?.toggle();
+    }
+
+    /**
+     * Toggle Model Editor (G key)
+     */
+    toggleModelEditor() {
+        this.modelEditorManager?.toggle();
     }
 
     /**

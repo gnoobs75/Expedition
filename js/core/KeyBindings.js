@@ -39,6 +39,8 @@ export const DEFAULT_BINDINGS = {
     'toggleObjectViewer': { key: 'KeyI', description: 'Toggle Object Viewer', category: 'UI' },
     'toggleShipMenu': { key: 'KeyC', description: 'Toggle Ship Menu', category: 'UI' },
     'togglePerformanceMonitor': { key: 'F3', description: 'Toggle Performance Monitor', category: 'UI' },
+    'toggleModelEditor': { key: 'KeyG', description: 'Toggle Model Editor', category: 'UI' },
+    'spawnBattleEvent': { key: 'KeyP', description: 'Spawn Battle Event (Stress Test)', category: 'UI' },
 };
 
 export class KeyBindings {

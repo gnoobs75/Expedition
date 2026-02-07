@@ -270,15 +270,21 @@ export class StationVendorManager {
         this.vendorRenderer = new THREE.WebGLRenderer({ canvas, antialias: true });
         this.vendorRenderer.setSize(width, height);
         this.vendorRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.vendorRenderer.outputEncoding = THREE.sRGBEncoding;
+        this.vendorRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.vendorRenderer.toneMappingExposure = 2.5;
 
         // Lighting
-        const ambient = new THREE.AmbientLight(0x404050, 0.6);
+        const ambient = new THREE.AmbientLight(0xffffff, 1.5);
         this.vendorScene.add(ambient);
-        const mainLight = new THREE.DirectionalLight(0x00ffff, 1.0);
-        mainLight.position.set(5, 5, 5);
+        const mainLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        mainLight.position.set(5, 8, 5);
         this.vendorScene.add(mainLight);
-        const backLight = new THREE.DirectionalLight(0x0066ff, 0.5);
-        backLight.position.set(-5, -3, -5);
+        const fillLight = new THREE.DirectionalLight(0x88bbff, 1.0);
+        fillLight.position.set(-5, 3, -4);
+        this.vendorScene.add(fillLight);
+        const backLight = new THREE.DirectionalLight(0x00ccff, 0.6);
+        backLight.position.set(0, -5, -5);
         this.vendorScene.add(backLight);
 
         // Grid background
@@ -295,7 +301,24 @@ export class StationVendorManager {
         if (!this.vendorScene) return;
 
         // Remove old mesh
-        if (this.vendorShipMesh) {
+        this.removeVendorShipMesh();
+
+        // Load async (GLB if available, procedural fallback)
+        shipMeshFactory.generateShipMeshAsync({
+            shipId,
+            role: config.role || 'mercenary',
+            size: config.size || 'small',
+            detailLevel: 'high',
+        }).then(mesh => {
+            if (!mesh) return;
+            this.removeVendorShipMesh();
+            this.vendorShipMesh = mesh;
+            this.vendorScene.add(this.vendorShipMesh);
+        });
+    }
+
+    removeVendorShipMesh() {
+        if (this.vendorShipMesh && this.vendorScene) {
             this.vendorScene.remove(this.vendorShipMesh);
             this.vendorShipMesh.traverse(child => {
                 if (child.geometry) child.geometry.dispose();
@@ -309,18 +332,6 @@ export class StationVendorManager {
             });
             this.vendorShipMesh = null;
         }
-
-        try {
-            this.vendorShipMesh = shipMeshFactory.generateShipMesh({
-                shipId,
-                role: config.role || 'mercenary',
-                size: config.size || 'small',
-                detailLevel: 'high',
-            });
-            this.vendorScene.add(this.vendorShipMesh);
-        } catch (e) {
-            // Ignore - no preview available
-        }
     }
 
     /**
@@ -332,7 +343,7 @@ export class StationVendorManager {
             return;
         }
 
-        this.vendorShipMesh.rotation.z += 0.005;
+        this.vendorShipMesh.rotation.y += 0.005;
         this.vendorShipMesh.rotation.x = Math.sin(Date.now() * 0.001) * 0.1;
         this.vendorRenderer.render(this.vendorScene, this.vendorCamera);
         this.vendorAnimationId = requestAnimationFrame(() => this.animateVendorViewer());

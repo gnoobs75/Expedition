@@ -31,8 +31,17 @@ export class PanelDragManager {
             'drone-bar': { bottom: 185, left: 200 },
         };
 
-        // Storage key
+        // Storage key - bump version to force reset when layout changes
         this.storageKey = 'expedition-panel-layout';
+        this.layoutVersion = 2;
+        this.versionKey = 'expedition-panel-layout-version';
+
+        // Force reset if layout version changed
+        const savedVersion = parseInt(localStorage.getItem(this.versionKey) || '0');
+        if (savedVersion < this.layoutVersion) {
+            localStorage.removeItem(this.storageKey);
+            localStorage.setItem(this.versionKey, String(this.layoutVersion));
+        }
 
         // Save debounce timer (for resize observer)
         this.saveTimer = null;
@@ -67,22 +76,38 @@ export class PanelDragManager {
      */
     constrainAllPanels() {
         for (const [panelId, panelData] of this.panels) {
-            const panel = panelData.element;
-            if (!panel || panel.classList.contains('hidden')) continue;
+            this.constrainPanel(panelId);
+        }
+    }
 
-            const rect = panel.getBoundingClientRect();
-            let changed = false;
+    constrainPanel(panelId) {
+        const panelData = this.panels.get(panelId);
+        if (!panelData) return;
+        const panel = panelData.element;
+        if (!panel || panel.classList.contains('hidden')) return;
 
-            if (rect.right > window.innerWidth) {
-                panel.style.left = `${Math.max(0, window.innerWidth - rect.width)}px`;
-                panel.style.right = 'auto';
-                changed = true;
-            }
-            if (rect.bottom > window.innerHeight) {
-                panel.style.top = `${Math.max(0, window.innerHeight - rect.height)}px`;
-                panel.style.bottom = 'auto';
-                changed = true;
-            }
+        const rect = panel.getBoundingClientRect();
+        const margin = 20; // keep at least 20px visible
+
+        // Off the right edge
+        if (rect.left > window.innerWidth - margin) {
+            panel.style.left = `${window.innerWidth - margin}px`;
+            panel.style.right = 'auto';
+        }
+        // Off the left edge
+        if (rect.right < margin) {
+            panel.style.left = `${margin - rect.width}px`;
+            panel.style.right = 'auto';
+        }
+        // Off the bottom edge
+        if (rect.top > window.innerHeight - margin) {
+            panel.style.top = `${window.innerHeight - margin}px`;
+            panel.style.bottom = 'auto';
+        }
+        // Off the top edge
+        if (rect.bottom < margin) {
+            panel.style.top = `${margin - rect.height}px`;
+            panel.style.bottom = 'auto';
         }
     }
 
@@ -108,6 +133,9 @@ export class PanelDragManager {
 
         // Apply saved position and size
         this.applyLayout(panelId);
+
+        // Constrain to viewport immediately after applying layout
+        requestAnimationFrame(() => this.constrainPanel(panelId));
 
         // Observe size changes (CSS resize handle)
         this.resizeObserver?.observe(panel);
@@ -283,6 +311,24 @@ export class PanelDragManager {
         panel.style.left = 'auto';
 
         if (layout) {
+            // Validate saved position is within current viewport
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            const offscreen =
+                (layout.left !== undefined && layout.left > w) ||
+                (layout.top !== undefined && layout.top > h) ||
+                (layout.left !== undefined && layout.left < -500) ||
+                (layout.top !== undefined && layout.top < -500);
+
+            if (offscreen && defaultPos) {
+                // Saved position is way off-screen, use defaults
+                if (defaultPos.top !== undefined) panel.style.top = `${defaultPos.top}px`;
+                if (defaultPos.right !== undefined) panel.style.right = `${defaultPos.right}px`;
+                if (defaultPos.bottom !== undefined) panel.style.bottom = `${defaultPos.bottom}px`;
+                if (defaultPos.left !== undefined) panel.style.left = `${defaultPos.left}px`;
+                return;
+            }
+
             // Restore saved position
             if (layout.top !== undefined) panel.style.top = `${layout.top}px`;
             if (layout.left !== undefined) panel.style.left = `${layout.left}px`;

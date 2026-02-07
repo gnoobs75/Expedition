@@ -581,6 +581,7 @@ export class NPCSystem {
         const spawnDist = 2000 + Math.random() * 1000;
 
         this.game.ui?.log(`Pirate activity detected on sensors!`, 'combat');
+        this.broadcastSecurityAlert(targetMiner);
 
         for (let i = 0; i < count; i++) {
             const angle = spawnAngle + (i - count / 2) * 0.3;
@@ -599,6 +600,100 @@ export class NPCSystem {
 
             sector.addEntity(pirate);
         }
+    }
+
+    /**
+     * Spawn a large-scale battle event for stress testing
+     * 25 security vs 25 pirates in an asteroid belt, fighting to the death
+     */
+    spawnBattleEvent() {
+        const sector = this.game.currentSector;
+        if (!sector) return;
+
+        // Find an asteroid belt away from the station
+        const asteroids = sector.getAsteroids();
+        if (asteroids.length === 0) return;
+
+        // Pick a cluster of asteroids to use as the battle site
+        const battleCenter = asteroids[Math.floor(Math.random() * asteroids.length)];
+        const bx = battleCenter.x;
+        const by = battleCenter.y;
+
+        this.game.ui?.log('[SYSTEM EVENT] Large-scale engagement initiated!', 'system');
+        this.game.ui?.toast('BATTLE EVENT: 25 Security vs 25 Pirates spawned!', 'warning');
+        this.broadcastSecurityAlert(battleCenter);
+
+        const station = sector.getStation();
+        const securityTypes = ['frigate', 'cruiser'];
+        const pirateTypes = ['pirate-frigate', 'pirate-cruiser'];
+        const spawnedSecurity = [];
+        const spawnedPirates = [];
+
+        // Spawn 25 security ships on one side
+        for (let i = 0; i < 25; i++) {
+            const angle = (i / 25) * Math.PI * 2;
+            const dist = 800 + Math.random() * 600;
+            const shipClass = securityTypes[Math.random() < 0.4 ? 1 : 0]; // 40% cruiser, 60% frigate
+
+            const sec = new NPCShip(this.game, {
+                x: bx - 1500 + Math.cos(angle) * dist,
+                y: by + Math.sin(angle) * dist,
+                role: 'security',
+                shipClass,
+                homeStation: station,
+                name: `Task Force ${i + 1}`,
+            });
+            sec.patrolCenter = { x: bx, y: by };
+            sec.aiState = 'patrol';
+            sector.addEntity(sec);
+            this.security.push(sec);
+            spawnedSecurity.push(sec);
+        }
+
+        // Spawn 25 pirate ships on the other side
+        for (let i = 0; i < 25; i++) {
+            const angle = (i / 25) * Math.PI * 2;
+            const dist = 800 + Math.random() * 600;
+            const enemyType = pirateTypes[Math.random() < 0.3 ? 1 : 0]; // 30% cruiser, 70% frigate
+
+            const pirate = new EnemyShip(this.game, {
+                x: bx + 1500 + Math.cos(angle) * dist,
+                y: by + Math.sin(angle) * dist,
+                enemyType,
+                name: `Raider ${i + 1}`,
+            });
+
+            // Target the nearest security ship
+            pirate.aiState = 'chase';
+            pirate.aiTarget = spawnedSecurity[i % spawnedSecurity.length];
+            pirate.aggroRange = 5000;
+
+            sector.addEntity(pirate);
+            spawnedPirates.push(pirate);
+        }
+
+        // Point security at the pirate group
+        for (let i = 0; i < spawnedSecurity.length; i++) {
+            const sec = spawnedSecurity[i];
+            sec.aiState = 'responding';
+            sec.aiTarget = spawnedPirates[i % spawnedPirates.length];
+        }
+    }
+
+    /**
+     * Broadcast a security alert about pirate activity
+     */
+    broadcastSecurityAlert(nearEntity) {
+        const alerts = [
+            'SECURITY ALERT: Hostile contacts detected. All vessels exercise caution.',
+            'CONCORD ADVISORY: Pirate activity reported. Security forces responding.',
+            'LOCAL SECURITY: Multiple hostiles on scan. Mining vessels advised to dock.',
+            'SYSTEM BROADCAST: Unauthorized combat signatures detected. Patrol units dispatched.',
+            'SECURITY NOTICE: Hostile fleet activity in asteroid belt. Stay alert.',
+        ];
+        const msg = alerts[Math.floor(Math.random() * alerts.length)];
+        this.game.ui?.toast(msg, 'warning');
+        this.game.ui?.log(`[LOCAL] ${msg}`, 'system');
     }
 
     // =========================================

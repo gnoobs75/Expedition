@@ -7,6 +7,7 @@ import { Ship } from './Ship.js';
 import { CONFIG } from '../config.js';
 import { SHIP_DATABASE } from '../data/shipDatabase.js';
 import { EQUIPMENT_DATABASE } from '../data/equipmentDatabase.js';
+import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
 
 export class PlayerShip extends Ship {
     constructor(game, options = {}) {
@@ -111,12 +112,28 @@ export class PlayerShip extends Ship {
      * Create player ship mesh with extra visual flair
      */
     createMesh() {
+        // Create procedural mesh immediately (shown until GLB loads)
+        const group = this.createProceduralMesh();
+
+        this.mesh = group;
+        this.mesh.position.set(this.x, this.y, 1);
+        this.mesh.rotation.z = this.rotation;
+
+        // Try loading GLB model async - swap in when ready
+        this.loadGLBMesh();
+
+        return this.mesh;
+    }
+
+    /**
+     * Create the procedural fallback mesh
+     */
+    createProceduralMesh() {
         const group = new THREE.Group();
+        const size = this.radius;
 
         // Main hull
         const hullShape = new THREE.Shape();
-        const size = this.radius;
-
         hullShape.moveTo(size * 1.2, 0);
         hullShape.lineTo(-size * 0.6, size * 0.6);
         hullShape.lineTo(-size * 0.3, 0);
@@ -175,14 +192,49 @@ export class PlayerShip extends Ship {
         wing2.rotation.z = -0.3;
         group.add(wing2);
 
-        this.mesh = group;
-        this.mesh.position.set(this.x, this.y, 1); // Higher z for player
-        this.mesh.rotation.z = this.rotation;
-
         // Store engine meshes for animation
         this.engineMeshes = [engine1, engine2];
 
-        return this.mesh;
+        return group;
+    }
+
+    /**
+     * Load GLB model and swap into the scene when ready
+     */
+    loadGLBMesh() {
+        const shipId = this.shipClass || 'frigate';
+
+        shipMeshFactory.loadModel(shipId, this.radius * 2.5).then(glbGroup => {
+            if (!glbGroup || !this.alive) return;
+
+            // Replace mesh contents - keep the same group reference
+            // so the renderer doesn't lose track
+            if (this.mesh) {
+                // Remove all procedural children
+                while (this.mesh.children.length > 0) {
+                    const child = this.mesh.children[0];
+                    this.mesh.remove(child);
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(m => m.dispose());
+                        } else {
+                            child.material.dispose();
+                        }
+                    }
+                }
+
+                // Add GLB group as child (preserves its centering position + scale)
+                this.mesh.add(glbGroup);
+
+                // Reset outer mesh scale - GLB group handles its own scale
+                this.mesh.scale.set(1, 1, 1);
+
+                // Clear engine meshes since GLB doesn't have them
+                this.engineMeshes = null;
+                this.glbLoaded = true;
+            }
+        });
     }
 
     /**
@@ -197,13 +249,12 @@ export class PlayerShip extends Ship {
             if (isOrbiting) {
                 // Apply 3D orbit visual effect
                 const { scale, zOffset } = this.calculateOrbitVisuals();
-                this.mesh.scale.setScalar(scale);
+                if (!this.glbLoaded) this.mesh.scale.setScalar(scale);
                 this.mesh.position.set(this.x, this.y, 1 + zOffset);
             } else {
                 // Normal rendering - reset any orbit effects
-                this.mesh.scale.setScalar(1.0);
+                if (!this.glbLoaded) this.mesh.scale.setScalar(1.0);
                 this.mesh.position.set(this.x, this.y, 1);
-                // Note: orbitPhase is reset in AutopilotSystem.stop() and orbit()
             }
 
             this.mesh.rotation.z = this.rotation;
@@ -278,6 +329,10 @@ export class PlayerShip extends Ship {
         } else {
             this.droneBay = { capacity: 0, bandwidth: 0, drones: [], deployed: new Map() };
         }
+
+        // Reset GLB state before recreating mesh
+        this.glbLoaded = false;
+        this.engineMeshes = null;
 
         // Recreate mesh
         if (this.mesh && this.game.renderer) {

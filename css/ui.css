@@ -3863,3 +3863,224 @@ select:focus-visible {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 2px;
 }
+
+/* =============================================
+   MODEL EDITOR MODAL
+   ============================================= */
+
+.model-editor-modal {
+    max-width: 1300px;
+    max-height: 90vh;
+    width: 90vw;
+    height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.model-editor-modal .modal-body {
+    padding: 0;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.model-editor-layout {
+    display: flex;
+    gap: 0;
+    height: 100%;
+    min-height: 0;
+}
+
+.model-editor-viewports {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: #000;
+    padding: 12px;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+.viewport-label {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(0, 255, 255, 0.5);
+    z-index: 1;
+    pointer-events: none;
+    text-transform: uppercase;
+}
+
+.viewport-hint {
+    font-size: 8px;
+    color: rgba(0, 255, 255, 0.3);
+    letter-spacing: 0.5px;
+    margin-left: 8px;
+}
+
+.model-editor-viewport {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.model-editor-viewport canvas {
+    width: 100%;
+    flex: 1;
+    min-height: 200px;
+    border: 1px solid var(--panel-border);
+    border-radius: 3px;
+    background: #0a1520;
+    display: block;
+    cursor: grab;
+}
+
+.model-editor-viewport canvas:active {
+    cursor: grabbing;
+}
+
+.model-editor-controls {
+    width: 280px;
+    flex-shrink: 0;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    border-left: 1px solid var(--panel-border);
+}
+
+.editor-control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.editor-control-group label {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.editor-path-row {
+    display: flex;
+    gap: 6px;
+}
+
+.editor-path-row input {
+    flex: 1;
+    background: rgba(0, 20, 40, 0.8);
+    border: 1px solid var(--panel-border);
+    border-radius: 3px;
+    color: var(--text-primary);
+    padding: 5px 8px;
+    font-size: 11px;
+    font-family: inherit;
+}
+
+.editor-path-row input:focus {
+    outline: none;
+    border-color: var(--panel-border-bright);
+}
+
+.editor-model-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 120px;
+    overflow-y: auto;
+    margin-top: 4px;
+}
+
+.editor-model-btn {
+    background: rgba(0, 255, 255, 0.05);
+    border: 1px solid rgba(0, 255, 255, 0.15);
+    border-radius: 2px;
+    color: var(--text-secondary);
+    padding: 4px 8px;
+    font-size: 10px;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.editor-model-btn:hover {
+    background: rgba(0, 255, 255, 0.12);
+    border-color: var(--panel-border-bright);
+    color: var(--text-primary);
+}
+
+.editor-model-btn.active {
+    border-color: var(--primary-cyan);
+    background: rgba(0, 255, 255, 0.15);
+    color: var(--primary-cyan);
+}
+
+/* Slider styling */
+.editor-control-group input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(0, 255, 255, 0.15);
+    border-radius: 2px;
+    outline: none;
+}
+
+.editor-control-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--primary-cyan);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 6px var(--glow-cyan);
+}
+
+.editor-control-group input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--primary-cyan);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 6px var(--glow-cyan);
+}
+
+.editor-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 255, 255, 0.15);
+}
+
+.editor-brightness-group {
+    border-top: 1px solid rgba(255, 200, 50, 0.2);
+    padding-top: 8px;
+}
+
+.editor-brightness-group input[type="range"] {
+    accent-color: #ffcc33;
+}
+
+.editor-status {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+    min-height: 14px;
+}
+
+.editor-status.success {
+    color: var(--friendly-color);
+}

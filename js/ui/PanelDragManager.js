@@ -29,7 +29,10 @@ export class PanelDragManager {
         };
 
         // Storage key
-        this.storageKey = 'expedition-panel-positions';
+        this.storageKey = 'expedition-panel-layout';
+
+        // Save debounce timer (for resize observer)
+        this.saveTimer = null;
 
         // Bind methods
         this.handleMouseDown = this.handleMouseDown.bind(this);
@@ -47,6 +50,13 @@ export class PanelDragManager {
 
         // Keep panels in bounds on window resize
         window.addEventListener('resize', () => this.constrainAllPanels());
+
+        // ResizeObserver to detect CSS resize-handle usage and save sizes
+        this.resizeObserver = new ResizeObserver((entries) => {
+            // Debounce saves while user is actively resizing
+            clearTimeout(this.saveTimer);
+            this.saveTimer = setTimeout(() => this.saveLayout(), 300);
+        });
     }
 
     /**
@@ -93,8 +103,11 @@ export class PanelDragManager {
         };
         this.panels.set(panelId, panelData);
 
-        // Apply saved or default position
-        this.applyPosition(panelId);
+        // Apply saved position and size
+        this.applyLayout(panelId);
+
+        // Observe size changes (CSS resize handle)
+        this.resizeObserver?.observe(panel);
 
         // Add mousedown listener to header (or label for minimap, or entire panel as fallback)
         const header = panel.querySelector('.panel-header') ||
@@ -242,24 +255,23 @@ export class PanelDragManager {
             }
         }
 
-        // Save positions after drag
-        this.savePositions();
+        // Save layout after drag
+        this.saveLayout();
 
         this.dragging = null;
     }
 
     /**
-     * Apply position to a panel (saved or default)
+     * Apply saved layout (position + size) to a panel
      */
-    applyPosition(panelId) {
+    applyLayout(panelId) {
         const panelData = this.panels.get(panelId);
         if (!panelData) return;
 
         const panel = panelData.element;
-        const savedPositions = this.getSavedPositions();
-        const position = savedPositions[panelId] || this.defaultPositions[panelId];
-
-        if (!position) return;
+        const saved = this.getSavedLayout();
+        const layout = saved[panelId];
+        const defaultPos = this.defaultPositions[panelId];
 
         // Clear all position properties first
         panel.style.top = 'auto';
@@ -267,52 +279,68 @@ export class PanelDragManager {
         panel.style.bottom = 'auto';
         panel.style.left = 'auto';
 
-        // Apply position
-        if (position.top !== undefined) panel.style.top = `${position.top}px`;
-        if (position.right !== undefined) panel.style.right = `${position.right}px`;
-        if (position.bottom !== undefined) panel.style.bottom = `${position.bottom}px`;
-        if (position.left !== undefined) panel.style.left = `${position.left}px`;
+        if (layout) {
+            // Restore saved position
+            if (layout.top !== undefined) panel.style.top = `${layout.top}px`;
+            if (layout.left !== undefined) panel.style.left = `${layout.left}px`;
+            if (layout.right !== undefined) panel.style.right = `${layout.right}px`;
+            if (layout.bottom !== undefined) panel.style.bottom = `${layout.bottom}px`;
+
+            // Restore saved size
+            if (layout.width !== undefined) panel.style.width = `${layout.width}px`;
+            if (layout.height !== undefined) panel.style.height = `${layout.height}px`;
+        } else if (defaultPos) {
+            if (defaultPos.top !== undefined) panel.style.top = `${defaultPos.top}px`;
+            if (defaultPos.right !== undefined) panel.style.right = `${defaultPos.right}px`;
+            if (defaultPos.bottom !== undefined) panel.style.bottom = `${defaultPos.bottom}px`;
+            if (defaultPos.left !== undefined) panel.style.left = `${defaultPos.left}px`;
+        }
     }
 
     /**
-     * Get saved positions from localStorage
+     * Get saved layout from localStorage
      */
-    getSavedPositions() {
+    getSavedLayout() {
         try {
-            const saved = localStorage.getItem(this.storageKey);
+            // Try new key first, fall back to old key for migration
+            let saved = localStorage.getItem(this.storageKey);
+            if (!saved) {
+                saved = localStorage.getItem('expedition-panel-positions');
+                if (saved) localStorage.removeItem('expedition-panel-positions');
+            }
             return saved ? JSON.parse(saved) : {};
         } catch (e) {
-            console.warn('[PanelDragManager] Failed to load positions:', e);
             return {};
         }
     }
 
     /**
-     * Save current positions to localStorage
+     * Save current layout (position + size) to localStorage
      */
-    savePositions() {
-        const positions = {};
+    saveLayout() {
+        const layout = {};
 
         for (const [panelId, panelData] of this.panels) {
             const panel = panelData.element;
             const rect = panel.getBoundingClientRect();
 
-            // Save as top/left
-            positions[panelId] = {
-                top: rect.top,
-                left: rect.left,
+            layout[panelId] = {
+                top: Math.round(rect.top),
+                left: Math.round(rect.left),
+                width: Math.round(rect.width),
+                height: Math.round(rect.height),
             };
         }
 
         try {
-            localStorage.setItem(this.storageKey, JSON.stringify(positions));
+            localStorage.setItem(this.storageKey, JSON.stringify(layout));
         } catch (e) {
-            console.warn('[PanelDragManager] Failed to save positions:', e);
+            // Ignore
         }
     }
 
     /**
-     * Reset all panels to default positions
+     * Reset all panels to default positions and sizes
      */
     resetPositions() {
         try {
@@ -321,11 +349,14 @@ export class PanelDragManager {
             // Ignore
         }
 
-        for (const panelId of this.panels.keys()) {
-            this.applyPosition(panelId);
+        for (const [panelId, panelData] of this.panels) {
+            // Clear saved sizes back to CSS defaults
+            panelData.element.style.width = '';
+            panelData.element.style.height = '';
+            this.applyLayout(panelId);
         }
 
-        this.game.ui?.log('Panel positions reset to defaults', 'system');
+        this.game.ui?.log('Panel layout reset to defaults', 'system');
     }
 
     /**

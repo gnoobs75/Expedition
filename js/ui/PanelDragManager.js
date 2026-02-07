@@ -26,6 +26,9 @@ export class PanelDragManager {
             'dscan-panel': { top: 200, right: 10 },
             'bookmarks-panel': { top: 400, right: 10 },
             'object-viewer': { top: 10, left: 310 },
+            'locked-targets-container': { top: 200, left: 10 },
+            'ship-indicator': { bottom: 185, left: 20 },
+            'drone-bar': { bottom: 185, left: 200 },
         };
 
         // Storage key

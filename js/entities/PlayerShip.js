@@ -5,6 +5,8 @@
 
 import { Ship } from './Ship.js';
 import { CONFIG } from '../config.js';
+import { SHIP_DATABASE } from '../data/shipDatabase.js';
+import { EQUIPMENT_DATABASE } from '../data/equipmentDatabase.js';
 
 export class PlayerShip extends Ship {
     constructor(game, options = {}) {
@@ -24,6 +26,9 @@ export class PlayerShip extends Ship {
         // Warnings state
         this.lowShieldWarned = false;
         this.lowCapacitorWarned = false;
+
+        // Module inventory (purchased but not fitted)
+        this.moduleInventory = [];
 
         // Orbit visual effect state
         this.orbitPhase = 0;      // Current angle in orbit (radians, 0-2π)
@@ -216,6 +221,76 @@ export class PlayerShip extends Ship {
     }
 
     /**
+     * Switch to a new ship class
+     */
+    switchShip(newShipClass) {
+        const shipConfig = SHIP_DATABASE[newShipClass] || CONFIG.SHIPS[newShipClass];
+        if (!shipConfig) return;
+
+        this.shipClass = newShipClass;
+
+        // Update stats from config
+        this.maxSpeed = shipConfig.maxSpeed;
+        this.acceleration = shipConfig.acceleration;
+        this.turnSpeed = shipConfig.turnSpeed || 2;
+        this.maxShield = shipConfig.shield;
+        this.maxArmor = shipConfig.armor;
+        this.maxHull = shipConfig.hull;
+        this.maxCapacitor = shipConfig.capacitor;
+        this.capacitorRegen = shipConfig.capacitorRegen;
+        this.signatureRadius = shipConfig.signatureRadius || 30;
+        this.cargoCapacity = shipConfig.cargoCapacity;
+
+        // Update slot counts
+        this.highSlots = shipConfig.weaponSlots || shipConfig.highSlots || 3;
+        this.midSlots = shipConfig.moduleSlots || shipConfig.midSlots || 2;
+        this.lowSlots = shipConfig.subsystemSlots || shipConfig.lowSlots || 2;
+
+        // Restore to full health
+        this.shield = this.maxShield;
+        this.armor = this.maxArmor;
+        this.hull = this.maxHull;
+        this.capacitor = this.maxCapacitor;
+
+        // Clear fitted modules
+        this.modules = {
+            high: new Array(this.highSlots).fill(null),
+            mid: new Array(this.midSlots).fill(null),
+            low: new Array(this.lowSlots).fill(null),
+        };
+        this.activeModules = new Set();
+
+        // Update drone bay
+        if (shipConfig.droneCapacity) {
+            this.droneBay = {
+                capacity: shipConfig.droneCapacity,
+                bandwidth: shipConfig.droneBandwidth || 0,
+                drones: [],
+                deployed: new Map(),
+            };
+            // Populate with mining drones (same as Ship constructor)
+            for (let i = 0; i < shipConfig.droneCapacity; i++) {
+                this.droneBay.drones.push({
+                    type: 'mining-drone',
+                    hp: CONFIG.DRONES['mining-drone']?.hp || 50,
+                });
+            }
+        } else {
+            this.droneBay = { capacity: 0, bandwidth: 0, drones: [], deployed: new Map() };
+        }
+
+        // Recreate mesh
+        if (this.mesh && this.game.renderer) {
+            this.game.renderer.scene.remove(this.mesh);
+            this.mesh = this.createMesh();
+            this.game.renderer.scene.add(this.mesh);
+        }
+
+        this.game.ui?.log(`Switched to ${shipConfig.name}`, 'system');
+        this.game.events.emit('ship:switched', { ship: this, shipClass: newShipClass });
+    }
+
+    /**
      * Get all fitted modules for UI
      */
     getFittedModules() {
@@ -227,7 +302,7 @@ export class PlayerShip extends Ship {
                 slotId: `high-${i + 1}`,
                 slotType: 'high',
                 moduleId,
-                config: moduleId ? CONFIG.MODULES[moduleId] : null,
+                config: moduleId ? (EQUIPMENT_DATABASE[moduleId] || CONFIG.MODULES[moduleId]) : null,
                 active: this.activeModules.has(`high-${i + 1}`),
                 cooldown: this.moduleCooldowns.get(`high-${i + 1}`) || 0,
             });
@@ -239,7 +314,7 @@ export class PlayerShip extends Ship {
                 slotId: `mid-${i + 1}`,
                 slotType: 'mid',
                 moduleId,
-                config: moduleId ? CONFIG.MODULES[moduleId] : null,
+                config: moduleId ? (EQUIPMENT_DATABASE[moduleId] || CONFIG.MODULES[moduleId]) : null,
                 active: this.activeModules.has(`mid-${i + 1}`),
                 cooldown: this.moduleCooldowns.get(`mid-${i + 1}`) || 0,
             });
@@ -251,7 +326,7 @@ export class PlayerShip extends Ship {
                 slotId: `low-${i + 1}`,
                 slotType: 'low',
                 moduleId,
-                config: moduleId ? CONFIG.MODULES[moduleId] : null,
+                config: moduleId ? (EQUIPMENT_DATABASE[moduleId] || CONFIG.MODULES[moduleId]) : null,
                 active: this.activeModules.has(`low-${i + 1}`),
                 cooldown: this.moduleCooldowns.get(`low-${i + 1}`) || 0,
             });

@@ -5,7 +5,15 @@
 
 import { Entity } from './Entity.js';
 import { CONFIG } from '../config.js';
+import { EQUIPMENT_DATABASE } from '../data/equipmentDatabase.js';
 import { Vector2, lerp, angleDifference, normalizeAngle } from '../utils/math.js';
+
+/**
+ * Look up module config from new equipment database or legacy CONFIG.MODULES
+ */
+function getModuleConfig(moduleId) {
+    return EQUIPMENT_DATABASE[moduleId] || CONFIG.MODULES[moduleId] || null;
+}
 
 export class Ship extends Entity {
     constructor(game, options = {}) {
@@ -139,7 +147,8 @@ export class Ship extends Entity {
         // Calculate effective max speed (with afterburner)
         let effectiveMaxSpeed = this.maxSpeed;
         if (this.isModuleActive('afterburner')) {
-            effectiveMaxSpeed *= CONFIG.MODULES['afterburner'].speedBonus;
+            const abConfig = getModuleConfig('afterburner');
+            if (abConfig) effectiveMaxSpeed *= abConfig.speedBonus;
         }
 
         // Accelerate/decelerate towards desired speed
@@ -180,7 +189,7 @@ export class Ship extends Entity {
 
             if (!moduleId) continue;
 
-            const moduleConfig = CONFIG.MODULES[moduleId];
+            const moduleConfig = getModuleConfig(moduleId);
             if (!moduleConfig) continue;
 
             // Continuous capacitor drain (for afterburner, etc.)
@@ -197,14 +206,18 @@ export class Ship extends Entity {
      */
     fitModule(slotId, moduleId) {
         const [slotType, slotIndex] = this.parseSlotId(slotId);
-        const moduleConfig = CONFIG.MODULES[moduleId];
+        const moduleConfig = getModuleConfig(moduleId);
 
         if (!moduleConfig) {
             console.warn(`Unknown module: ${moduleId}`);
             return false;
         }
 
-        if (moduleConfig.slot !== slotType) {
+        // Map new slot types to internal: weapon->high, module->mid, subsystem->low
+        const slotMap = { weapon: 'high', module: 'mid', subsystem: 'low' };
+        const internalSlot = slotMap[moduleConfig.slot] || moduleConfig.slot;
+
+        if (internalSlot !== slotType) {
             console.warn(`Module ${moduleId} cannot fit in ${slotType} slot`);
             return false;
         }
@@ -267,7 +280,7 @@ export class Ship extends Entity {
 
         if (!moduleId) return false;
 
-        const moduleConfig = CONFIG.MODULES[moduleId];
+        const moduleConfig = getModuleConfig(moduleId);
         if (!moduleConfig) return false;
 
         // Check cooldown
@@ -387,11 +400,14 @@ export class Ship extends Entity {
         // Calculate damage with bonuses
         let damage = moduleConfig.damage;
 
-        // Apply damage mod bonus
+        // Apply damage mod bonus from subsystem slots
         for (let i = 0; i < this.lowSlots; i++) {
             const mod = this.modules.low[i];
-            if (mod && CONFIG.MODULES[mod]?.damageBonus) {
-                damage *= CONFIG.MODULES[mod].damageBonus;
+            if (mod) {
+                const modConfig = getModuleConfig(mod);
+                if (modConfig?.damageBonus) damage *= modConfig.damageBonus;
+                if (modConfig?.laserDamageBonus) damage *= modConfig.laserDamageBonus;
+                if (modConfig?.missileDamageBonus && moduleConfig.category === 'missile') damage *= modConfig.missileDamageBonus;
             }
         }
 

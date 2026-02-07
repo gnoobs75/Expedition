@@ -4,11 +4,15 @@
 // =============================================
 
 import { CONFIG } from '../config.js';
+import { EQUIPMENT_DATABASE } from '../data/equipmentDatabase.js';
+import { SHIP_DATABASE } from '../data/shipDatabase.js';
+import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
 import { formatDistance, formatCredits } from '../utils/math.js';
 import { keyBindings } from '../core/KeyBindings.js';
 import { PanelDragManager } from './PanelDragManager.js';
 import { ShipMenuManager } from './ShipMenuManager.js';
 import { SectorMapManager } from './SectorMapManager.js';
+import { StationVendorManager } from './StationVendorManager.js';
 import { PerformanceMonitor } from '../utils/PerformanceMonitor.js';
 
 export class UIManager {
@@ -38,12 +42,26 @@ export class UIManager {
         // Sector map manager (for M key)
         this.sectorMapManager = new SectorMapManager(game);
 
+        // Station vendor manager
+        this.vendorManager = new StationVendorManager(game);
+
         // Performance monitor
         this.performanceMonitor = new PerformanceMonitor(game);
+
+        // Ship indicator 3D viewer state
+        this.shipViewerScene = null;
+        this.shipViewerCamera = null;
+        this.shipViewerRenderer = null;
+        this.shipViewerMesh = null;
+        this.shipViewerInitialized = false;
 
         // Initialize UI
         this.setupEventListeners();
         this.initPanelDragManager();
+        this.initShipIndicatorViewer();
+
+        // Listen for ship switch to update 3D viewer
+        game.events.on('ship:switched', () => this.updateShipViewerMesh());
 
         // Log messages
         this.maxLogMessages = 50;
@@ -109,6 +127,12 @@ export class UIManager {
 
             // Ship Indicator
             shipIndicator: document.getElementById('ship-indicator'),
+            shipIndicatorCanvas: document.getElementById('ship-indicator-canvas'),
+            shipIndicatorName: document.getElementById('ship-indicator-name'),
+            shipIndicatorClass: document.getElementById('ship-indicator-class'),
+            shipShieldBar: document.getElementById('ship-shield-bar'),
+            shipArmorBar: document.getElementById('ship-armor-bar'),
+            shipHullBar: document.getElementById('ship-hull-bar'),
 
             // Drone Bar
             droneBar: document.getElementById('drone-bar'),
@@ -188,10 +212,27 @@ export class UIManager {
         // Station panel tabs
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                // Find parent modal to scope tab switching
+                const parentModal = btn.closest('.modal-content');
+                if (parentModal) {
+                    parentModal.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    parentModal.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                } else {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                }
                 btn.classList.add('active');
-                document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+                const tabEl = document.getElementById(`tab-${btn.dataset.tab}`);
+                if (tabEl) tabEl.classList.add('active');
+
+                // Notify vendor manager of tab change
+                if (['hangar', 'ships', 'equipment', 'fitting'].includes(btn.dataset.tab)) {
+                    this.vendorManager?.updateTab(btn.dataset.tab);
+                }
+                // Update refinery when switching to it
+                if (btn.dataset.tab === 'refinery') {
+                    this.updateRefineryTab();
+                }
             });
         });
 
@@ -300,16 +341,27 @@ export class UIManager {
             });
         });
 
-        // Ship indicator right-click for drone launch/recall
+        // Ship indicator right-click - show standard context menu for player ship
         document.getElementById('ship-indicator')?.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            this.showShipIndicatorContextMenu(e.clientX, e.clientY);
+            if (this.game.player) {
+                this.showContextMenu(e.clientX, e.clientY, this.game.player);
+            }
         });
 
         // Ship indicator left-click to select own ship
         document.getElementById('ship-indicator')?.addEventListener('click', () => {
             if (this.game.player) {
                 this.game.selectTarget(this.game.player);
+            }
+        });
+
+        // Target panel right-click - show standard context menu for selected target
+        document.getElementById('target-panel')?.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const target = this.game.selectedTarget;
+            if (target) {
+                this.showContextMenu(e.clientX, e.clientY, target);
             }
         });
     }
@@ -381,6 +433,9 @@ export class UIManager {
         this.panelDragManager.registerPanel('ship-indicator');
         this.panelDragManager.registerPanel('drone-bar');
         this.panelDragManager.registerPanel('performance-monitor');
+
+        // Constrain all panels to viewport after loading saved positions
+        requestAnimationFrame(() => this.panelDragManager.constrainAllPanels());
     }
 
     /**
@@ -601,25 +656,142 @@ export class UIManager {
     }
 
     /**
+     * Initialize the 3D ship viewer for the ship indicator panel
+     */
+    initShipIndicatorViewer() {
+        const canvas = this.elements.shipIndicatorCanvas;
+        if (!canvas || this.shipViewerInitialized) return;
+
+        const width = 140;
+        const height = 120;
+        canvas.width = width;
+        canvas.height = height;
+
+        this.shipViewerScene = new THREE.Scene();
+        this.shipViewerScene.background = new THREE.Color(0x000a14);
+
+        this.shipViewerCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+        this.shipViewerCamera.position.set(0, 50, 120);
+        this.shipViewerCamera.lookAt(0, 0, 0);
+
+        this.shipViewerRenderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        this.shipViewerRenderer.setSize(width, height);
+        this.shipViewerRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // Lighting
+        const ambient = new THREE.AmbientLight(0x404050, 0.6);
+        this.shipViewerScene.add(ambient);
+        const mainLight = new THREE.DirectionalLight(0x00ffff, 1.0);
+        mainLight.position.set(5, 5, 5);
+        this.shipViewerScene.add(mainLight);
+        const backLight = new THREE.DirectionalLight(0x0066ff, 0.5);
+        backLight.position.set(-5, -3, -5);
+        this.shipViewerScene.add(backLight);
+
+        // Grid background
+        const grid = new THREE.GridHelper(200, 20, 0x003344, 0x001122);
+        grid.rotation.x = Math.PI / 2;
+        grid.position.z = -50;
+        this.shipViewerScene.add(grid);
+
+        this.shipViewerInitialized = true;
+        this.updateShipViewerMesh();
+    }
+
+    /**
+     * Update the ship mesh in the indicator 3D viewer
+     */
+    updateShipViewerMesh() {
+        if (!this.shipViewerScene) return;
+
+        // Remove old mesh
+        if (this.shipViewerMesh) {
+            this.shipViewerScene.remove(this.shipViewerMesh);
+            this.shipViewerMesh.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
+            this.shipViewerMesh = null;
+        }
+
+        const player = this.game.player;
+        if (!player) return;
+
+        const shipConfig = SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
+        if (!shipConfig) return;
+
+        // Generate mesh using ShipMeshFactory
+        try {
+            this.shipViewerMesh = shipMeshFactory.generateShipMesh({
+                shipId: player.shipClass,
+                role: shipConfig.role || 'mercenary',
+                size: shipConfig.size || 'small',
+                detailLevel: 'high',
+            });
+            this.shipViewerScene.add(this.shipViewerMesh);
+        } catch (e) {
+            // Fallback: create a simple ship shape
+            this.createFallbackShipMesh();
+        }
+
+        // Update name/class text
+        if (this.elements.shipIndicatorName) {
+            this.elements.shipIndicatorName.textContent = shipConfig.name || 'Your Ship';
+        }
+        if (this.elements.shipIndicatorClass) {
+            const role = shipConfig.role ? shipConfig.role.toUpperCase() : '';
+            const size = shipConfig.size ? shipConfig.size.toUpperCase() : '';
+            this.elements.shipIndicatorClass.textContent = role && size ? `${role} - ${size}` : '';
+        }
+    }
+
+    /**
+     * Fallback ship mesh if ShipMeshFactory fails
+     */
+    createFallbackShipMesh() {
+        const group = new THREE.Group();
+        const size = 25;
+        const shape = new THREE.Shape();
+        shape.moveTo(size * 1.2, 0);
+        shape.lineTo(-size * 0.6, size * 0.6);
+        shape.lineTo(-size * 0.3, 0);
+        shape.lineTo(-size * 0.6, -size * 0.6);
+        shape.closePath();
+        const geo = new THREE.ExtrudeGeometry(shape, { depth: 8, bevelEnabled: true, bevelThickness: 2, bevelSize: 1, bevelSegments: 2 });
+        const mat = new THREE.MeshPhongMaterial({ color: 0x00aaff, transparent: true, opacity: 0.9, shininess: 50, specular: 0x00ffff });
+        const hull = new THREE.Mesh(geo, mat);
+        hull.position.z = -4;
+        group.add(hull);
+        this.shipViewerMesh = group;
+        this.shipViewerScene.add(this.shipViewerMesh);
+    }
+
+    /**
      * Update ship status indicator
      */
     updateShipIndicator() {
-        const indicator = this.elements.shipIndicator;
-        if (!indicator) return;
-
         const player = this.game.player;
         if (!player) return;
 
         const health = player.getHealthPercents();
 
-        // Update ring clip-paths based on health percentages
-        const shieldRing = indicator.querySelector('.ship-ring.shield');
-        const armorRing = indicator.querySelector('.ship-ring.armor');
-        const hullRing = indicator.querySelector('.ship-ring.hull');
+        // Update health bars
+        if (this.elements.shipShieldBar) this.elements.shipShieldBar.style.width = `${health.shield}%`;
+        if (this.elements.shipArmorBar) this.elements.shipArmorBar.style.width = `${health.armor}%`;
+        if (this.elements.shipHullBar) this.elements.shipHullBar.style.width = `${health.hull}%`;
 
-        if (shieldRing) shieldRing.style.clipPath = `inset(0 ${100 - health.shield}% 0 0 round 50%)`;
-        if (armorRing) armorRing.style.clipPath = `inset(0 ${100 - health.armor}% 0 0 round 50%)`;
-        if (hullRing) hullRing.style.clipPath = `inset(0 ${100 - health.hull}% 0 0 round 50%)`;
+        // Animate 3D viewer
+        if (this.shipViewerMesh && this.shipViewerRenderer && this.shipViewerScene) {
+            this.shipViewerMesh.rotation.z += 0.005;
+            this.shipViewerMesh.rotation.x = Math.sin(Date.now() * 0.001) * 0.1;
+            this.shipViewerRenderer.render(this.shipViewerScene, this.shipViewerCamera);
+        }
     }
 
     /**
@@ -756,11 +928,64 @@ export class UIManager {
     }
 
     /**
+     * Rebuild module rack HTML when ship slot counts change
+     */
+    rebuildModuleRack() {
+        const player = this.game.player;
+        if (!player) return;
+
+        const buildSlots = (prefix, count) => {
+            let html = '';
+            for (let i = 1; i <= count; i++) {
+                html += `<div class="module-slot" data-slot="${prefix}-${i}">
+                    <div class="module-icon"></div>
+                    <div class="module-cooldown"></div>
+                </div>`;
+            }
+            return html;
+        };
+
+        const highContainer = document.getElementById('high-slots');
+        const midContainer = document.getElementById('mid-slots');
+        const lowContainer = document.getElementById('low-slots');
+
+        if (highContainer) highContainer.innerHTML = buildSlots('high', player.highSlots);
+        if (midContainer) midContainer.innerHTML = buildSlots('mid', player.midSlots);
+        if (lowContainer) lowContainer.innerHTML = buildSlots('low', player.lowSlots);
+
+        // Re-attach click handlers
+        document.querySelectorAll('.module-slot').forEach(slot => {
+            slot.addEventListener('click', () => {
+                const slotData = slot.dataset.slot;
+                if (slotData) {
+                    const parts = slotData.split('-');
+                    const slotType = parts[0];
+                    const slotNum = parseInt(parts[1]);
+
+                    let index;
+                    if (slotType === 'high') index = slotNum - 1;
+                    else if (slotType === 'mid') index = player.highSlots + slotNum - 1;
+                    else index = player.highSlots + player.midSlots + slotNum - 1;
+
+                    player.toggleModule(index);
+                }
+            });
+        });
+    }
+
+    /**
      * Update module rack display
      */
     updateModuleRack() {
         const player = this.game.player;
         if (!player) return;
+
+        // Rebuild rack if slot counts changed (ship switch)
+        const slotKey = `${player.highSlots}-${player.midSlots}-${player.lowSlots}`;
+        if (this._lastSlotKey !== slotKey) {
+            this._lastSlotKey = slotKey;
+            this.rebuildModuleRack();
+        }
 
         const modules = player.getFittedModules();
 
@@ -900,7 +1125,22 @@ export class UIManager {
             'armor-repairer': '&#10010;',
             'damage-mod': '&#9881;',
         };
-        return icons[moduleId] || '&#9632;';
+        if (icons[moduleId]) return icons[moduleId];
+
+        // Fallback: check equipment database config for new modules
+        const config = EQUIPMENT_DATABASE?.[moduleId] || CONFIG.MODULES?.[moduleId];
+        if (config) {
+            if (config.damage) return '&#9889;';
+            if (config.miningYield) return '&#9874;';
+            if (config.shieldRepair) return '&#9211;';
+            if (config.armorRepair) return '&#10010;';
+            if (config.speedBonus) return '&#10148;';
+            if (config.warpDisrupt) return '&#10006;';
+            if (config.damageBonus || config.laserDamageBonus || config.missileDamageBonus) return '&#9733;';
+            if (config.missileSpeed) return '&#9737;';
+            if (config.salvageChance) return '&#9851;';
+        }
+        return '&#9632;';
     }
 
     /**
@@ -1123,7 +1363,10 @@ export class UIManager {
         this.elements.stationName.textContent = station.name;
         this.elements.stationPanel.classList.remove('hidden');
 
-        // Populate shop
+        // Initialize vendor manager
+        this.vendorManager.show(station);
+
+        // Populate shop (uses vendor manager for market/fitting, legacy for repair)
         this.updateShopPanel(station);
 
         // Populate refinery tab
@@ -1135,45 +1378,18 @@ export class UIManager {
      */
     hideStationPanel() {
         this.elements.stationPanel.classList.add('hidden');
+        this.vendorManager.hide();
     }
 
     /**
      * Update shop panel content
      */
     updateShopPanel(station) {
-        // Ships
-        const shipsHtml = station.shipsForSale.map(shipId => {
-            const config = CONFIG.SHIPS[shipId];
-            return `
-                <div class="shop-item">
-                    <div class="item-info">
-                        <div class="item-name">${config.name}</div>
-                        <div class="item-desc">Speed: ${config.maxSpeed} | Shield: ${config.shield}</div>
-                    </div>
-                    <div class="item-price">${formatCredits(config.price)} ISK</div>
-                    <button class="buy-btn" onclick="game.ui.buyShip('${shipId}')">BUY</button>
-                </div>
-            `;
-        }).join('');
-        document.getElementById('market-ships').innerHTML = shipsHtml;
+        // Ships and Equipment tabs handled by StationVendorManager
+        this.vendorManager.renderShips();
+        this.vendorManager.renderEquipment();
 
-        // Modules
-        const modulesHtml = station.modulesForSale.map(modId => {
-            const config = CONFIG.MODULES[modId];
-            return `
-                <div class="shop-item">
-                    <div class="item-info">
-                        <div class="item-name">${config.name}</div>
-                        <div class="item-desc">${config.slot.toUpperCase()} slot</div>
-                    </div>
-                    <div class="item-price">${formatCredits(config.price)} ISK</div>
-                    <button class="buy-btn" onclick="game.ui.buyModule('${modId}')">BUY</button>
-                </div>
-            `;
-        }).join('');
-        document.getElementById('market-modules').innerHTML = modulesHtml;
-
-        // Repair cost
+        // Repair cost (still handled here)
         const repairCost = station.getRepairCost(this.game.player);
         document.getElementById('repair-options').innerHTML = `
             <div class="shop-item">

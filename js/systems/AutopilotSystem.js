@@ -271,7 +271,8 @@ export class AutopilotSystem {
     orbit(target, distance = 500) {
         this.command = 'orbit';
         this.target = target;
-        this.distance = distance;
+        // Orbit from edge of target, not center
+        this.distance = distance + (target.radius || 0);
         // Reset orbit phase when starting a new orbit (smooth transition)
         if (this.game.player?.isPlayer) {
             this.game.player.orbitPhase = 0;
@@ -285,7 +286,8 @@ export class AutopilotSystem {
     keepAtRange(target, distance = 1000) {
         this.command = 'keepAtRange';
         this.target = target;
-        this.distance = distance;
+        // Keep range from edge of target, not center
+        this.distance = distance + (target.radius || 0);
         this.game.ui?.log(`Keeping ${distance}m from ${target.name}`, 'system');
     }
 

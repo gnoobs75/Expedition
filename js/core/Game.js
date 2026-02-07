@@ -135,8 +135,8 @@ export class Game {
         // high-3 left empty
         this.player.fitModule('mid-1', 'shield-booster');
         this.player.fitModule('mid-2', 'afterburner');
-        this.player.fitModule('low-1', 'armor-repairer');
-        this.player.fitModule('low-2', 'damage-mod');
+        this.player.fitModule('low-1', 'damage-mod');
+        // low-2 left empty - buy armor repairer (mid slot) from station
     }
 
     /**

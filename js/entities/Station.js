@@ -5,6 +5,8 @@
 
 import { Entity } from './Entity.js';
 import { CONFIG } from '../config.js';
+import { SHIP_DATABASE } from '../data/shipDatabase.js';
+import { EQUIPMENT_DATABASE } from '../data/equipmentDatabase.js';
 
 export class Station extends Entity {
     constructor(game, options = {}) {
@@ -24,9 +26,9 @@ export class Station extends Entity {
         // Rotation for visual effect
         this.rotationSpeed = 0.05;
 
-        // Shop inventory
-        this.shipsForSale = Object.keys(CONFIG.SHIPS);
-        this.modulesForSale = Object.keys(CONFIG.MODULES);
+        // Shop inventory (uses new databases with fallback to CONFIG)
+        this.shipsForSale = Object.keys(SHIP_DATABASE).length > 0 ? Object.keys(SHIP_DATABASE) : Object.keys(CONFIG.SHIPS);
+        this.modulesForSale = Object.keys(EQUIPMENT_DATABASE).length > 0 ? Object.keys(EQUIPMENT_DATABASE) : Object.keys(CONFIG.MODULES);
     }
 
     /**

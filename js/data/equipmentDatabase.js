@@ -1,0 +1,882 @@
+// =============================================
+// Equipment Database
+// All purchasable weapons, modules, and subsystems
+// =============================================
+
+// Equipment categories
+export const EQUIPMENT_CATEGORIES = {
+    WEAPON: 'weapon',
+    MODULE: 'module',
+    SUBSYSTEM: 'subsystem',
+};
+
+// Equipment size tiers
+export const EQUIPMENT_SIZES = {
+    SMALL: 'small',
+    MEDIUM: 'medium',
+    LARGE: 'large',
+    XLARGE: 'xlarge',
+};
+
+// Slot display names (internal -> display)
+export const SLOT_DISPLAY_MAP = {
+    high: 'Weapon',
+    mid: 'Module',
+    low: 'Subsystem',
+};
+
+// Slot internal mapping (display -> internal)
+export const SLOT_INTERNAL_MAP = {
+    weapon: 'high',
+    module: 'mid',
+    subsystem: 'low',
+};
+
+// Full equipment database
+// Weapons use slot:'weapon' (mapped to high internally)
+// Modules use slot:'module' (mapped to mid internally)
+// Subsystems use slot:'subsystem' (mapped to low internally)
+export const EQUIPMENT_DATABASE = {
+
+    // =============================================
+    // WEAPONS - Lasers
+    // =============================================
+
+    'small-pulse-laser': {
+        name: 'Small Pulse Laser I',
+        slot: 'weapon',
+        size: 'small',
+        category: 'laser',
+        description: 'Short-range energy turret with rapid fire rate.',
+        damage: 15,
+        range: 500,
+        cycleTime: 2,
+        capacitorUse: 5,
+        trackingSpeed: 1.2,
+        price: 1000,
+    },
+    'small-pulse-laser-2': {
+        name: 'Small Pulse Laser II',
+        slot: 'weapon',
+        size: 'small',
+        category: 'laser',
+        description: 'Tech II small pulse laser with improved damage.',
+        damage: 20,
+        range: 550,
+        cycleTime: 1.8,
+        capacitorUse: 6,
+        trackingSpeed: 1.3,
+        price: 3500,
+    },
+    'medium-pulse-laser': {
+        name: 'Medium Pulse Laser I',
+        slot: 'weapon',
+        size: 'medium',
+        category: 'laser',
+        description: 'Standard medium-range energy turret.',
+        damage: 35,
+        range: 800,
+        cycleTime: 3,
+        capacitorUse: 12,
+        trackingSpeed: 0.9,
+        price: 5000,
+    },
+    'medium-pulse-laser-2': {
+        name: 'Medium Pulse Laser II',
+        slot: 'weapon',
+        size: 'medium',
+        category: 'laser',
+        description: 'Tech II medium energy turret. Enhanced output.',
+        damage: 45,
+        range: 900,
+        cycleTime: 2.8,
+        capacitorUse: 14,
+        trackingSpeed: 1.0,
+        price: 12000,
+    },
+    'large-beam-laser': {
+        name: 'Large Beam Laser I',
+        slot: 'weapon',
+        size: 'large',
+        category: 'laser',
+        description: 'Long-range heavy energy turret.',
+        damage: 70,
+        range: 1500,
+        cycleTime: 4,
+        capacitorUse: 22,
+        trackingSpeed: 0.5,
+        price: 18000,
+    },
+    'large-beam-laser-2': {
+        name: 'Large Beam Laser II',
+        slot: 'weapon',
+        size: 'large',
+        category: 'laser',
+        description: 'Tech II large beam. Devastating at range.',
+        damage: 90,
+        range: 1800,
+        cycleTime: 3.8,
+        capacitorUse: 26,
+        trackingSpeed: 0.55,
+        price: 35000,
+    },
+    'xlarge-turbo-laser': {
+        name: 'XL Turbo Laser',
+        slot: 'weapon',
+        size: 'xlarge',
+        category: 'laser',
+        description: 'Capital-class energy weapon. Massive damage output.',
+        damage: 150,
+        range: 2500,
+        cycleTime: 5,
+        capacitorUse: 45,
+        trackingSpeed: 0.3,
+        price: 80000,
+    },
+
+    // =============================================
+    // WEAPONS - Missiles
+    // =============================================
+
+    'light-missile': {
+        name: 'Light Missile Launcher I',
+        slot: 'weapon',
+        size: 'small',
+        category: 'missile',
+        description: 'Standard light missile launcher. Good all-around.',
+        damage: 18,
+        range: 700,
+        cycleTime: 3,
+        capacitorUse: 3,
+        missileSpeed: 400,
+        price: 1200,
+    },
+    'light-missile-2': {
+        name: 'Light Missile Launcher II',
+        slot: 'weapon',
+        size: 'small',
+        category: 'missile',
+        description: 'Tech II light missile launcher. Faster reload.',
+        damage: 24,
+        range: 800,
+        cycleTime: 2.5,
+        capacitorUse: 4,
+        missileSpeed: 450,
+        price: 4000,
+    },
+    'heavy-missile': {
+        name: 'Heavy Missile Launcher I',
+        slot: 'weapon',
+        size: 'medium',
+        category: 'missile',
+        description: 'Medium-class missile launcher for cruiser combat.',
+        damage: 40,
+        range: 1200,
+        cycleTime: 4,
+        capacitorUse: 8,
+        missileSpeed: 350,
+        price: 6000,
+    },
+    'heavy-missile-2': {
+        name: 'Heavy Missile Launcher II',
+        slot: 'weapon',
+        size: 'medium',
+        category: 'missile',
+        description: 'Tech II heavy missile system. Increased payload.',
+        damage: 55,
+        range: 1400,
+        cycleTime: 3.5,
+        capacitorUse: 10,
+        missileSpeed: 400,
+        price: 15000,
+    },
+    'cruise-missile': {
+        name: 'Cruise Missile Launcher',
+        slot: 'weapon',
+        size: 'large',
+        category: 'missile',
+        description: 'Long-range battleship-class missile system.',
+        damage: 80,
+        range: 2000,
+        cycleTime: 5,
+        capacitorUse: 15,
+        missileSpeed: 300,
+        price: 22000,
+    },
+    'torpedo-launcher': {
+        name: 'Torpedo Launcher',
+        slot: 'weapon',
+        size: 'large',
+        category: 'missile',
+        description: 'Close-range high-damage torpedo system.',
+        damage: 120,
+        range: 800,
+        cycleTime: 6,
+        capacitorUse: 18,
+        missileSpeed: 250,
+        price: 28000,
+    },
+    'xl-cruise-missile': {
+        name: 'XL Cruise Missile Battery',
+        slot: 'weapon',
+        size: 'xlarge',
+        category: 'missile',
+        description: 'Capital-class missile system. Area saturation.',
+        damage: 160,
+        range: 3000,
+        cycleTime: 6,
+        capacitorUse: 35,
+        missileSpeed: 350,
+        price: 90000,
+    },
+
+    // =============================================
+    // WEAPONS - Mining
+    // =============================================
+
+    'mining-laser': {
+        name: 'Mining Laser I',
+        slot: 'weapon',
+        size: 'small',
+        category: 'mining',
+        description: 'Basic mining laser for ore extraction.',
+        miningYield: 50,
+        range: 200,
+        cycleTime: 5,
+        capacitorUse: 8,
+        price: 2000,
+    },
+    'mining-laser-2': {
+        name: 'Mining Laser II',
+        slot: 'weapon',
+        size: 'small',
+        category: 'mining',
+        description: 'Enhanced mining laser. Higher extraction rate.',
+        miningYield: 100,
+        range: 250,
+        cycleTime: 4,
+        capacitorUse: 10,
+        price: 10000,
+    },
+    'modulated-miner': {
+        name: 'Modulated Strip Miner I',
+        slot: 'weapon',
+        size: 'medium',
+        category: 'mining',
+        description: 'Advanced modulated mining laser for cruiser hulls.',
+        miningYield: 180,
+        range: 300,
+        cycleTime: 6,
+        capacitorUse: 15,
+        price: 25000,
+    },
+    'strip-miner': {
+        name: 'Strip Miner I',
+        slot: 'weapon',
+        size: 'large',
+        category: 'mining',
+        description: 'Industrial strip mining laser. Maximum yield.',
+        miningYield: 350,
+        range: 350,
+        cycleTime: 8,
+        capacitorUse: 25,
+        price: 50000,
+    },
+
+    // =============================================
+    // WEAPONS - Salvagers
+    // =============================================
+
+    'salvager-1': {
+        name: 'Salvager I',
+        slot: 'weapon',
+        size: 'small',
+        category: 'salvage',
+        description: 'Standard salvaging module for wreck recovery.',
+        salvageChance: 0.5,
+        range: 300,
+        cycleTime: 5,
+        capacitorUse: 6,
+        price: 3000,
+    },
+    'salvager-2': {
+        name: 'Salvager II',
+        slot: 'weapon',
+        size: 'small',
+        category: 'salvage',
+        description: 'Advanced salvager with improved success rate.',
+        salvageChance: 0.7,
+        range: 400,
+        cycleTime: 4,
+        capacitorUse: 8,
+        price: 12000,
+    },
+
+    // =============================================
+    // WEAPONS - Harvesters
+    // =============================================
+
+    'gas-harvester-1': {
+        name: 'Gas Cloud Harvester I',
+        slot: 'weapon',
+        size: 'small',
+        category: 'harvest',
+        description: 'Collects gas cloud resources for processing.',
+        harvestYield: 40,
+        range: 200,
+        cycleTime: 5,
+        capacitorUse: 7,
+        price: 4000,
+    },
+    'gas-harvester-2': {
+        name: 'Gas Cloud Harvester II',
+        slot: 'weapon',
+        size: 'medium',
+        category: 'harvest',
+        description: 'Enhanced gas harvester with better yield.',
+        harvestYield: 80,
+        range: 250,
+        cycleTime: 4,
+        capacitorUse: 10,
+        price: 15000,
+    },
+
+    // =============================================
+    // MODULES - Shield
+    // =============================================
+
+    'shield-booster': {
+        name: 'Shield Booster I',
+        slot: 'module',
+        size: 'small',
+        category: 'shield',
+        description: 'Active shield repair module. Cycles to restore shields.',
+        shieldRepair: 30,
+        cycleTime: 4,
+        capacitorUse: 15,
+        price: 3000,
+    },
+    'shield-booster-2': {
+        name: 'Shield Booster II',
+        slot: 'module',
+        size: 'medium',
+        category: 'shield',
+        description: 'Improved shield booster with faster cycle time.',
+        shieldRepair: 60,
+        cycleTime: 3.5,
+        capacitorUse: 25,
+        price: 10000,
+    },
+    'xl-shield-booster': {
+        name: 'XL Shield Booster',
+        slot: 'module',
+        size: 'large',
+        category: 'shield',
+        description: 'Capital-grade shield restoration system.',
+        shieldRepair: 120,
+        cycleTime: 4,
+        capacitorUse: 50,
+        price: 35000,
+    },
+
+    // =============================================
+    // MODULES - Armor
+    // =============================================
+
+    'armor-repairer': {
+        name: 'Armor Repairer I',
+        slot: 'module',
+        size: 'small',
+        category: 'armor',
+        description: 'Active armor repair module. Restores armor HP.',
+        armorRepair: 25,
+        cycleTime: 5,
+        capacitorUse: 20,
+        price: 4000,
+    },
+    'armor-repairer-2': {
+        name: 'Armor Repairer II',
+        slot: 'module',
+        size: 'medium',
+        category: 'armor',
+        description: 'Improved armor repair with enhanced output.',
+        armorRepair: 50,
+        cycleTime: 4.5,
+        capacitorUse: 35,
+        price: 12000,
+    },
+    'xl-armor-repairer': {
+        name: 'XL Armor Repairer',
+        slot: 'module',
+        size: 'large',
+        category: 'armor',
+        description: 'Capital-grade armor restoration system.',
+        armorRepair: 100,
+        cycleTime: 5,
+        capacitorUse: 60,
+        price: 40000,
+    },
+
+    // =============================================
+    // MODULES - Propulsion
+    // =============================================
+
+    'afterburner': {
+        name: 'Afterburner I',
+        slot: 'module',
+        size: 'small',
+        category: 'propulsion',
+        description: 'Increases max speed when active. Low signature bloom.',
+        speedBonus: 1.5,
+        capacitorUse: 3,
+        price: 2500,
+    },
+    'afterburner-2': {
+        name: 'Afterburner II',
+        slot: 'module',
+        size: 'medium',
+        category: 'propulsion',
+        description: 'Enhanced afterburner with greater speed bonus.',
+        speedBonus: 1.75,
+        capacitorUse: 5,
+        price: 8000,
+    },
+    'microwarpdrive': {
+        name: 'Microwarpdrive I',
+        slot: 'module',
+        size: 'medium',
+        category: 'propulsion',
+        description: 'Massive speed boost but blooms signature radius.',
+        speedBonus: 3.0,
+        signatureBloom: 5.0,
+        capacitorUse: 8,
+        price: 12000,
+    },
+    'microwarpdrive-2': {
+        name: 'Microwarpdrive II',
+        slot: 'module',
+        size: 'large',
+        category: 'propulsion',
+        description: 'Capital MWD with extreme thrust. Heavy cap drain.',
+        speedBonus: 3.5,
+        signatureBloom: 4.0,
+        capacitorUse: 12,
+        price: 30000,
+    },
+
+    // =============================================
+    // MODULES - EWAR
+    // =============================================
+
+    'warp-scrambler': {
+        name: 'Warp Scrambler I',
+        slot: 'module',
+        size: 'small',
+        category: 'ewar',
+        description: 'Prevents target from warping. Short range.',
+        range: 300,
+        warpDisrupt: 2,
+        capacitorUse: 5,
+        price: 8000,
+    },
+    'warp-disruptor': {
+        name: 'Warp Disruptor I',
+        slot: 'module',
+        size: 'medium',
+        category: 'ewar',
+        description: 'Long-range warp disruption. Single point.',
+        range: 600,
+        warpDisrupt: 1,
+        capacitorUse: 4,
+        price: 10000,
+    },
+    'sensor-dampener': {
+        name: 'Sensor Dampener I',
+        slot: 'module',
+        size: 'small',
+        category: 'ewar',
+        description: 'Reduces target lock range and scan resolution.',
+        range: 500,
+        ewarStrength: 0.30,
+        capacitorUse: 4,
+        price: 6000,
+    },
+
+    // =============================================
+    // MODULES - Utility
+    // =============================================
+
+    'capacitor-booster': {
+        name: 'Capacitor Booster I',
+        slot: 'module',
+        size: 'small',
+        category: 'utility',
+        description: 'Injects capacitor energy when activated.',
+        capacitorBoost: 40,
+        cycleTime: 10,
+        price: 5000,
+    },
+    'energy-vampire': {
+        name: 'Energy Nosferatu I',
+        slot: 'module',
+        size: 'medium',
+        category: 'utility',
+        description: 'Drains capacitor from target and transfers to you.',
+        range: 400,
+        capacitorDrain: 8,
+        cycleTime: 4,
+        capacitorUse: 2,
+        price: 9000,
+    },
+
+    // =============================================
+    // SUBSYSTEMS - Damage
+    // =============================================
+
+    'damage-mod': {
+        name: 'Damage Amplifier I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'damage',
+        description: 'Passive module that increases weapon damage.',
+        damageBonus: 1.10,
+        price: 5000,
+    },
+    'damage-mod-2': {
+        name: 'Damage Amplifier II',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'damage',
+        description: 'Tech II damage amplifier. Greater damage bonus.',
+        damageBonus: 1.15,
+        price: 15000,
+    },
+    'gyrostabilizer': {
+        name: 'Gyrostabilizer I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'damage',
+        description: 'Improves tracking speed and rate of fire.',
+        trackingSpeed: 1.10,
+        cycleTimeBonus: 0.95,
+        price: 4000,
+    },
+    'gyrostabilizer-2': {
+        name: 'Gyrostabilizer II',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'damage',
+        description: 'Tech II gyrostabilizer. Superior tracking.',
+        trackingSpeed: 1.15,
+        cycleTimeBonus: 0.92,
+        price: 12000,
+    },
+    'ballistic-control': {
+        name: 'Ballistic Control System I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'damage',
+        description: 'Increases missile damage and rate of fire.',
+        missileDamageBonus: 1.10,
+        cycleTimeBonus: 0.95,
+        price: 5000,
+    },
+    'ballistic-control-2': {
+        name: 'Ballistic Control System II',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'damage',
+        description: 'Tech II ballistic computer. Maximum missile output.',
+        missileDamageBonus: 1.15,
+        cycleTimeBonus: 0.92,
+        price: 16000,
+    },
+    'heat-sink': {
+        name: 'Heat Sink I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'damage',
+        description: 'Reduces laser capacitor use and increases damage.',
+        laserDamageBonus: 1.10,
+        capacitorReduction: 0.92,
+        price: 4500,
+    },
+    'heat-sink-2': {
+        name: 'Heat Sink II',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'damage',
+        description: 'Tech II heat sink. Superior energy management.',
+        laserDamageBonus: 1.15,
+        capacitorReduction: 0.88,
+        price: 14000,
+    },
+
+    // =============================================
+    // SUBSYSTEMS - Tank
+    // =============================================
+
+    'shield-extender': {
+        name: 'Shield Extender I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'tank',
+        description: 'Passively increases maximum shield capacity.',
+        shieldBonus: 50,
+        price: 3000,
+    },
+    'shield-extender-2': {
+        name: 'Shield Extender II',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'tank',
+        description: 'Tech II shield extender. Greater capacity boost.',
+        shieldBonus: 100,
+        price: 10000,
+    },
+    'armor-plate': {
+        name: 'Armor Plate I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'tank',
+        description: 'Passively increases maximum armor HP. Reduces speed.',
+        armorBonus: 40,
+        speedPenalty: 0.95,
+        price: 3000,
+    },
+    'armor-plate-2': {
+        name: 'Armor Plate II',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'tank',
+        description: 'Tech II armor plate. More armor, bigger speed penalty.',
+        armorBonus: 80,
+        speedPenalty: 0.90,
+        price: 10000,
+    },
+    'damage-control': {
+        name: 'Damage Control I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'tank',
+        description: 'Increases all resistances. Essential defensive module.',
+        shieldResist: 0.10,
+        armorResist: 0.10,
+        hullResist: 0.15,
+        price: 6000,
+    },
+    'damage-control-2': {
+        name: 'Damage Control II',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'tank',
+        description: 'Tech II damage control. Superior across-the-board resistance.',
+        shieldResist: 0.15,
+        armorResist: 0.15,
+        hullResist: 0.25,
+        price: 18000,
+    },
+
+    // =============================================
+    // SUBSYSTEMS - Speed/Agility
+    // =============================================
+
+    'nanofiber': {
+        name: 'Nanofiber Internal Structure I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'speed',
+        description: 'Increases agility and max speed at cost of hull.',
+        speedBonus: 1.08,
+        agilityBonus: 1.12,
+        hullPenalty: 0.90,
+        price: 3500,
+    },
+    'nanofiber-2': {
+        name: 'Nanofiber Internal Structure II',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'speed',
+        description: 'Tech II nanofiber. Greater speed, greater hull loss.',
+        speedBonus: 1.12,
+        agilityBonus: 1.18,
+        hullPenalty: 0.85,
+        price: 11000,
+    },
+    'overdrive-injector': {
+        name: 'Overdrive Injector I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'speed',
+        description: 'Maximizes engine output. Reduces cargo capacity.',
+        speedBonus: 1.12,
+        cargoPenalty: 0.85,
+        price: 4000,
+    },
+    'inertial-stabilizer': {
+        name: 'Inertial Stabilizer I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'speed',
+        description: 'Improves alignment and turn speed. Blooms signature.',
+        agilityBonus: 1.20,
+        signatureBloom: 1.10,
+        price: 3000,
+    },
+
+    // =============================================
+    // SUBSYSTEMS - Capacitor
+    // =============================================
+
+    'capacitor-flux-coil': {
+        name: 'Capacitor Flux Coil I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'capacitor',
+        description: 'Increases capacitor recharge rate. Reduces max cap.',
+        capacitorRegenBonus: 1.20,
+        capacitorPenalty: 0.90,
+        price: 3000,
+    },
+    'capacitor-power-relay': {
+        name: 'Capacitor Power Relay I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'capacitor',
+        description: 'Boosts cap recharge. Reduces shield boost amount.',
+        capacitorRegenBonus: 1.25,
+        shieldBoostPenalty: 0.90,
+        price: 3500,
+    },
+    'reactor-control': {
+        name: 'Reactor Control Unit I',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'capacitor',
+        description: 'Increases maximum capacitor capacity.',
+        capacitorBonus: 50,
+        price: 6000,
+    },
+    'reactor-control-2': {
+        name: 'Reactor Control Unit II',
+        slot: 'subsystem',
+        size: 'large',
+        category: 'capacitor',
+        description: 'Tech II reactor control. Large capacitor increase.',
+        capacitorBonus: 100,
+        price: 18000,
+    },
+
+    // =============================================
+    // SUBSYSTEMS - Mining Enhancements
+    // =============================================
+
+    'mining-upgrade': {
+        name: 'Mining Laser Upgrade I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'mining',
+        description: 'Increases mining laser yield.',
+        miningYieldBonus: 1.10,
+        price: 4000,
+    },
+    'mining-upgrade-2': {
+        name: 'Mining Laser Upgrade II',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'mining',
+        description: 'Tech II mining upgrade. Superior yield.',
+        miningYieldBonus: 1.15,
+        price: 12000,
+    },
+    'ice-harvester-upgrade': {
+        name: 'Ice Harvester Upgrade I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'mining',
+        description: 'Improves ice and gas harvesting cycle time.',
+        harvestCycleBonus: 0.90,
+        price: 5000,
+    },
+
+    // =============================================
+    // SUBSYSTEMS - Drone Enhancements
+    // =============================================
+
+    'drone-damage-amp': {
+        name: 'Drone Damage Amplifier I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'drone',
+        description: 'Increases drone damage output.',
+        droneBonus: 1.10,
+        price: 5000,
+    },
+    'drone-damage-amp-2': {
+        name: 'Drone Damage Amplifier II',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'drone',
+        description: 'Tech II drone amplifier. Superior drone performance.',
+        droneBonus: 1.18,
+        price: 14000,
+    },
+    'drone-navigation': {
+        name: 'Drone Navigation Computer I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'drone',
+        description: 'Increases drone speed and tracking.',
+        droneSpeedBonus: 1.20,
+        price: 4000,
+    },
+    'omnidirectional-tracker': {
+        name: 'Omnidirectional Tracking Link I',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'drone',
+        description: 'Improves drone tracking and optimal range.',
+        droneTrackingBonus: 1.15,
+        droneRangeBonus: 1.15,
+        price: 8000,
+    },
+};
+
+// =============================================
+// HELPER FUNCTIONS
+// =============================================
+
+/**
+ * Get all equipment for a given slot type ('weapon', 'module', 'subsystem')
+ */
+export function getEquipmentBySlot(slotType) {
+    return Object.entries(EQUIPMENT_DATABASE)
+        .filter(([, eq]) => eq.slot === slotType)
+        .reduce((acc, [id, eq]) => { acc[id] = eq; return acc; }, {});
+}
+
+/**
+ * Get all equipment of a specific category
+ */
+export function getEquipmentByCategory(category) {
+    return Object.entries(EQUIPMENT_DATABASE)
+        .filter(([, eq]) => eq.category === category)
+        .reduce((acc, [id, eq]) => { acc[id] = eq; return acc; }, {});
+}
+
+/**
+ * Get all equipment of a specific size
+ */
+export function getEquipmentBySize(size) {
+    return Object.entries(EQUIPMENT_DATABASE)
+        .filter(([, eq]) => eq.size === size)
+        .reduce((acc, [id, eq]) => { acc[id] = eq; return acc; }, {});
+}
+
+/**
+ * Get equipment sorted by price
+ */
+export function getEquipmentByPrice(ascending = true) {
+    return Object.entries(EQUIPMENT_DATABASE)
+        .sort((a, b) => ascending ? a[1].price - b[1].price : b[1].price - a[1].price);
+}

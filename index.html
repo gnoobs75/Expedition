@@ -144,7 +144,7 @@
         <!-- Bottom Panel: Module Rack -->
         <div id="module-rack">
             <div class="module-section">
-                <div class="section-label">HIGH</div>
+                <div class="section-label">WEAPONS</div>
                 <div class="module-slots" id="high-slots">
                     <div class="module-slot" data-slot="high-1">
                         <div class="module-icon">&#9889;</div>
@@ -161,7 +161,7 @@
                 </div>
             </div>
             <div class="module-section">
-                <div class="section-label">MID</div>
+                <div class="section-label">MODULES</div>
                 <div class="module-slots" id="mid-slots">
                     <div class="module-slot" data-slot="mid-1">
                         <div class="module-icon">&#9211;</div>
@@ -174,7 +174,7 @@
                 </div>
             </div>
             <div class="module-section">
-                <div class="section-label">LOW</div>
+                <div class="section-label">SUBSYS</div>
                 <div class="module-slots" id="low-slots">
                     <div class="module-slot" data-slot="low-1">
                         <div class="module-icon">&#9881;</div>
@@ -206,11 +206,21 @@
                 <span class="panel-title">SHIP</span>
             </div>
             <div class="ship-indicator-content">
-                <div class="ship-indicator-rings">
-                    <div class="ship-ring shield"></div>
-                    <div class="ship-ring armor"></div>
-                    <div class="ship-ring hull"></div>
-                    <div class="ship-indicator-icon">&#9650;</div>
+                <canvas id="ship-indicator-canvas"></canvas>
+                <div class="ship-indicator-info">
+                    <div id="ship-indicator-name" class="ship-indicator-name">Your Ship</div>
+                    <div id="ship-indicator-class" class="ship-indicator-class"></div>
+                </div>
+                <div id="ship-indicator-health">
+                    <div class="mini-bar-group">
+                        <div id="ship-shield-bar" class="mini-bar shield"></div>
+                    </div>
+                    <div class="mini-bar-group">
+                        <div id="ship-armor-bar" class="mini-bar armor"></div>
+                    </div>
+                    <div class="mini-bar-group">
+                        <div id="ship-hull-bar" class="mini-bar hull"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -281,7 +291,8 @@
                 </div>
                 <div class="modal-tabs">
                     <button class="tab-btn active" data-tab="hangar">HANGAR</button>
-                    <button class="tab-btn" data-tab="market">MARKET</button>
+                    <button class="tab-btn" data-tab="ships">SHIPS</button>
+                    <button class="tab-btn" data-tab="equipment">EQUIPMENT</button>
                     <button class="tab-btn" data-tab="fitting">FITTING</button>
                     <button class="tab-btn" data-tab="repair">REPAIR</button>
                     <button class="tab-btn" data-tab="refinery">REFINERY</button>
@@ -293,14 +304,14 @@
                         <h3>Cargo Hold</h3>
                         <div id="cargo-contents"></div>
                     </div>
-                    <div id="tab-market" class="tab-content">
-                        <h3>Ships for Sale</h3>
-                        <div id="market-ships"></div>
-                        <h3>Modules for Sale</h3>
-                        <div id="market-modules"></div>
+                    <div id="tab-ships" class="tab-content">
+                        <div id="ships-market" class="market-section"></div>
+                    </div>
+                    <div id="tab-equipment" class="tab-content">
+                        <div id="equipment-market" class="market-section"></div>
                     </div>
                     <div id="tab-fitting" class="tab-content">
-                        <div id="fitting-display"></div>
+                        <div id="fitting-display" class="fitting-container"></div>
                     </div>
                     <div id="tab-repair" class="tab-content">
                         <div id="repair-options"></div>

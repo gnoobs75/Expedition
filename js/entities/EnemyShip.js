@@ -5,6 +5,7 @@
 
 import { Ship } from './Ship.js';
 import { CONFIG } from '../config.js';
+import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
 
 export class EnemyShip extends Ship {
     constructor(game, options = {}) {
@@ -80,54 +81,37 @@ export class EnemyShip extends Ship {
      * Create enemy ship mesh
      */
     createMesh() {
-        const group = new THREE.Group();
+        const enemyConfig = CONFIG.ENEMIES[this.enemyType];
+        const shipClass = enemyConfig?.shipClass || 'frigate';
+        const sizeMap = { frigate: 'frigate', destroyer: 'destroyer', cruiser: 'cruiser', battlecruiser: 'battlecruiser', battleship: 'battleship', capital: 'capital' };
+        const factorySize = sizeMap[shipClass] || 'frigate';
 
-        // Aggressive angular shape
-        const hullShape = new THREE.Shape();
-        const size = this.radius;
+        try {
+            this.mesh = shipMeshFactory.generateShipMesh({
+                shipId: `enemy-${this.enemyType}`,
+                role: 'pirate',
+                size: factorySize,
+                detailLevel: 'low',
+            });
+        } catch (e) {
+            const group = new THREE.Group();
+            const size = this.radius;
+            const shape = new THREE.Shape();
+            shape.moveTo(size, 0);
+            shape.lineTo(0, size * 0.7);
+            shape.lineTo(-size * 0.8, size * 0.3);
+            shape.lineTo(-size * 0.6, 0);
+            shape.lineTo(-size * 0.8, -size * 0.3);
+            shape.lineTo(0, -size * 0.7);
+            shape.closePath();
+            const geo = new THREE.ShapeGeometry(shape);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xaa2222, transparent: true, opacity: 0.9 });
+            group.add(new THREE.Mesh(geo, mat));
+            this.mesh = group;
+        }
 
-        hullShape.moveTo(size, 0);
-        hullShape.lineTo(0, size * 0.7);
-        hullShape.lineTo(-size * 0.8, size * 0.3);
-        hullShape.lineTo(-size * 0.6, 0);
-        hullShape.lineTo(-size * 0.8, -size * 0.3);
-        hullShape.lineTo(0, -size * 0.7);
-        hullShape.closePath();
-
-        const hullGeometry = new THREE.ShapeGeometry(hullShape);
-        const hullMaterial = new THREE.MeshBasicMaterial({
-            color: 0xaa2222,
-            transparent: true,
-            opacity: 0.9,
-        });
-        const hull = new THREE.Mesh(hullGeometry, hullMaterial);
-        group.add(hull);
-
-        // Red engine glow
-        const engineGeometry = new THREE.CircleGeometry(size * 0.15, 6);
-        const engineMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff4444,
-            transparent: true,
-            opacity: 0.7,
-        });
-        const engine = new THREE.Mesh(engineGeometry, engineMaterial);
-        engine.position.set(-size * 0.6, 0, 0);
-        group.add(engine);
-
-        // Hostile indicator
-        const indicatorGeometry = new THREE.RingGeometry(size * 1.3, size * 1.4, 6);
-        const indicatorMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
-            transparent: true,
-            opacity: 0.3,
-        });
-        const indicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
-        group.add(indicator);
-
-        this.mesh = group;
         this.mesh.position.set(this.x, this.y, 0);
         this.mesh.rotation.z = this.rotation;
-
         return this.mesh;
     }
 }

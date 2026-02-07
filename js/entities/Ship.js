@@ -69,8 +69,9 @@ export class Ship extends Entity {
         // Timers for module cooldowns
         this.moduleCooldowns = new Map();
 
-        // Ship class name
+        // Ship class name and size
         this.shipClass = options.shipClass || 'frigate';
+        this.shipSize = options.size || 'frigate';
 
         // Drone bay
         this.droneBay = {
@@ -166,15 +167,27 @@ export class Ship extends Entity {
     }
 
     /**
-     * Update module cooldowns
+     * Update module cooldowns (tick-based cycling)
+     * When a cooldown expires and the module is still active, re-trigger its effect
      */
     updateModuleCooldowns(dt) {
-        for (const [moduleId, cooldown] of this.moduleCooldowns) {
+        for (const [slotId, cooldown] of this.moduleCooldowns) {
             const newCooldown = cooldown - dt;
             if (newCooldown <= 0) {
-                this.moduleCooldowns.delete(moduleId);
+                this.moduleCooldowns.delete(slotId);
+                // Re-trigger active cycle-based modules
+                if (this.activeModules.has(slotId) && this.alive) {
+                    const [slotType, slotIndex] = this.parseSlotId(slotId);
+                    const moduleId = this.modules[slotType]?.[slotIndex];
+                    if (moduleId) {
+                        const moduleConfig = getModuleConfig(moduleId);
+                        if (moduleConfig?.cycleTime) {
+                            this.triggerModuleEffect(slotId, moduleConfig);
+                        }
+                    }
+                }
             } else {
-                this.moduleCooldowns.set(moduleId, newCooldown);
+                this.moduleCooldowns.set(slotId, newCooldown);
             }
         }
     }
@@ -227,8 +240,37 @@ export class Ship extends Entity {
             return false;
         }
 
+        // Size compatibility check (only for equipment DB items with size property)
+        if (moduleConfig.size && this.shipSize) {
+            if (!Ship.isEquipmentSizeCompatible(this.shipSize, moduleConfig.size)) {
+                if (this.isPlayer) {
+                    this.game.ui?.toast(`${moduleConfig.name} is too ${moduleConfig.size === 'xlarge' ? 'large' : moduleConfig.size} for this hull`, 'warning');
+                }
+                return false;
+            }
+        }
+
         this.modules[slotType][slotIndex] = moduleId;
         return true;
+    }
+
+    /**
+     * Check if an equipment size fits a ship size
+     * Frigates: small | Destroyers: small+medium | Cruisers: small+medium+large
+     * Battlecruisers: medium+large | Battleships: large | Capitals: xlarge
+     */
+    static isEquipmentSizeCompatible(shipSize, equipSize) {
+        const compat = {
+            'frigate':       ['small'],
+            'destroyer':     ['small', 'medium'],
+            'cruiser':       ['small', 'medium', 'large'],
+            'battlecruiser': ['medium', 'large'],
+            'battleship':    ['large'],
+            'capital':       ['xlarge'],
+        };
+        const allowed = compat[shipSize];
+        if (!allowed) return true; // Unknown ship size, allow all
+        return allowed.includes(equipSize);
     }
 
     /**
@@ -278,31 +320,49 @@ export class Ship extends Entity {
         const [slotType, slotIndex] = this.parseSlotId(slotId);
         const moduleId = this.modules[slotType][slotIndex];
 
-        if (!moduleId) return false;
+        if (!moduleId) {
+            if (this.isPlayer) this.game.ui?.toast('Empty slot - fit a module at a station', 'warning');
+            return false;
+        }
 
         const moduleConfig = getModuleConfig(moduleId);
         if (!moduleConfig) return false;
 
         // Check cooldown
-        if (this.moduleCooldowns.has(slotId)) return false;
+        if (this.moduleCooldowns.has(slotId)) {
+            if (this.isPlayer) {
+                const remaining = this.moduleCooldowns.get(slotId).toFixed(1);
+                this.game.ui?.toast(`${moduleConfig.name} cycling (${remaining}s)`, 'warning');
+            }
+            return false;
+        }
 
         // Check capacitor for cycle-based modules
         if (moduleConfig.cycleTime && moduleConfig.capacitorUse) {
             if (this.capacitor < moduleConfig.capacitorUse) {
-                if (this.isPlayer) this.game.ui?.log('Not enough capacitor', 'system');
+                if (this.isPlayer) {
+                    this.game.ui?.log('Not enough capacitor', 'system');
+                    this.game.ui?.toast('Not enough capacitor', 'warning');
+                }
                 return false;
             }
         }
 
         // Weapons need a locked target
         if (moduleConfig.damage && !this.target) {
-            if (this.isPlayer) this.game.ui?.log('No target locked', 'system');
+            if (this.isPlayer) {
+                this.game.ui?.log('No target locked', 'system');
+                this.game.ui?.toast('No target locked (R to lock)', 'warning');
+            }
             return false;
         }
 
         // Mining laser needs target
         if (moduleConfig.miningYield && !this.target) {
-            if (this.isPlayer) this.game.ui?.log('No target locked', 'system');
+            if (this.isPlayer) {
+                this.game.ui?.log('No target locked', 'system');
+                this.game.ui?.toast('Lock an asteroid first (R)', 'warning');
+            }
             return false;
         }
 
@@ -349,15 +409,17 @@ export class Ship extends Entity {
 
     /**
      * Trigger a module's effect (weapons, repair, etc.)
+     * Called once on activation, then re-triggered by updateModuleCooldowns when cooldown expires
      */
     triggerModuleEffect(slotId, moduleConfig) {
         // Use capacitor
         if (!this.useCapacitor(moduleConfig.capacitorUse)) {
             this.deactivateModule(slotId);
+            if (this.isPlayer) this.game.ui?.toast('Capacitor depleted', 'warning');
             return;
         }
 
-        // Set cooldown
+        // Set cooldown - updateModuleCooldowns will call triggerModuleEffect again when it expires
         this.moduleCooldowns.set(slotId, moduleConfig.cycleTime);
 
         // Apply effect based on module type
@@ -369,15 +431,6 @@ export class Ship extends Entity {
             this.repairShield(moduleConfig.shieldRepair);
         } else if (moduleConfig.armorRepair) {
             this.repairArmor(moduleConfig.armorRepair);
-        }
-
-        // Schedule next cycle if still active
-        if (this.activeModules.has(slotId) && this.alive) {
-            setTimeout(() => {
-                if (this.activeModules.has(slotId) && this.alive) {
-                    this.triggerModuleEffect(slotId, moduleConfig);
-                }
-            }, moduleConfig.cycleTime * 1000);
         }
     }
 
@@ -393,7 +446,10 @@ export class Ship extends Entity {
         // Check range
         const dist = this.distanceTo(this.target);
         if (dist > moduleConfig.range) {
-            if (this.isPlayer) this.game.ui?.log('Target out of range', 'system');
+            if (this.isPlayer) {
+                this.game.ui?.log('Target out of range', 'system');
+                this.game.ui?.toast(`Out of range (${Math.floor(dist)}m / ${moduleConfig.range}m)`, 'warning');
+            }
             return;
         }
 
@@ -428,7 +484,10 @@ export class Ship extends Entity {
         // Check range
         const dist = this.distanceTo(this.target);
         if (dist > moduleConfig.range) {
-            if (this.isPlayer) this.game.ui?.log('Target out of range', 'system');
+            if (this.isPlayer) {
+                this.game.ui?.log('Target out of range', 'system');
+                this.game.ui?.toast(`Mining range exceeded (${Math.floor(dist)}m / ${moduleConfig.range}m)`, 'warning');
+            }
             return;
         }
 
@@ -801,6 +860,73 @@ export class Ship extends Entity {
         this.mesh.position.set(this.x, this.y, 0);
         this.mesh.rotation.z = this.rotation;
 
+        // Add shield overlay mesh
+        const shieldGeo = new THREE.CircleGeometry(this.radius * 1.5, 32);
+        const shieldMat = new THREE.MeshBasicMaterial({
+            color: 0x4488ff,
+            transparent: true,
+            opacity: 0.0,
+            side: THREE.DoubleSide,
+        });
+        this.shieldOverlay = new THREE.Mesh(shieldGeo, shieldMat);
+        this.shieldOverlay.position.z = 2;
+        this.mesh.add(this.shieldOverlay);
+
         return this.mesh;
+    }
+
+    /**
+     * Update mesh position to match entity (override Entity.updateMesh)
+     */
+    updateMesh() {
+        if (this.mesh) {
+            this.mesh.position.set(this.x, this.y, 0);
+            this.mesh.rotation.z = this.rotation;
+            this.mesh.visible = this.visible && this.alive;
+            this.updateDamageVisuals();
+        }
+    }
+
+    /**
+     * Update visual damage states based on health
+     */
+    updateDamageVisuals() {
+        if (!this.mesh) return;
+
+        const shieldPct = this.shield / this.maxShield;
+        const hullPct = this.hull / this.maxHull;
+
+        // Shield glow overlay - visible when shields are up, pulses when hit
+        if (this.shieldOverlay) {
+            // Base opacity scales with shield percentage (0 = no shields, 0.15 = full)
+            this.shieldOverlay.material.opacity = shieldPct * 0.15;
+        }
+
+        // Hull damage - tint red and add particles
+        if (hullPct < 0.3 && this.alive) {
+            // Spawn damage sparks
+            if (Math.random() < 0.15) {
+                const sparkX = this.x + (Math.random() - 0.5) * this.radius;
+                const sparkY = this.y + (Math.random() - 0.5) * this.radius;
+                this.game.renderer?.effects.spawn('hit', sparkX, sparkY, {
+                    color: 0xff4400,
+                    size: 1 + Math.random(),
+                    lifetime: 0.3,
+                });
+            }
+
+            // Critical hull - smoke trail
+            if (hullPct < 0.15 && Math.random() < 0.3) {
+                const smokeX = this.x + (Math.random() - 0.5) * this.radius;
+                const smokeY = this.y + (Math.random() - 0.5) * this.radius;
+                this.game.renderer?.effects.spawn('trail', smokeX, smokeY, {
+                    color: 0x332211,
+                    size: 2 + Math.random() * 2,
+                    lifetime: 0.8,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                });
+            }
+        }
     }
 }

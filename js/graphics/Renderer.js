@@ -201,9 +201,10 @@ export class Renderer {
      * Clear all sector entities from scene
      */
     clearSector() {
-        // Remove all entity meshes
+        // Remove all entity meshes and dispose GPU resources
         for (const [entity, mesh] of this.entityMeshes) {
             this.entityGroup.remove(mesh);
+            this.disposeMesh(mesh);
         }
         this.entityMeshes.clear();
 
@@ -231,8 +232,25 @@ export class Renderer {
         const mesh = this.entityMeshes.get(entity);
         if (mesh) {
             this.entityGroup.remove(mesh);
+            this.disposeMesh(mesh);
             this.entityMeshes.delete(entity);
         }
+    }
+
+    /**
+     * Dispose of a mesh's geometry and materials to free GPU memory
+     */
+    disposeMesh(mesh) {
+        mesh.traverse(child => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(m => m.dispose());
+                } else {
+                    child.material.dispose();
+                }
+            }
+        });
     }
 
     /**

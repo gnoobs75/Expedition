@@ -192,6 +192,13 @@
         <div id="event-log" class="panel">
             <div class="panel-header">
                 <span class="panel-title">EVENT LOG</span>
+                <div id="log-filters">
+                    <button class="log-filter-btn active" data-log-filter="all">ALL</button>
+                    <button class="log-filter-btn" data-log-filter="combat">&#9876;</button>
+                    <button class="log-filter-btn" data-log-filter="mining">&#9874;</button>
+                    <button class="log-filter-btn" data-log-filter="system">&#9881;</button>
+                    <button class="log-filter-btn" data-log-filter="warp">&#10070;</button>
+                </div>
             </div>
             <div class="panel-content">
                 <div id="log-messages">
@@ -225,6 +232,22 @@
             </div>
         </div>
 
+        <!-- Fleet Panel -->
+        <div id="fleet-panel" class="panel hidden">
+            <div class="panel-header">
+                <span class="panel-title">FLEET</span>
+                <button class="panel-close">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="fleet-panel-body">
+                    <div class="fleet-empty">
+                        <div>No fleet ships</div>
+                        <div class="fleet-hint">Buy ships at stations and add them to your fleet</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Drone Quick Action Bar -->
         <div id="drone-bar" class="panel hidden">
             <div class="panel-header drone-bar-header">
@@ -239,6 +262,15 @@
                     <button class="drone-cmd-btn" data-cmd="return" title="Return to Bay">&#8617;</button>
                 </div>
                 <div class="drone-status">Idle</div>
+            </div>
+        </div>
+
+        <!-- Autopilot Status Indicator -->
+        <div id="autopilot-indicator" class="panel hidden">
+            <div class="autopilot-content">
+                <span class="autopilot-icon">&#9678;</span>
+                <span id="autopilot-status-text">Idle</span>
+                <button id="autopilot-cancel-btn" title="Cancel autopilot (Ctrl+Space)">&times;</button>
             </div>
         </div>
 
@@ -296,6 +328,7 @@
                     <button class="tab-btn" data-tab="fitting">FITTING</button>
                     <button class="tab-btn" data-tab="repair">REPAIR</button>
                     <button class="tab-btn" data-tab="refinery">REFINERY</button>
+                    <button class="tab-btn" data-tab="cantina">CANTINA</button>
                 </div>
                 <div class="modal-body">
                     <div id="tab-hangar" class="tab-content active">
@@ -321,6 +354,9 @@
                         <div id="refinery-ore-list"></div>
                         <div id="refinery-total"></div>
                         <button id="sell-all-ore-btn" class="buy-btn">SELL ALL ORE</button>
+                    </div>
+                    <div id="tab-cantina" class="tab-content">
+                        <div id="cantina-content"></div>
                     </div>
                 </div>
             </div>

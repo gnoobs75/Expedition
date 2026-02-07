@@ -5,6 +5,7 @@
 
 import { Ship } from './Ship.js';
 import { CONFIG } from '../config.js';
+import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
 
 export class NPCShip extends Ship {
     constructor(game, options = {}) {
@@ -110,141 +111,35 @@ export class NPCShip extends Ship {
         super.destroy();
     }
 
-    /**
-     * Create miner ship mesh - industrial/boxy look
-     */
-    createMinerMesh() {
-        const group = new THREE.Group();
-        const size = this.radius;
-
-        // Boxy industrial hull
-        const hullShape = new THREE.Shape();
-        hullShape.moveTo(size * 0.8, 0);
-        hullShape.lineTo(size * 0.5, size * 0.5);
-        hullShape.lineTo(-size * 0.7, size * 0.4);
-        hullShape.lineTo(-size * 0.8, size * 0.2);
-        hullShape.lineTo(-size * 0.8, -size * 0.2);
-        hullShape.lineTo(-size * 0.7, -size * 0.4);
-        hullShape.lineTo(size * 0.5, -size * 0.5);
-        hullShape.closePath();
-
-        const hullGeometry = new THREE.ShapeGeometry(hullShape);
-        const hullMaterial = new THREE.MeshBasicMaterial({
-            color: CONFIG.COLORS.miner,
-            transparent: true,
-            opacity: 0.85,
-        });
-        const hull = new THREE.Mesh(hullGeometry, hullMaterial);
-        group.add(hull);
-
-        // Cargo bay indicator (rectangle on top)
-        const cargoGeometry = new THREE.PlaneGeometry(size * 0.6, size * 0.3);
-        const cargoMaterial = new THREE.MeshBasicMaterial({
-            color: 0x667788,
-            transparent: true,
-            opacity: 0.7,
-        });
-        const cargoBay = new THREE.Mesh(cargoGeometry, cargoMaterial);
-        cargoBay.position.set(-size * 0.1, 0, 0.05);
-        group.add(cargoBay);
-
-        // Engine
-        const engineGeometry = new THREE.CircleGeometry(size * 0.15, 6);
-        const engineMaterial = new THREE.MeshBasicMaterial({
-            color: 0x88ccff,
-            transparent: true,
-            opacity: 0.6,
-        });
-        const engine = new THREE.Mesh(engineGeometry, engineMaterial);
-        engine.position.set(-size * 0.75, 0, 0);
-        group.add(engine);
-
-        // Neutral indicator ring
-        const indicatorGeometry = new THREE.RingGeometry(size * 1.2, size * 1.3, 16);
-        const indicatorMaterial = new THREE.MeshBasicMaterial({
-            color: CONFIG.COLORS.miner,
-            transparent: true,
-            opacity: 0.15,
-        });
-        const indicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
-        group.add(indicator);
-
-        return group;
-    }
-
-    /**
-     * Create security ship mesh - militaristic
-     */
-    createSecurityMesh() {
-        const group = new THREE.Group();
-        const size = this.radius;
-
-        // Sleek military hull
-        const hullShape = new THREE.Shape();
-        hullShape.moveTo(size * 1.1, 0);
-        hullShape.lineTo(size * 0.2, size * 0.6);
-        hullShape.lineTo(-size * 0.5, size * 0.5);
-        hullShape.lineTo(-size * 0.7, size * 0.2);
-        hullShape.lineTo(-size * 0.7, -size * 0.2);
-        hullShape.lineTo(-size * 0.5, -size * 0.5);
-        hullShape.lineTo(size * 0.2, -size * 0.6);
-        hullShape.closePath();
-
-        const hullGeometry = new THREE.ShapeGeometry(hullShape);
-        const hullMaterial = new THREE.MeshBasicMaterial({
-            color: CONFIG.COLORS.security,
-            transparent: true,
-            opacity: 0.9,
-        });
-        const hull = new THREE.Mesh(hullGeometry, hullMaterial);
-        group.add(hull);
-
-        // Wing stripes
-        const stripeGeometry = new THREE.PlaneGeometry(size * 0.4, size * 0.08);
-        const stripeMaterial = new THREE.MeshBasicMaterial({
-            color: 0x88bbff,
-            transparent: true,
-            opacity: 0.6,
-        });
-        const stripe1 = new THREE.Mesh(stripeGeometry, stripeMaterial);
-        stripe1.position.set(0, size * 0.35, 0.05);
-        group.add(stripe1);
-        const stripe2 = stripe1.clone();
-        stripe2.position.set(0, -size * 0.35, 0.05);
-        group.add(stripe2);
-
-        // Engines
-        const engineGeometry = new THREE.CircleGeometry(size * 0.12, 8);
-        const engineMaterial = new THREE.MeshBasicMaterial({
-            color: 0x44aaff,
-            transparent: true,
-            opacity: 0.7,
-        });
-        const engine1 = new THREE.Mesh(engineGeometry, engineMaterial);
-        engine1.position.set(-size * 0.65, size * 0.15, 0);
-        group.add(engine1);
-        const engine2 = engine1.clone();
-        engine2.position.set(-size * 0.65, -size * 0.15, 0);
-        group.add(engine2);
-
-        // Security indicator ring - blue
-        const indicatorGeometry = new THREE.RingGeometry(size * 1.2, size * 1.3, 8);
-        const indicatorMaterial = new THREE.MeshBasicMaterial({
-            color: CONFIG.COLORS.security,
-            transparent: true,
-            opacity: 0.2,
-        });
-        const indicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
-        group.add(indicator);
-
-        return group;
-    }
-
     createMesh() {
-        if (this.role === 'security') {
-            this.mesh = this.createSecurityMesh();
-        } else {
-            this.mesh = this.createMinerMesh();
+        // Map NPC roles to ShipMeshFactory roles
+        const roleMap = { miner: 'mining', security: 'police' };
+        const factoryRole = roleMap[this.role] || 'mining';
+        const shipClass = this.shipClass || 'frigate';
+
+        // Determine size from CONFIG.SHIPS
+        const sizeMap = { frigate: 'frigate', destroyer: 'destroyer', cruiser: 'cruiser', battlecruiser: 'battlecruiser', battleship: 'battleship', capital: 'capital' };
+        const factorySize = sizeMap[shipClass] || 'frigate';
+
+        try {
+            this.mesh = shipMeshFactory.generateShipMesh({
+                shipId: `npc-${this.role}-${shipClass}`,
+                role: factoryRole,
+                size: factorySize,
+                detailLevel: 'low',
+            });
+        } catch (e) {
+            // Fallback to simple triangle
+            const shape = new THREE.Shape();
+            const size = this.radius;
+            shape.moveTo(size, 0);
+            shape.lineTo(-size * 0.7, size * 0.5);
+            shape.lineTo(-size * 0.5, 0);
+            shape.lineTo(-size * 0.7, -size * 0.5);
+            shape.closePath();
+            const geometry = new THREE.ShapeGeometry(shape);
+            const material = new THREE.MeshBasicMaterial({ color: this.color, transparent: true, opacity: 0.9 });
+            this.mesh = new THREE.Mesh(geometry, material);
         }
 
         this.mesh.position.set(this.x, this.y, 0);

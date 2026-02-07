@@ -192,28 +192,52 @@ export class CombatSystem {
     }
 
     /**
-     * Calculate hit chance based on signature, range, etc.
+     * Calculate hit chance using tracking-based formula (EVE-inspired)
+     *
+     * angularVelocity = targetSpeed / max(distance, 50) * targetSignature / 28
+     * trackingFactor = weaponTracking / max(angularVelocity, 0.01)
+     * hitChance = clamp(trackingFactor * 0.5, 0.05, 1.0) * rangeModifier
+     *
+     * Result: Small fast ships orbiting big ships at close range are very hard
+     * to hit with large slow-tracking weapons.
      */
-    calculateHitChance(source, target, range) {
+    calculateHitChance(source, target, range, weaponConfig = null) {
         const dist = source.distanceTo(target);
         if (dist > range) return 0;
 
-        // Base hit chance
-        let chance = 1.0;
+        // Range modifier: 1.0 at close range, drops to 0.3 at max range
+        const rangeFraction = dist / range;
+        const rangeModifier = 1 - rangeFraction * 0.7;
 
-        // Reduce for distance
-        chance *= 1 - (dist / range) * 0.3;
-
-        // Reduce for small targets
-        if (target.signatureRadius) {
-            chance *= Math.min(1, target.signatureRadius / 50);
+        // Get weapon tracking speed (higher = better at hitting fast targets)
+        let weaponTracking = 1.0;
+        if (weaponConfig && weaponConfig.trackingSpeed) {
+            weaponTracking = weaponConfig.trackingSpeed;
+        } else {
+            // Estimate from source - larger weapons track slower
+            weaponTracking = source.signatureRadius ? Math.min(1.5, 40 / source.signatureRadius) : 1.0;
         }
 
-        // Reduce for fast targets
-        if (target.currentSpeed) {
-            chance *= 1 - Math.min(0.3, target.currentSpeed / 500);
+        // Target's angular velocity relative to source
+        const targetSpeed = target.currentSpeed || 0;
+        const targetSig = target.signatureRadius || 30;
+        const effectiveDist = Math.max(dist, 50);
+        const angularVelocity = (targetSpeed / effectiveDist) * (targetSig / 28);
+
+        // Tracking factor: how well the weapon tracks vs how fast target moves
+        const trackingFactor = weaponTracking / Math.max(angularVelocity, 0.01);
+
+        // Hit chance from tracking (capped at 1.0)
+        let chance = Math.min(1.0, trackingFactor * 0.5);
+
+        // Apply range modifier
+        chance *= rangeModifier;
+
+        // Pilot 'steady' trait bonus
+        if (source.pilot?.traits?.includes('steady')) {
+            chance *= 1.1;
         }
 
-        return Math.max(0.1, Math.min(1, chance));
+        return Math.max(0.05, Math.min(1.0, chance));
     }
 }

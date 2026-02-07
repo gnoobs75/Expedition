@@ -507,6 +507,11 @@ export class InputManager {
             case 'toggleModelEditor':
                 this.game.ui?.toggleModelEditor();
                 break;
+
+            case 'toggleFleet':
+                this.game.ui?.toggleFleet();
+                break;
+
             case 'spawnBattleEvent':
                 this.game.npcSystem?.spawnBattleEvent();
                 break;

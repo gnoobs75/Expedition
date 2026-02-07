@@ -4084,3 +4084,549 @@ select:focus-visible {
 .editor-status.success {
     color: var(--friendly-color);
 }
+
+/* =============================================
+   Fleet Panel Styles
+   ============================================= */
+
+#fleet-panel {
+    width: 360px;
+    max-height: 400px;
+}
+
+#fleet-panel .panel-content {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.fleet-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.fleet-table th {
+    color: var(--text-dim);
+    font-weight: normal;
+    text-transform: uppercase;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    padding: 4px 6px;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+    text-align: left;
+}
+
+.fleet-row {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.fleet-row:hover {
+    background: rgba(0, 255, 255, 0.08);
+}
+
+.fleet-row.selected {
+    background: rgba(0, 255, 255, 0.15);
+    border-left: 2px solid var(--primary-cyan);
+}
+
+.fleet-row td {
+    padding: 4px 6px;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.05);
+    white-space: nowrap;
+}
+
+.fleet-name {
+    color: var(--text-primary);
+    font-weight: bold;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fleet-pilot {
+    color: var(--text-secondary);
+    max-width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fleet-state {
+    font-size: 10px;
+    text-transform: capitalize;
+}
+
+.fleet-hp {
+    width: 60px;
+}
+
+.fleet-hp-bars {
+    position: relative;
+    height: 10px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.fleet-hp-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    transition: width 0.3s;
+}
+
+.fleet-hp-bar.shield {
+    background: rgba(0, 170, 255, 0.6);
+    z-index: 2;
+    height: 50%;
+}
+
+.fleet-hp-bar.hull {
+    background: rgba(255, 68, 68, 0.6);
+    z-index: 1;
+    top: 50%;
+    height: 50%;
+}
+
+.fleet-group {
+    color: var(--text-dim);
+    text-align: center;
+    width: 30px;
+}
+
+.fleet-commands {
+    display: flex;
+    gap: 4px;
+    padding: 6px 0 2px;
+    border-top: 1px solid rgba(0, 255, 255, 0.15);
+    margin-top: 4px;
+}
+
+.fleet-cmd-btn {
+    flex: 1;
+    background: rgba(0, 255, 255, 0.08);
+    border: 1px solid rgba(0, 255, 255, 0.25);
+    color: var(--text-primary);
+    padding: 4px 6px;
+    font-size: 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
+}
+
+.fleet-cmd-btn:hover {
+    background: rgba(0, 255, 255, 0.2);
+    border-color: var(--primary-cyan);
+}
+
+.fleet-empty {
+    text-align: center;
+    padding: 20px 10px;
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+.fleet-hint {
+    font-size: 10px;
+    color: var(--text-dim);
+    opacity: 0.6;
+    margin-top: 6px;
+}
+
+.dim {
+    opacity: 0.4;
+}
+
+/* =============================================
+   Cantina Styles
+   ============================================= */
+
+.cantina-section {
+    margin-bottom: 16px;
+}
+
+.cantina-section-title {
+    font-size: 11px;
+    color: var(--primary-cyan);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+}
+
+.cantina-pilots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 10px;
+}
+
+.pilot-card {
+    background: rgba(0, 20, 40, 0.6);
+    border: 1px solid rgba(0, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 10px;
+    transition: border-color 0.2s;
+}
+
+.pilot-card:hover {
+    border-color: rgba(0, 255, 255, 0.4);
+}
+
+.pilot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.pilot-name {
+    color: var(--text-primary);
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.pilot-salary {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+.pilot-skills {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.pilot-skill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+}
+
+.skill-label {
+    color: var(--text-dim);
+    width: 60px;
+    text-transform: uppercase;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+}
+
+.skill-bar-bg {
+    flex: 1;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.skill-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+.skill-bar.combat {
+    background: linear-gradient(90deg, #ff4444, #ff8844);
+}
+
+.skill-bar.mining {
+    background: linear-gradient(90deg, #ffcc44, #88cc44);
+}
+
+.skill-bar.navigation {
+    background: linear-gradient(90deg, #4488ff, #44ccff);
+}
+
+.skill-value {
+    color: var(--text-secondary);
+    width: 24px;
+    text-align: right;
+    font-size: 10px;
+}
+
+.pilot-traits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.pilot-trait {
+    font-size: 9px;
+    padding: 2px 6px;
+    border: 1px solid;
+    border-radius: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.3px;
+}
+
+.pilot-status {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+}
+
+.pilot-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.cantina-btn {
+    background: rgba(0, 255, 255, 0.08);
+    border: 1px solid rgba(0, 255, 255, 0.25);
+    color: var(--text-primary);
+    padding: 4px 10px;
+    font-size: 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    text-transform: uppercase;
+    transition: all 0.15s;
+}
+
+.cantina-btn:hover {
+    background: rgba(0, 255, 255, 0.2);
+    border-color: var(--primary-cyan);
+}
+
+.hire-btn {
+    border-color: rgba(68, 255, 136, 0.4);
+    color: #44ff88;
+}
+
+.hire-btn:hover {
+    background: rgba(68, 255, 136, 0.15);
+    border-color: #44ff88;
+}
+
+.fire-btn {
+    border-color: rgba(255, 68, 68, 0.3);
+    color: #ff6666;
+}
+
+.fire-btn:hover {
+    background: rgba(255, 68, 68, 0.15);
+    border-color: #ff4444;
+}
+
+.cantina-empty {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+.cantina-assign-menu {
+    background: var(--panel-bg-solid);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 4px 0;
+    z-index: 10000;
+    min-width: 180px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.cantina-assign-title {
+    padding: 4px 10px;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cantina-assign-option {
+    padding: 6px 10px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.cantina-assign-option:hover {
+    background: rgba(0, 255, 255, 0.15);
+    color: var(--text-primary);
+}
+
+/* Event Log Filters */
+#log-filters {
+    display: flex;
+    gap: 2px;
+    margin-left: auto;
+}
+
+.log-filter-btn {
+    background: rgba(0, 30, 60, 0.6);
+    border: 1px solid rgba(0, 170, 255, 0.2);
+    color: rgba(0, 170, 255, 0.5);
+    cursor: pointer;
+    padding: 1px 5px;
+    font-size: 9px;
+    border-radius: 2px;
+    line-height: 14px;
+}
+
+.log-filter-btn:hover {
+    border-color: rgba(0, 170, 255, 0.5);
+    color: rgba(0, 170, 255, 0.8);
+}
+
+.log-filter-btn.active {
+    background: rgba(0, 170, 255, 0.2);
+    border-color: rgba(0, 170, 255, 0.6);
+    color: #00aaff;
+}
+
+/* =============================================
+   Autopilot Status Indicator
+   ============================================= */
+
+#autopilot-indicator {
+    position: fixed;
+    bottom: 85px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    pointer-events: auto;
+}
+
+#autopilot-indicator .autopilot-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background: rgba(0, 30, 60, 0.85);
+    border: 1px solid var(--accent-primary, #00aaff);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--accent-primary, #00aaff);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#autopilot-indicator .autopilot-icon {
+    animation: autopilot-pulse 2s infinite;
+}
+
+@keyframes autopilot-pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+#autopilot-cancel-btn {
+    background: none;
+    border: 1px solid rgba(255, 100, 100, 0.5);
+    color: #ff6666;
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 12px;
+    line-height: 16px;
+    border-radius: 2px;
+}
+
+#autopilot-cancel-btn:hover {
+    background: rgba(255, 100, 100, 0.2);
+    border-color: #ff6666;
+}
+
+/* =============================================
+   Contextual Help System
+   ============================================= */
+
+.help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 170, 255, 0.4);
+    color: rgba(0, 170, 255, 0.6);
+    font-size: 9px;
+    font-weight: bold;
+    cursor: help;
+    margin-left: 4px;
+    vertical-align: middle;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.help-icon:hover {
+    border-color: #00aaff;
+    color: #00aaff;
+    background: rgba(0, 170, 255, 0.15);
+}
+
+.help-popover {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    max-width: 320px;
+    padding: 10px 14px;
+    background: rgba(0, 15, 30, 0.95);
+    border: 1px solid rgba(0, 170, 255, 0.5);
+    border-radius: 4px;
+    color: #aaccdd;
+    font-size: 11px;
+    line-height: 1.5;
+    pointer-events: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.help-popover.visible {
+    display: block;
+}
+
+.help-popover .help-title {
+    color: #00ccff;
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.help-popover .help-text {
+    margin-bottom: 6px;
+}
+
+.help-popover .help-keys {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0, 170, 255, 0.2);
+}
+
+.help-popover .help-key {
+    display: inline-block;
+    padding: 1px 5px;
+    background: rgba(0, 170, 255, 0.15);
+    border: 1px solid rgba(0, 170, 255, 0.3);
+    border-radius: 2px;
+    color: #00ccff;
+    font-size: 10px;
+    font-family: monospace;
+}
+
+.help-popover .help-key-desc {
+    color: #88aacc;
+    font-size: 10px;
+    margin-left: 4px;
+}
+
+/* Help icon in panel headers */
+.panel-header .help-icon {
+    margin-left: auto;
+    margin-right: 4px;
+}
+
+/* When panels have close button too */
+.panel-header .panel-close {
+    order: 10;
+}

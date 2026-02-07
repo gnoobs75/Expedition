@@ -15,6 +15,7 @@ import { CollisionSystem } from '../systems/CollisionSystem.js';
 import { AISystem } from '../systems/AISystem.js';
 import { NPCSystem } from '../systems/NPCSystem.js';
 import { AutopilotSystem } from '../systems/AutopilotSystem.js';
+import { FleetSystem } from '../systems/FleetSystem.js';
 import { UIManager } from '../ui/UIManager.js';
 import { AudioManager } from './AudioManager.js';
 import { EventBus } from './EventBus.js';
@@ -42,6 +43,9 @@ export class Game {
         // Bookmarks
         this.bookmarks = [];
 
+        // Fleet state (persists across sectors)
+        this.fleet = { ships: [], hiredPilots: [] };
+
         // Systems will be initialized in init()
         this.renderer = null;
         this.input = null;
@@ -53,6 +57,7 @@ export class Game {
         this.ai = null;
         this.npcSystem = null;
         this.autopilot = null;
+        this.fleetSystem = null;
         this.playerAggressive = false;
         this.ui = null;
         this.audio = null;
@@ -91,6 +96,7 @@ export class Game {
         this.ai = new AISystem(this);
         this.npcSystem = new NPCSystem(this);
         this.autopilot = new AutopilotSystem(this);
+        this.fleetSystem = new FleetSystem(this);
 
         // Create UI manager (last, needs other systems)
         this.ui = new UIManager(this);
@@ -438,6 +444,7 @@ export class Game {
         // Update game systems
         this.ai.update(dt);
         this.npcSystem.update(dt);
+        this.fleetSystem.update(dt);
         this.combat.update(dt);
         this.mining.update(dt);
         this.collision.update(dt);

@@ -29,11 +29,12 @@ export class PanelDragManager {
             'locked-targets-container': { top: 200, left: 10 },
             'ship-indicator': { bottom: 185, left: 20 },
             'drone-bar': { bottom: 185, left: 200 },
+            'fleet-panel': { top: 300, left: 10 },
         };
 
         // Storage key - bump version to force reset when layout changes
         this.storageKey = 'expedition-panel-layout';
-        this.layoutVersion = 2;
+        this.layoutVersion = 3;
         this.versionKey = 'expedition-panel-layout-version';
 
         // Force reset if layout version changed
@@ -63,6 +64,9 @@ export class PanelDragManager {
         // Keep panels in bounds on window resize
         window.addEventListener('resize', () => this.constrainAllPanels());
 
+        // Constrain all panels shortly after init in case any loaded offscreen
+        setTimeout(() => this.constrainAllPanels(), 500);
+
         // ResizeObserver to detect CSS resize-handle usage and save sizes
         this.resizeObserver = new ResizeObserver((entries) => {
             // Debounce saves while user is actively resizing
@@ -84,31 +88,58 @@ export class PanelDragManager {
         const panelData = this.panels.get(panelId);
         if (!panelData) return;
         const panel = panelData.element;
-        if (!panel || panel.classList.contains('hidden')) return;
+        if (!panel) return;
+
+        // Skip hidden panels - they have no valid rect
+        if (panel.classList.contains('hidden') || panel.offsetParent === null) return;
 
         const rect = panel.getBoundingClientRect();
-        const margin = 20; // keep at least 20px visible
+        if (rect.width === 0 && rect.height === 0) return;
 
-        // Off the right edge
-        if (rect.left > window.innerWidth - margin) {
-            panel.style.left = `${window.innerWidth - margin}px`;
-            panel.style.right = 'auto';
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        // Ensure the panel header (top 40px) is fully visible so user can always grab it
+        const headerH = 40;
+        const minVisible = Math.min(rect.width, 100); // at least 100px wide visible
+
+        let left = rect.left;
+        let top = rect.top;
+        let changed = false;
+
+        // Don't let the left edge go so far right that less than minVisible is showing
+        if (left > vw - minVisible) {
+            left = vw - minVisible;
+            changed = true;
         }
-        // Off the left edge
-        if (rect.right < margin) {
-            panel.style.left = `${margin - rect.width}px`;
-            panel.style.right = 'auto';
+        // Don't let the right edge go past the left side
+        if (left + minVisible < 0) {
+            left = 0;
+            changed = true;
         }
-        // Off the bottom edge
-        if (rect.top > window.innerHeight - margin) {
-            panel.style.top = `${window.innerHeight - margin}px`;
+        // Don't let the top go below the viewport (header must be visible)
+        if (top > vh - headerH) {
+            top = vh - headerH;
+            changed = true;
+        }
+        // Don't let it go above the viewport
+        if (top < 0) {
+            top = 0;
+            changed = true;
+        }
+
+        if (changed) {
+            panel.style.left = `${Math.round(left)}px`;
+            panel.style.top = `${Math.round(top)}px`;
+            panel.style.right = 'auto';
             panel.style.bottom = 'auto';
         }
-        // Off the top edge
-        if (rect.bottom < margin) {
-            panel.style.top = `${margin - rect.height}px`;
-            panel.style.bottom = 'auto';
-        }
+    }
+
+    /**
+     * Constrain a panel when it becomes visible (call after removing 'hidden' class)
+     */
+    onPanelShown(panelId) {
+        requestAnimationFrame(() => this.constrainPanel(panelId));
     }
 
     /**
@@ -139,6 +170,17 @@ export class PanelDragManager {
 
         // Observe size changes (CSS resize handle)
         this.resizeObserver?.observe(panel);
+
+        // Watch for hidden class removal so we can constrain when panel becomes visible
+        const classObserver = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+                if (m.attributeName === 'class' && !panel.classList.contains('hidden')) {
+                    // Panel just became visible - constrain to viewport
+                    requestAnimationFrame(() => this.constrainPanel(panelId));
+                }
+            }
+        });
+        classObserver.observe(panel, { attributes: true, attributeFilter: ['class'] });
 
         // Add mousedown listener to header (or label for minimap, or entire panel as fallback)
         const header = panel.querySelector('.panel-header') ||
@@ -311,21 +353,20 @@ export class PanelDragManager {
         panel.style.left = 'auto';
 
         if (layout) {
-            // Validate saved position is within current viewport
+            // Validate saved position against current viewport with tighter bounds
             const w = window.innerWidth;
             const h = window.innerHeight;
+            const savedW = layout.width || 200;
+            const savedH = layout.height || 100;
             const offscreen =
-                (layout.left !== undefined && layout.left > w) ||
-                (layout.top !== undefined && layout.top > h) ||
-                (layout.left !== undefined && layout.left < -500) ||
-                (layout.top !== undefined && layout.top < -500);
+                (layout.left !== undefined && layout.left > w - 50) ||
+                (layout.top !== undefined && layout.top > h - 40) ||
+                (layout.left !== undefined && layout.left < -(savedW - 50)) ||
+                (layout.top !== undefined && layout.top < -10);
 
             if (offscreen && defaultPos) {
-                // Saved position is way off-screen, use defaults
-                if (defaultPos.top !== undefined) panel.style.top = `${defaultPos.top}px`;
-                if (defaultPos.right !== undefined) panel.style.right = `${defaultPos.right}px`;
-                if (defaultPos.bottom !== undefined) panel.style.bottom = `${defaultPos.bottom}px`;
-                if (defaultPos.left !== undefined) panel.style.left = `${defaultPos.left}px`;
+                // Saved position is off-screen, use defaults
+                this.applyDefaultPos(panel, defaultPos);
                 return;
             }
 
@@ -339,11 +380,18 @@ export class PanelDragManager {
             if (layout.width !== undefined) panel.style.width = `${layout.width}px`;
             if (layout.height !== undefined) panel.style.height = `${layout.height}px`;
         } else if (defaultPos) {
-            if (defaultPos.top !== undefined) panel.style.top = `${defaultPos.top}px`;
-            if (defaultPos.right !== undefined) panel.style.right = `${defaultPos.right}px`;
-            if (defaultPos.bottom !== undefined) panel.style.bottom = `${defaultPos.bottom}px`;
-            if (defaultPos.left !== undefined) panel.style.left = `${defaultPos.left}px`;
+            this.applyDefaultPos(panel, defaultPos);
         }
+    }
+
+    /**
+     * Apply default position to a panel
+     */
+    applyDefaultPos(panel, defaultPos) {
+        if (defaultPos.top !== undefined) panel.style.top = `${defaultPos.top}px`;
+        if (defaultPos.right !== undefined) panel.style.right = `${defaultPos.right}px`;
+        if (defaultPos.bottom !== undefined) panel.style.bottom = `${defaultPos.bottom}px`;
+        if (defaultPos.left !== undefined) panel.style.left = `${defaultPos.left}px`;
     }
 
     /**

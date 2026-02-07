@@ -14,7 +14,10 @@ import { ShipMenuManager } from './ShipMenuManager.js';
 import { SectorMapManager } from './SectorMapManager.js';
 import { StationVendorManager } from './StationVendorManager.js';
 import { ModelEditorManager } from './ModelEditorManager.js';
+import { FleetPanelManager } from './FleetPanelManager.js';
+import { CantinaManager } from './CantinaManager.js';
 import { PerformanceMonitor } from '../utils/PerformanceMonitor.js';
+import { HelpSystem } from './HelpSystem.js';
 
 export class UIManager {
     constructor(game) {
@@ -49,8 +52,17 @@ export class UIManager {
         // Model editor manager (for G key)
         this.modelEditorManager = new ModelEditorManager(game);
 
+        // Fleet panel manager
+        this.fleetPanelManager = new FleetPanelManager(game);
+
+        // Cantina manager
+        this.cantinaManager = new CantinaManager(game);
+
         // Performance monitor
         this.performanceMonitor = new PerformanceMonitor(game);
+
+        // Help system
+        this.helpSystem = new HelpSystem();
 
         // Ship indicator 3D viewer state
         this.shipViewerScene = null;
@@ -62,6 +74,7 @@ export class UIManager {
         // Initialize UI
         this.setupEventListeners();
         this.initPanelDragManager();
+        this.helpSystem.init();
         this.initShipIndicatorViewer();
 
         // Listen for ship switch to update 3D viewer
@@ -69,6 +82,7 @@ export class UIManager {
 
         // Log messages
         this.maxLogMessages = 50;
+        this.logFilter = 'all';
 
         // Previous health values for warning flash
         this.prevHealth = { shield: 100, armor: 100, hull: 100, capacitor: 100 };
@@ -141,6 +155,10 @@ export class UIManager {
             // Drone Bar
             droneBar: document.getElementById('drone-bar'),
 
+            // Autopilot Indicator
+            autopilotIndicator: document.getElementById('autopilot-indicator'),
+            autopilotStatusText: document.getElementById('autopilot-status-text'),
+
             // Context menu
             contextMenu: document.getElementById('context-menu'),
 
@@ -181,6 +199,16 @@ export class UIManager {
                 btn.classList.add('active');
                 this.currentFilter = btn.dataset.filter;
                 this.updateOverview();
+            });
+        });
+
+        // Log filter buttons
+        document.querySelectorAll('.log-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.logFilter = btn.dataset.logFilter;
+                this.applyLogFilter();
             });
         });
 
@@ -236,6 +264,10 @@ export class UIManager {
                 // Update refinery when switching to it
                 if (btn.dataset.tab === 'refinery') {
                     this.updateRefineryTab();
+                }
+                // Update cantina when switching to it
+                if (btn.dataset.tab === 'cantina') {
+                    this.cantinaManager?.show(this.game.dockedAt);
                 }
             });
         });
@@ -345,6 +377,13 @@ export class UIManager {
             });
         });
 
+        // Autopilot cancel button
+        document.getElementById('autopilot-cancel-btn')?.addEventListener('click', () => {
+            this.game.autopilot?.stop();
+            this.game.autopilot?.cancelWarp();
+            this.game.audio?.play('click');
+        });
+
         // Ship indicator right-click - show standard context menu for player ship
         document.getElementById('ship-indicator')?.addEventListener('contextmenu', (e) => {
             e.preventDefault();
@@ -437,6 +476,7 @@ export class UIManager {
         this.panelDragManager.registerPanel('ship-indicator');
         this.panelDragManager.registerPanel('drone-bar');
         this.panelDragManager.registerPanel('performance-monitor');
+        this.panelDragManager.registerPanel('fleet-panel');
 
         // Constrain all panels to viewport after loading saved positions
         requestAnimationFrame(() => this.panelDragManager.constrainAllPanels());
@@ -461,12 +501,16 @@ export class UIManager {
             this.updateObjectViewer();
             this.updateShipIndicator();
             this.updateDroneBar();
+            this.updateAutopilotIndicator();
         }
 
         if (this.overviewTimer >= CONFIG.OVERVIEW_UPDATE_RATE / 1000) {
             this.overviewTimer = 0;
             this.updateOverview();
         }
+
+        // Update fleet panel
+        this.fleetPanelManager?.update(dt);
     }
 
     /**
@@ -564,8 +608,16 @@ export class UIManager {
         this.elements.cargoBar.classList.remove('warning', 'full');
         if (percent >= 100) {
             this.elements.cargoBar.classList.add('full');
+            if (!this._cargoFullWarned) {
+                this.toast('Cargo hold full!', 'warning');
+                this.game.audio?.play('warning');
+                this._cargoFullWarned = true;
+            }
         } else if (percent >= 80) {
             this.elements.cargoBar.classList.add('warning');
+            this._cargoFullWarned = false;
+        } else {
+            this._cargoFullWarned = false;
         }
     }
 
@@ -1363,9 +1415,15 @@ export class UIManager {
 
         const element = document.createElement('div');
         element.className = `log-message ${type}`;
+        element.dataset.logType = type;
         element.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
 
         container.appendChild(element);
+
+        // Hide if filtered out
+        if (this.logFilter !== 'all' && type !== this.logFilter) {
+            element.style.display = 'none';
+        }
 
         // Remove old messages
         while (container.children.length > this.maxLogMessages) {
@@ -1373,6 +1431,23 @@ export class UIManager {
         }
 
         // Scroll to bottom
+        container.scrollTop = container.scrollHeight;
+    }
+
+    /**
+     * Apply current log filter to all messages
+     */
+    applyLogFilter() {
+        const container = this.elements.logMessages;
+        if (!container) return;
+
+        for (const msg of container.children) {
+            if (this.logFilter === 'all' || msg.dataset.logType === this.logFilter) {
+                msg.style.display = '';
+            } else {
+                msg.style.display = 'none';
+            }
+        }
         container.scrollTop = container.scrollHeight;
     }
 
@@ -1391,6 +1466,9 @@ export class UIManager {
 
         // Populate refinery tab
         this.updateRefineryTab();
+
+        // Initialize cantina (generates pilots when docked)
+        this.cantinaManager.show(station);
     }
 
     /**
@@ -1399,6 +1477,7 @@ export class UIManager {
     hideStationPanel() {
         this.elements.stationPanel.classList.add('hidden');
         this.vendorManager.hide();
+        this.cantinaManager.hide();
     }
 
     /**
@@ -1702,6 +1781,13 @@ export class UIManager {
      */
     toggleModelEditor() {
         this.modelEditorManager?.toggle();
+    }
+
+    /**
+     * Toggle Fleet Panel (F key)
+     */
+    toggleFleet() {
+        this.fleetPanelManager?.toggle();
     }
 
     /**
@@ -2029,6 +2115,42 @@ export class UIManager {
      */
     resetPanelPositions() {
         this.panelDragManager.resetPositions();
+    }
+
+    /**
+     * Update autopilot status indicator
+     */
+    updateAutopilotIndicator() {
+        const indicator = this.elements.autopilotIndicator;
+        if (!indicator) return;
+
+        const autopilot = this.game.autopilot;
+        if (!autopilot) return;
+
+        const status = autopilot.getStatus();
+
+        if (status === 'idle') {
+            indicator.classList.add('hidden');
+            return;
+        }
+
+        indicator.classList.remove('hidden');
+
+        const statusText = this.elements.autopilotStatusText;
+        if (!statusText) return;
+
+        const targetName = autopilot.target?.name || autopilot.warpTarget?.name || '';
+
+        const labels = {
+            'approach': `Approaching ${targetName}`,
+            'approachPosition': 'Approaching location',
+            'orbit': `Orbiting ${targetName} at ${autopilot.distance || 0}m`,
+            'keepAtRange': `Keeping ${autopilot.distance || 0}m from ${targetName}`,
+            'aligning': `Aligning to ${targetName}...`,
+            'warping': `Warping to ${targetName}`,
+        };
+
+        statusText.textContent = labels[status] || status;
     }
 }
 

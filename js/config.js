@@ -54,7 +54,7 @@ export const CONFIG = {
             armor: 50,
             hull: 100,
             capacitor: 100,
-            capacitorRegen: 5,
+            capacitorRegen: 3,
             signatureRadius: 30,
             highSlots: 3,
             midSlots: 2,
@@ -73,7 +73,7 @@ export const CONFIG = {
             armor: 200,
             hull: 250,
             capacitor: 200,
-            capacitorRegen: 8,
+            capacitorRegen: 5,
             signatureRadius: 80,
             highSlots: 4,
             midSlots: 3,
@@ -89,7 +89,7 @@ export const CONFIG = {
             armor: 600,
             hull: 500,
             capacitor: 400,
-            capacitorRegen: 12,
+            capacitorRegen: 8,
             signatureRadius: 200,
             highSlots: 6,
             midSlots: 4,
@@ -275,6 +275,11 @@ export const CONFIG = {
         normal: { chance: 0.45, interval: 90, maxPirates: 3 },
         dangerous: { chance: 0.6, interval: 60, maxPirates: 4 },
         deadly: { chance: 0.8, interval: 45, maxPirates: 5 },
+    },
+
+    // Fleet
+    FLEET: {
+        MAX_SIZE: 10,
     },
 
     // Colors

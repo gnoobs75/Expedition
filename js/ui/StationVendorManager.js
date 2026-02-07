@@ -255,6 +255,12 @@ export class StationVendorManager {
     initVendor3DViewer(canvas) {
         if (!canvas) return;
 
+        // Dispose old renderer to prevent WebGL context leak
+        if (this.vendorRenderer) {
+            this.vendorRenderer.dispose();
+            this.vendorRenderer = null;
+        }
+
         const width = 200;
         const height = 180;
         canvas.width = width;
@@ -312,7 +318,37 @@ export class StationVendorManager {
         }).then(mesh => {
             if (!mesh) return;
             this.removeVendorShipMesh();
-            this.vendorShipMesh = mesh;
+
+            // Wrap in a group so we can tilt the group while rotating the mesh inside
+            const wrapper = new THREE.Group();
+
+            // Measure original bounds
+            const box = new THREE.Box3().setFromObject(mesh);
+            const dims = new THREE.Vector3();
+            box.getSize(dims);
+            const maxDim = Math.max(dims.x, dims.y, dims.z);
+
+            // Normalize to fit camera view (camera at z=120, fov=45)
+            if (maxDim > 0) {
+                const targetSize = 60;
+                const scale = targetSize / maxDim;
+                mesh.scale.multiplyScalar(scale);
+            }
+
+            // Center the mesh at origin (recalculate box after scaling)
+            const scaledBox = new THREE.Box3().setFromObject(mesh);
+            const center = new THREE.Vector3();
+            scaledBox.getCenter(center);
+            mesh.position.sub(center);
+
+            // Detect flat procedural meshes (tiny Z extent) and tilt wrapper
+            this._vendorIsProcedural = dims.z < dims.x * 0.3;
+            if (this._vendorIsProcedural) {
+                wrapper.rotation.x = -Math.PI / 3; // Tilt 60deg toward camera
+            }
+
+            wrapper.add(mesh);
+            this.vendorShipMesh = wrapper;
             this.vendorScene.add(this.vendorShipMesh);
         });
     }
@@ -343,8 +379,14 @@ export class StationVendorManager {
             return;
         }
 
-        this.vendorShipMesh.rotation.y += 0.005;
-        this.vendorShipMesh.rotation.x = Math.sin(Date.now() * 0.001) * 0.1;
+        // Rotate the inner mesh (child of wrapper group) so wrapper tilt stays intact
+        const inner = this.vendorShipMesh.children[0];
+        if (inner) {
+            inner.rotation.y += 0.005;
+            if (!this._vendorIsProcedural) {
+                inner.rotation.x = Math.sin(Date.now() * 0.001) * 0.1;
+            }
+        }
         this.vendorRenderer.render(this.vendorScene, this.vendorCamera);
         this.vendorAnimationId = requestAnimationFrame(() => this.animateVendorViewer());
     }

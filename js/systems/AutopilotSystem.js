@@ -5,6 +5,7 @@
 
 import { CONFIG } from '../config.js';
 import { wrappedDirection, wrappedDistance } from '../utils/math.js';
+import { ObstacleAvoidance } from '../utils/ObstacleAvoidance.js';
 
 export class AutopilotSystem {
     constructor(game) {
@@ -17,11 +18,10 @@ export class AutopilotSystem {
 
         // Warp state
         this.warping = false;
-        this.warpProgress = 0;
         this.warpTarget = null;
-        this.warpStartPos = { x: 0, y: 0 };
         this.alignTimer = 0;
         this.aligning = false;
+        this.alignTimeTotal = 0;
     }
 
     /**
@@ -107,8 +107,12 @@ export class AutopilotSystem {
             CONFIG.SECTOR_SIZE
         );
 
-        player.desiredRotation = angle;
-        player.desiredSpeed = player.maxSpeed;
+        // Apply obstacle avoidance
+        const entities = this.game.currentSector?.entities || [];
+        const avoidance = ObstacleAvoidance.getAvoidance(player, angle, entities);
+
+        player.desiredRotation = avoidance.angle;
+        player.desiredSpeed = player.maxSpeed * avoidance.speedMultiplier;
     }
 
     /**
@@ -142,8 +146,12 @@ export class AutopilotSystem {
             CONFIG.SECTOR_SIZE
         );
 
-        player.desiredRotation = angle;
-        player.desiredSpeed = player.maxSpeed;
+        // Apply obstacle avoidance
+        const entities = this.game.currentSector?.entities || [];
+        const avoidance = ObstacleAvoidance.getAvoidance(player, angle, entities);
+
+        player.desiredRotation = avoidance.angle;
+        player.desiredSpeed = player.maxSpeed * avoidance.speedMultiplier;
 
     }
 
@@ -317,10 +325,12 @@ export class AutopilotSystem {
             return;
         }
 
-        // Start alignment
+        // Start alignment - time scales with ship size (signature radius)
         this.warpTarget = target;
         this.aligning = true;
-        this.alignTimer = CONFIG.PLAYER_WARP_ALIGN_TIME;
+        const sigRadius = player.signatureRadius || 30;
+        this.alignTimer = Math.min(12, Math.max(2, 2 + (sigRadius / 100) * 8));
+        this.alignTimeTotal = this.alignTimer;
 
         this.game.ui?.log(`Aligning to ${target.name}...`, 'warp');
         this.game.audio?.play('warp-start');
@@ -355,7 +365,8 @@ export class AutopilotSystem {
         );
 
         player.desiredRotation = targetAngle;
-        player.desiredSpeed = player.maxSpeed * 0.3;
+        const alignProgress = 1 - (this.alignTimer / (this.alignTimeTotal || 3));
+        player.desiredSpeed = player.maxSpeed * (0.3 + alignProgress * 0.5);
 
         // Count down alignment
         this.alignTimer -= dt;
@@ -366,67 +377,24 @@ export class AutopilotSystem {
     }
 
     /**
-     * Start the actual warp
+     * Start the actual warp - instant teleport with brief visual effect
      */
     startWarp() {
         const player = this.game.player;
 
         this.aligning = false;
         this.warping = true;
-        this.warpProgress = 0;
-        this.warpStartPos = { x: player.x, y: player.y };
 
-        // Show warp tunnel UI
+        // Show warp tunnel effect
         document.getElementById('warp-tunnel').classList.remove('hidden');
-
         this.game.ui?.log('Warp drive active!', 'warp');
-    }
 
-    /**
-     * Update warp travel
-     */
-    updateWarp(dt) {
-        const player = this.game.player;
-        const warpSpeed = CONFIG.PLAYER_WARP_SPEED;
-
-        // Calculate distance to target
-        const totalDist = wrappedDistance(
-            this.warpStartPos.x, this.warpStartPos.y,
-            this.warpTarget.x, this.warpTarget.y,
-            CONFIG.SECTOR_SIZE
-        );
-
-        // Warp progress
-        this.warpProgress += (warpSpeed * dt) / totalDist;
-
-        if (this.warpProgress >= 1) {
-            this.completeWarp();
-            return;
+        // Drain all capacitor
+        if (player.capacitor !== undefined) {
+            player.capacitor = 0;
         }
 
-        // Move player along warp path
-        const angle = wrappedDirection(
-            this.warpStartPos.x, this.warpStartPos.y,
-            this.warpTarget.x, this.warpTarget.y,
-            CONFIG.SECTOR_SIZE
-        );
-
-        const currentDist = this.warpProgress * totalDist;
-        player.x = this.warpStartPos.x + Math.cos(angle) * currentDist;
-        player.y = this.warpStartPos.y + Math.sin(angle) * currentDist;
-
-        // Keep rotation aligned
-        player.rotation = angle;
-        player.velocity.set(0, 0);
-    }
-
-    /**
-     * Complete warp travel
-     */
-    completeWarp() {
-        const player = this.game.player;
-
-        // Position at warp target (with offset)
+        // Instant teleport to destination
         const landingDist = (this.warpTarget.radius || 50) + 200;
         const landingAngle = Math.random() * Math.PI * 2;
 
@@ -435,14 +403,23 @@ export class AutopilotSystem {
         player.velocity.set(0, 0);
         player.currentSpeed = 0;
 
-        // Hide warp tunnel
-        document.getElementById('warp-tunnel').classList.add('hidden');
+        // Brief warp tunnel display then cleanup
+        setTimeout(() => {
+            document.getElementById('warp-tunnel').classList.add('hidden');
+            this.warping = false;
+            this.warpTarget = null;
 
-        this.warping = false;
-        this.warpTarget = null;
+            this.game.ui?.log('Warp complete', 'warp');
+            this.game.audio?.play('warp-end');
+        }, 1000);
+    }
 
-        this.game.ui?.log('Warp complete', 'warp');
-        this.game.audio?.play('warp-end');
+    /**
+     * Update warp travel
+     */
+    updateWarp(dt) {
+        // Warp is instant - this just waits for the brief visual effect to finish
+        // The warping flag is cleared by the setTimeout in startWarp()
     }
 
     /**
@@ -485,6 +462,9 @@ export class AutopilotSystem {
 
             player.velocity.set(0, 0);
             player.currentSpeed = 0;
+
+            // Fleet ships follow through gate
+            this.game.fleetSystem?.followThroughGate();
 
             // Hide warp tunnel
             document.getElementById('warp-tunnel').classList.add('hidden');

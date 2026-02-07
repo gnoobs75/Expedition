@@ -119,6 +119,18 @@ export class PlayerShip extends Ship {
         this.mesh.position.set(this.x, this.y, 1);
         this.mesh.rotation.z = this.rotation;
 
+        // Add shield overlay mesh
+        const shieldGeo = new THREE.CircleGeometry(this.radius * 1.5, 32);
+        const shieldMat = new THREE.MeshBasicMaterial({
+            color: 0x4488ff,
+            transparent: true,
+            opacity: 0.0,
+            side: THREE.DoubleSide,
+        });
+        this.shieldOverlay = new THREE.Mesh(shieldGeo, shieldMat);
+        this.shieldOverlay.position.z = 2;
+        this.mesh.add(this.shieldOverlay);
+
         // Try loading GLB model async - swap in when ready
         this.loadGLBMesh();
 
@@ -126,13 +138,31 @@ export class PlayerShip extends Ship {
     }
 
     /**
-     * Create the procedural fallback mesh
+     * Create the procedural fallback mesh using ShipMeshFactory
      */
     createProceduralMesh() {
+        const shipId = this.shipClass || 'frigate';
+        const dbConfig = SHIP_DATABASE[shipId];
+
+        if (dbConfig) {
+            try {
+                const mesh = shipMeshFactory.generateShipMesh({
+                    shipId,
+                    role: dbConfig.role || 'mercenary',
+                    size: dbConfig.size || 'frigate',
+                    detailLevel: 'low',
+                });
+                this.engineMeshes = null;
+                return mesh;
+            } catch (e) {
+                // Fall through to simple fallback
+            }
+        }
+
+        // Simple fallback for unknown ship classes
         const group = new THREE.Group();
         const size = this.radius;
 
-        // Main hull
         const hullShape = new THREE.Shape();
         hullShape.moveTo(size * 1.2, 0);
         hullShape.lineTo(-size * 0.6, size * 0.6);
@@ -140,61 +170,10 @@ export class PlayerShip extends Ship {
         hullShape.lineTo(-size * 0.6, -size * 0.6);
         hullShape.closePath();
 
-        const hullGeometry = new THREE.ShapeGeometry(hullShape);
-        const hullMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00aaff,
-            transparent: true,
-            opacity: 0.9,
-        });
-        const hull = new THREE.Mesh(hullGeometry, hullMaterial);
-        group.add(hull);
-
-        // Cockpit
-        const cockpitGeometry = new THREE.CircleGeometry(size * 0.25, 8);
-        const cockpitMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00ffff,
-            transparent: true,
-            opacity: 0.8,
-        });
-        const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
-        cockpit.position.set(size * 0.2, 0, 0.1);
-        group.add(cockpit);
-
-        // Engine glow
-        const engineGeometry = new THREE.CircleGeometry(size * 0.2, 8);
-        const engineMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00ffff,
-            transparent: true,
-            opacity: 0.6,
-        });
-        const engine1 = new THREE.Mesh(engineGeometry, engineMaterial);
-        engine1.position.set(-size * 0.5, size * 0.3, 0);
-        group.add(engine1);
-
-        const engine2 = engine1.clone();
-        engine2.position.set(-size * 0.5, -size * 0.3, 0);
-        group.add(engine2);
-
-        // Wing details
-        const wingGeometry = new THREE.PlaneGeometry(size * 0.1, size * 0.4);
-        const wingMaterial = new THREE.MeshBasicMaterial({
-            color: 0x0066aa,
-            transparent: true,
-            opacity: 0.7,
-        });
-        const wing1 = new THREE.Mesh(wingGeometry, wingMaterial);
-        wing1.position.set(-size * 0.2, size * 0.5, 0);
-        wing1.rotation.z = 0.3;
-        group.add(wing1);
-
-        const wing2 = wing1.clone();
-        wing2.position.set(-size * 0.2, -size * 0.5, 0);
-        wing2.rotation.z = -0.3;
-        group.add(wing2);
-
-        // Store engine meshes for animation
-        this.engineMeshes = [engine1, engine2];
-
+        const geo = new THREE.ShapeGeometry(hullShape);
+        const mat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.9 });
+        group.add(new THREE.Mesh(geo, mat));
+        this.engineMeshes = null;
         return group;
     }
 
@@ -268,6 +247,8 @@ export class PlayerShip extends Ship {
                     engine.scale.setScalar(0.8 + (this.currentSpeed / this.maxSpeed) * 0.4);
                 }
             }
+
+            this.updateDamageVisuals();
         }
     }
 

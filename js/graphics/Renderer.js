@@ -1,7 +1,7 @@
 // =============================================
 // Three.js Renderer
 // Handles all rendering with orthographic camera
-// 3D-enhanced with camera tilt, dynamic lights, and shadows
+// 3D-enhanced with dynamic lights and shadows
 // =============================================
 
 import { CONFIG } from '../config.js';
@@ -9,9 +9,6 @@ import { StarField } from './StarField.js';
 import { Nebula } from './Nebula.js';
 import { Effects } from './Effects.js';
 import { LightPool } from './LightPool.js';
-
-// Camera tilt angle in radians (~12 degrees)
-const CAMERA_TILT = 0.21;
 
 export class Renderer {
     constructor(game) {
@@ -48,9 +45,6 @@ export class Renderer {
         this.hemisphereLight = null;
         this.directionalLight = null;
 
-        // Raycaster for tilted coordinate conversion
-        this._raycaster = null;
-        this._groundPlane = null;
     }
 
     /**
@@ -74,12 +68,6 @@ export class Renderer {
             1000
         );
         this.camera.position.z = 100;
-        // Apply slight downward tilt to reveal 3D geometry
-        this.camera.rotation.x = -CAMERA_TILT;
-
-        // Setup raycaster and ground plane for tilted coordinate conversion
-        this._raycaster = new THREE.Raycaster();
-        this._groundPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 
         // Create WebGL renderer
         this.renderer = new THREE.WebGLRenderer({
@@ -108,9 +96,6 @@ export class Renderer {
         this.scene.add(this.entityGroup);
         this.scene.add(this.effectsGroup);
         this.scene.add(this.uiGroup);
-
-        // Counter-rotate background so stars/nebula stay "flat" behind the action
-        this.backgroundGroup.rotation.x = CAMERA_TILT;
 
         // Create starfield
         this.starField = new StarField(this.game);
@@ -201,9 +186,9 @@ export class Renderer {
         this.hemisphereLight = new THREE.HemisphereLight(0x8888ff, 0x222244, 0.4);
         this.scene.add(this.hemisphereLight);
 
-        // Directional light from above — creates depth shading on extruded faces
+        // Directional light from upper-right — angled to shade extruded side faces
         this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-        this.directionalLight.position.set(100, 200, 800);
+        this.directionalLight.position.set(200, 300, 500);
         this.scene.add(this.directionalLight);
     }
 
@@ -235,7 +220,7 @@ export class Renderer {
             top: 0; left: 0;
             width: 100%; height: 100%;
             pointer-events: none;
-            box-shadow: inset 0 0 250px 80px rgba(0, 4, 12, 0.5);
+            box-shadow: inset 0 0 120px 30px rgba(0, 4, 12, 0.25);
             z-index: 1;
         `;
         document.getElementById('game-container').appendChild(vignetteEl);
@@ -525,23 +510,12 @@ export class Renderer {
 
     /**
      * Convert screen coordinates to world coordinates
-     * Accounts for camera tilt by ray-plane intersection
      */
     screenToWorld(screenX, screenY) {
         const rect = this.renderer.domElement.getBoundingClientRect();
         const ndcX = ((screenX - rect.left) / rect.width) * 2 - 1;
         const ndcY = -((screenY - rect.top) / rect.height) * 2 + 1;
 
-        // For tilted orthographic camera, cast a ray and intersect with z=0 plane
-        this._raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
-        const intersection = new THREE.Vector3();
-        const result = this._raycaster.ray.intersectPlane(this._groundPlane, intersection);
-
-        if (result) {
-            return { x: intersection.x, y: intersection.y };
-        }
-
-        // Fallback: untilted projection
         const vector = new THREE.Vector3(ndcX, ndcY, 0);
         vector.unproject(this.camera);
         return { x: vector.x, y: vector.y };

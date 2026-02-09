@@ -34,7 +34,7 @@ export class PanelDragManager {
 
         // Storage key - bump version to force reset when layout changes
         this.storageKey = 'expedition-panel-layout';
-        this.layoutVersion = 3;
+        this.layoutVersion = 4;
         this.versionKey = 'expedition-panel-layout-version';
 
         // Force reset if layout version changed
@@ -376,9 +376,9 @@ export class PanelDragManager {
             if (layout.right !== undefined) panel.style.right = `${layout.right}px`;
             if (layout.bottom !== undefined) panel.style.bottom = `${layout.bottom}px`;
 
-            // Restore saved size
-            if (layout.width !== undefined) panel.style.width = `${layout.width}px`;
-            if (layout.height !== undefined) panel.style.height = `${layout.height}px`;
+            // Restore saved size (skip 0 values from corrupted saves)
+            if (layout.width && layout.width > 0) panel.style.width = `${layout.width}px`;
+            if (layout.height && layout.height > 0) panel.style.height = `${layout.height}px`;
         } else if (defaultPos) {
             this.applyDefaultPos(panel, defaultPos);
         }
@@ -419,7 +419,12 @@ export class PanelDragManager {
 
         for (const [panelId, panelData] of this.panels) {
             const panel = panelData.element;
+
+            // Skip hidden panels - they report 0x0 which would corrupt saved layout
+            if (panel.classList.contains('hidden') || panel.offsetParent === null) continue;
+
             const rect = panel.getBoundingClientRect();
+            if (rect.width === 0 && rect.height === 0) continue;
 
             layout[panelId] = {
                 top: Math.round(rect.top),

@@ -512,8 +512,16 @@ export class InputManager {
                 this.game.ui?.toggleFleet();
                 break;
 
+            case 'toggleQuestTracker':
+                this.game.ui?.questTracker?.toggle();
+                break;
+
             case 'spawnBattleEvent':
                 this.game.npcSystem?.spawnBattleEvent();
+                break;
+
+            case 'toggleAdminDashboard':
+                this.game.adminDashboard?.toggle();
                 break;
         }
     }

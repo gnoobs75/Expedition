@@ -164,6 +164,7 @@ export class Sector {
             y: centerY + Math.sin(stationAngle) * stationDist,
             name: `${this.name} Station`,
             radius: 500, // Much larger station
+            sectorId: this.id,
         });
 
         this.entities.push(station);

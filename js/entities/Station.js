@@ -7,6 +7,7 @@ import { Entity } from './Entity.js';
 import { CONFIG } from '../config.js';
 import { SHIP_DATABASE } from '../data/shipDatabase.js';
 import { EQUIPMENT_DATABASE } from '../data/equipmentDatabase.js';
+import { TRADE_GOODS, STATION_SPECIALTIES, getStationPrice } from '../data/tradeGoodsDatabase.js';
 
 export class Station extends Entity {
     constructor(game, options = {}) {
@@ -29,6 +30,93 @@ export class Station extends Entity {
         // Shop inventory (uses new databases with fallback to CONFIG)
         this.shipsForSale = Object.keys(SHIP_DATABASE).length > 0 ? Object.keys(SHIP_DATABASE) : Object.keys(CONFIG.SHIPS);
         this.modulesForSale = Object.keys(EQUIPMENT_DATABASE).length > 0 ? Object.keys(EQUIPMENT_DATABASE) : Object.keys(CONFIG.MODULES);
+
+        // Trade goods - sector-based specialty
+        this.sectorId = options.sectorId || 'hub';
+        this.specialty = STATION_SPECIALTIES[this.sectorId] || null;
+
+        // Trade goods stock (produced goods are always available, others may be limited)
+        this.tradeGoods = {};
+        this.initTradeGoods();
+    }
+
+    /**
+     * Initialize trade goods inventory
+     */
+    initTradeGoods() {
+        if (!this.specialty) return;
+
+        // Stock produced goods heavily
+        for (const goodId of this.specialty.produces) {
+            this.tradeGoods[goodId] = {
+                stock: 50 + Math.floor(Math.random() * 50), // 50-100 units
+                maxStock: 200,
+                produced: true,
+            };
+        }
+
+        // Stock consumed goods lightly (they get used up)
+        for (const goodId of this.specialty.consumes) {
+            this.tradeGoods[goodId] = {
+                stock: Math.floor(Math.random() * 10), // 0-10 units
+                maxStock: 100,
+                produced: false,
+            };
+        }
+
+        // Some random other goods in small quantities
+        const otherGoods = Object.keys(TRADE_GOODS).filter(
+            id => !this.specialty.produces.includes(id) && !this.specialty.consumes.includes(id)
+        );
+        for (const goodId of otherGoods) {
+            if (Math.random() < 0.3) { // 30% chance to stock random goods
+                this.tradeGoods[goodId] = {
+                    stock: Math.floor(Math.random() * 15),
+                    maxStock: 50,
+                    produced: false,
+                };
+            }
+        }
+    }
+
+    /**
+     * Get price for a trade good at this station
+     */
+    getTradePrice(goodId) {
+        return getStationPrice(goodId, this.sectorId);
+    }
+
+    /**
+     * Buy trade goods from station (player buys)
+     */
+    buyTradeGood(goodId, quantity) {
+        const stock = this.tradeGoods[goodId];
+        if (!stock || stock.stock < quantity) return false;
+
+        const price = this.getTradePrice(goodId);
+        const totalCost = price.buy * quantity;
+
+        if (!this.game.spendCredits(totalCost)) return false;
+
+        stock.stock -= quantity;
+        return { cost: totalCost, price: price.buy };
+    }
+
+    /**
+     * Sell trade goods to station (player sells)
+     */
+    sellTradeGood(goodId, quantity) {
+        const price = this.getTradePrice(goodId);
+        const totalValue = price.sell * quantity;
+
+        // Add to station stock
+        if (!this.tradeGoods[goodId]) {
+            this.tradeGoods[goodId] = { stock: 0, maxStock: 100, produced: false };
+        }
+        this.tradeGoods[goodId].stock += quantity;
+
+        this.game.addCredits(totalValue);
+        return { value: totalValue, price: price.sell };
     }
 
     /**

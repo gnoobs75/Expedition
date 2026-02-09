@@ -38,7 +38,7 @@ export class CombatSystem {
     /**
      * Fire a weapon from source at target
      */
-    fireAt(source, target, damage, range) {
+    fireAt(source, target, damage, range, moduleConfig = null) {
         if (!source || !target) return;
 
         // Check range
@@ -51,6 +51,8 @@ export class CombatSystem {
         const hitChance = this.calculateHitChance(source, target, range);
         const hits = Math.random() < hitChance;
 
+        const isMissile = moduleConfig?.category === 'missile';
+
         // Determine laser color based on source type
         let laserColor = 0xff4444; // Default hostile red
         if (source.isPlayer) {
@@ -59,19 +61,36 @@ export class CombatSystem {
             laserColor = 0x4488ff; // Security blue
         }
 
-        // Create laser effect (always shows beam even on miss)
-        this.game.renderer.effects.spawn('laser', source.x, source.y, {
-            target: target,
-            color: laserColor,
-        });
+        if (isMissile) {
+            // Missile: smoke trail from source to target (snapshot positions)
+            const sx = source.x, sy = source.y;
+            const tx = target.x, ty = target.y;
+            const dx = tx - sx;
+            const dy = ty - sy;
+            this.game.renderer.effects.spawn('missile-trail', sx, sy);
+            for (let t = 0.25; t < 1; t += 0.25) {
+                const px = sx + dx * t + (Math.random() - 0.5) * 20;
+                const py = sy + dy * t + (Math.random() - 0.5) * 20;
+                setTimeout(() => {
+                    this.game.renderer?.effects?.spawn('missile-trail', px, py);
+                }, t * 200);
+            }
+        } else {
+            // Laser: beam effect
+            this.game.renderer.effects.spawn('laser', source.x, source.y, {
+                target: target,
+                color: laserColor,
+            });
+        }
 
         // Muzzle flash at source
         this.game.renderer.effects.spawn('hit', source.x, source.y, {
-            count: 3,
-            color: laserColor,
+            count: isMissile ? 5 : 3,
+            color: isMissile ? 0xff8800 : laserColor,
         });
 
-        // Apply damage with slight delay (for visual sync)
+        // Apply damage with slight delay (for visual sync, longer for missiles)
+        const impactDelay = isMissile ? 300 : 100;
         setTimeout(() => {
             if (target.alive) {
                 // Miss handling
@@ -94,11 +113,17 @@ export class CombatSystem {
                 // Show damage number
                 this.showDamageNumber(target.x, target.y, damage, damageType);
 
-                // Spawn hit effect
+                // Spawn hit effect - missiles have bigger impact
                 const effectType = damageType === 'shield' ? 'shield-hit' : 'hit';
                 this.game.renderer.effects.spawn(effectType, target.x, target.y, {
                     radius: target.radius || 30,
+                    count: isMissile ? 10 : undefined,
                 });
+
+                // Missile impact sound
+                if (isMissile && source.isPlayer) {
+                    this.game.audio?.play('missile-hit');
+                }
 
                 // Camera shake for player hit
                 if (target === this.game.player) {
@@ -112,7 +137,7 @@ export class CombatSystem {
                     this.game.ui?.toast('You are now flagged as hostile!', 'error');
                 }
             }
-        }, 100);
+        }, impactDelay);
     }
 
     /**

@@ -16,6 +16,11 @@ import { AISystem } from '../systems/AISystem.js';
 import { NPCSystem } from '../systems/NPCSystem.js';
 import { AutopilotSystem } from '../systems/AutopilotSystem.js';
 import { FleetSystem } from '../systems/FleetSystem.js';
+import { GuildSystem } from '../systems/GuildSystem.js';
+import { CommerceSystem } from '../systems/CommerceSystem.js';
+import { GuildEconomySystem } from '../systems/GuildEconomySystem.js';
+import { TackleSystem } from '../systems/TackleSystem.js';
+import { AdminDashboardManager } from '../ui/AdminDashboardManager.js';
 import { UIManager } from '../ui/UIManager.js';
 import { AudioManager } from './AudioManager.js';
 import { EventBus } from './EventBus.js';
@@ -58,6 +63,12 @@ export class Game {
         this.npcSystem = null;
         this.autopilot = null;
         this.fleetSystem = null;
+        this.guildSystem = null;
+        this.commerceSystem = null;
+        this.guildEconomySystem = null;
+        this.tackleSystem = null;
+        this.adminDashboard = null;
+        this.dialogueManager = null;
         this.playerAggressive = false;
         this.ui = null;
         this.audio = null;
@@ -97,9 +108,16 @@ export class Game {
         this.npcSystem = new NPCSystem(this);
         this.autopilot = new AutopilotSystem(this);
         this.fleetSystem = new FleetSystem(this);
+        this.guildSystem = new GuildSystem(this);
+        this.commerceSystem = new CommerceSystem(this);
+        this.guildEconomySystem = new GuildEconomySystem(this);
+        this.tackleSystem = new TackleSystem(this);
 
         // Create UI manager (last, needs other systems)
         this.ui = new UIManager(this);
+
+        // Create admin dashboard (after UI)
+        this.adminDashboard = new AdminDashboardManager(this);
 
         // Start in hub sector
         this.changeSector('hub');
@@ -171,6 +189,25 @@ export class Game {
         this.events.on('combat:hit', (data) => {
             if (data.target === this.player) {
                 this.audio.play('hit');
+                // Screen flash based on damage severity
+                const hpPercent = this.player.hp / this.player.maxHp;
+                if (hpPercent < 0.5) {
+                    this.ui?.damageFlash(0.4);
+                } else if (data.damage > this.player.maxHp * 0.1) {
+                    this.ui?.damageFlash(0.2);
+                }
+            }
+        });
+
+        // Visual feedback on enemy kill (credits already handled in EnemyShip.destroy)
+        this.events.on('entity:destroyed', (entity) => {
+            if (entity.bounty && entity.bounty > 0 && this.player?.alive) {
+                this.audio?.play('target-destroyed');
+                // Show floating credit popup at entity screen position
+                if (this.input) {
+                    const screen = this.input.worldToScreen(entity.x, entity.y);
+                    this.ui?.showCreditPopup(entity.bounty, screen.x, screen.y, 'bounty');
+                }
             }
         });
 
@@ -186,11 +223,14 @@ export class Game {
     handlePlayerDeath() {
         this.ui.log('Ship destroyed! Respawning at hub...', 'combat');
         this.audio.play('explosion');
+        this.ui?.damageFlash(0.6);
+        this.camera?.shake(15, 0.5);
 
         // Lose credits
         const loss = Math.floor(this.credits * CONFIG.DEATH_CREDIT_PENALTY);
         this.credits -= loss;
         this.ui.log(`Lost ${loss} ISK`, 'combat');
+        this.ui?.showCreditPopup(loss, window.innerWidth / 2, window.innerHeight / 2, 'loss');
 
         // Respawn after delay
         setTimeout(() => {
@@ -251,6 +291,9 @@ export class Game {
 
         // Spawn NPCs for this sector
         this.npcSystem.onSectorEnter(sector);
+
+        // Materialize/dematerialize guild ships for this sector
+        this.guildEconomySystem?.onSectorChange(sector);
 
         // Fire event
         this.events.emit('sector:change', sectorId);
@@ -445,7 +488,9 @@ export class Game {
         this.ai.update(dt);
         this.npcSystem.update(dt);
         this.fleetSystem.update(dt);
+        this.guildEconomySystem.update(dt);
         this.combat.update(dt);
+        this.tackleSystem.update(dt);
         this.mining.update(dt);
         this.collision.update(dt);
 

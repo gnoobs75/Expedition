@@ -41,7 +41,9 @@ export const DEFAULT_BINDINGS = {
     'togglePerformanceMonitor': { key: 'F3', description: 'Toggle Performance Monitor', category: 'UI' },
     'toggleModelEditor': { key: 'KeyG', description: 'Toggle Model Editor', category: 'UI' },
     'toggleFleet': { key: 'KeyF', description: 'Toggle Fleet Panel', category: 'UI' },
+    'toggleQuestTracker': { key: 'KeyJ', description: 'Toggle Quest Tracker', category: 'UI' },
     'spawnBattleEvent': { key: 'KeyP', description: 'Spawn Battle Event (Stress Test)', category: 'UI' },
+    'toggleAdminDashboard': { key: 'Backquote', description: 'Toggle Admin Dashboard', category: 'UI' },
 };
 
 export class KeyBindings {

@@ -4,6 +4,7 @@
 // =============================================
 
 import { CONFIG } from '../config.js';
+import { evaluatePursuit, calculateInterceptPoint, activateTackleModules } from '../utils/PursuitAI.js';
 
 export class AISystem {
     constructor(game) {
@@ -74,6 +75,22 @@ export class AISystem {
                 this.handleFleeState(enemy, player, distToPlayer);
                 break;
 
+            case 'pursuing':
+                this.handlePursuingState(enemy, player, distToPlayer);
+                break;
+
+            case 'intercepting':
+                this.handleInterceptingState(enemy, player, distToPlayer);
+                break;
+
+            case 'tackling':
+                this.handleTacklingState(enemy, player, distToPlayer);
+                break;
+
+            case 'disengaging':
+                this.handleDisengagingState(enemy, player, distToPlayer);
+                break;
+
             default:
                 enemy.aiState = 'idle';
         }
@@ -93,7 +110,7 @@ export class AISystem {
             return player;
         }
 
-        // Look for nearby NPCs to attack (prefer miners, but also target security)
+        // Look for nearby NPCs and non-pirate guild ships to attack
         const entities = this.game.currentSector?.entities || [];
         let closestMiner = null;
         let closestMinerDist = enemy.aggroRange;
@@ -101,19 +118,35 @@ export class AISystem {
         let closestNPCDist = enemy.aggroRange;
 
         for (const e of entities) {
-            if (!e.alive || e.type !== 'npc') continue;
-            const d = enemy.distanceTo(e);
-            if (e.role === 'miner' && d < closestMinerDist) {
-                closestMiner = e;
-                closestMinerDist = d;
+            if (!e.alive) continue;
+
+            // Target NPC miners and security
+            if (e.type === 'npc') {
+                const d = enemy.distanceTo(e);
+                if (e.role === 'miner' && d < closestMinerDist) {
+                    closestMiner = e;
+                    closestMinerDist = d;
+                }
+                if (e.role === 'security' && d < closestNPCDist) {
+                    closestNPC = e;
+                    closestNPCDist = d;
+                }
             }
-            if (e.role === 'security' && d < closestNPCDist) {
-                closestNPC = e;
-                closestNPCDist = d;
+
+            // Also target non-pirate guild ships (miners/haulers preferred)
+            if (e.type === 'guild' && !e.isPirate) {
+                const d = enemy.distanceTo(e);
+                if ((e.role === 'miner' || e.role === 'hauler') && d < closestMinerDist) {
+                    closestMiner = e;
+                    closestMinerDist = d;
+                } else if (e.role === 'ratter' && d < closestNPCDist) {
+                    closestNPC = e;
+                    closestNPCDist = d;
+                }
             }
         }
 
-        // Prefer miners, fall back to security
+        // Prefer miners/haulers, fall back to security/ratters
         return closestMiner || closestNPC;
     }
 
@@ -190,10 +223,10 @@ export class AISystem {
 
         const distToTarget = enemy.distanceTo(target);
 
-        // Check if target out of range
+        // If target exceeds leash range, transition to pursuit instead of giving up
         if (distToTarget > enemy.aggroRange * 1.5) {
-            enemy.setAIState('patrol');
-            this.setNewPatrolPoint(enemy);
+            enemy._chaseStartTime = enemy._chaseStartTime || (Date.now() / 1000);
+            enemy.aiState = 'pursuing';
             return;
         }
 
@@ -240,6 +273,9 @@ export class AISystem {
         // Lock and fire
         enemy.target = target;
 
+        // Activate tackle modules
+        activateTackleModules(enemy);
+
         // Orbit the target
         const orbitAngle = Math.atan2(enemy.y - target.y, enemy.x - target.x);
         const orbitDist = enemy.attackRange * 0.7;
@@ -279,6 +315,15 @@ export class AISystem {
             return;
         }
 
+        // Try to warp away if not pointed
+        if (!enemy.isPointed && enemy.sectorWarpState === 'none' && enemy.sectorWarpCooldown <= 0) {
+            const fleeAngle = Math.atan2(enemy.y - fleeFrom.y, enemy.x - fleeFrom.x);
+            const warpDist = 3000 + Math.random() * 3000;
+            const warpX = Math.max(500, Math.min(CONFIG.SECTOR_SIZE - 500, enemy.x + Math.cos(fleeAngle) * warpDist));
+            const warpY = Math.max(500, Math.min(CONFIG.SECTOR_SIZE - 500, enemy.y + Math.sin(fleeAngle) * warpDist));
+            enemy.initSectorWarp(warpX, warpY);
+        }
+
         // Run away
         const fleeAngle = Math.atan2(enemy.y - fleeFrom.y, enemy.x - fleeFrom.x);
         const fleeDist = 1000;
@@ -288,6 +333,154 @@ export class AISystem {
             enemy.y + Math.sin(fleeAngle) * fleeDist
         );
         enemy.desiredSpeed = enemy.maxSpeed;
+    }
+
+    /**
+     * Handle pursuing state — use PursuitAI to decide next action
+     */
+    handlePursuingState(enemy, player, distToPlayer) {
+        const target = enemy.aiTarget;
+        if (!target || !target.alive) {
+            enemy.setAIState('patrol');
+            this.setNewPatrolPoint(enemy);
+            enemy._chaseStartTime = 0;
+            return;
+        }
+
+        if (enemy.hull < enemy.maxHull * enemy.fleeThreshold) {
+            enemy.setAIState('flee', target);
+            return;
+        }
+
+        enemy.target = target;
+        const result = evaluatePursuit(enemy, target, {
+            chaseStartTime: enemy._chaseStartTime || 0,
+            currentTime: Date.now() / 1000,
+            maxChaseTime: 60,
+            homePoint: enemy.patrolPoint,
+            maxHomeDistance: enemy.aggroRange * 3,
+            allyCount: 0,
+        });
+
+        enemy._pursuitReason = result.reason;
+
+        switch (result.decision) {
+            case 'tackle':
+                enemy.aiState = 'tackling';
+                break;
+            case 'intercept': {
+                const intercept = calculateInterceptPoint(enemy, target);
+                if (intercept && enemy.initSectorWarp(intercept.x, intercept.y)) {
+                    enemy.aiState = 'intercepting';
+                } else {
+                    enemy.setDestination(target.x, target.y);
+                    enemy.desiredSpeed = enemy.maxSpeed;
+                }
+                break;
+            }
+            case 'disengage':
+                enemy.aiState = 'disengaging';
+                break;
+            case 'continue':
+            default:
+                enemy.setDestination(target.x, target.y);
+                enemy.desiredSpeed = enemy.maxSpeed;
+                // Back in attack range?
+                if (enemy.distanceTo(target) < enemy.attackRange) {
+                    enemy.setAIState('attack', target);
+                    enemy._chaseStartTime = 0;
+                }
+                break;
+        }
+    }
+
+    /**
+     * Handle intercepting state — waiting for warp to complete
+     */
+    handleInterceptingState(enemy, player, distToPlayer) {
+        const target = enemy.aiTarget;
+        if (!target || !target.alive) {
+            enemy.setAIState('patrol');
+            this.setNewPatrolPoint(enemy);
+            return;
+        }
+
+        enemy._pursuitReason = 'Warping to intercept';
+
+        if (enemy.sectorWarpState === 'none') {
+            const dist = enemy.distanceTo(target);
+            if (dist <= enemy.attackRange * 1.5) {
+                enemy.setAIState('attack', target);
+                enemy._chaseStartTime = 0;
+            } else if (dist <= enemy.aggroRange * 2) {
+                enemy.aiState = 'pursuing';
+            } else {
+                enemy.aiState = 'disengaging';
+            }
+        } else {
+            enemy.setDestination(target.x, target.y);
+            enemy.desiredSpeed = enemy.maxSpeed * 0.3;
+        }
+    }
+
+    /**
+     * Handle tackling state — keep point on target, orbit close, fire
+     */
+    handleTacklingState(enemy, player, distToPlayer) {
+        const target = enemy.aiTarget;
+        if (!target || !target.alive) {
+            enemy.setAIState('patrol');
+            this.setNewPatrolPoint(enemy);
+            enemy._chaseStartTime = 0;
+            return;
+        }
+
+        if (enemy.hull < enemy.maxHull * enemy.fleeThreshold) {
+            enemy.setAIState('flee', target);
+            return;
+        }
+
+        enemy.target = target;
+        enemy._pursuitReason = 'Tackling target';
+
+        // Activate tackle modules
+        activateTackleModules(enemy);
+
+        const dist = enemy.distanceTo(target);
+
+        // Close orbit
+        const orbitAngle = Math.atan2(enemy.y - target.y, enemy.x - target.x);
+        const orbitDist = enemy.attackRange * 0.5;
+        enemy.setDestination(
+            target.x + Math.cos(orbitAngle + 0.1) * orbitDist,
+            target.y + Math.sin(orbitAngle + 0.1) * orbitDist
+        );
+        enemy.desiredSpeed = enemy.maxSpeed * 0.5;
+
+        // Fire weapons
+        if (!enemy.activeModules.has('high-1')) {
+            enemy.activateModule('high-1');
+        }
+
+        // If target breaks free and gets far, go back to pursuing
+        if (!target.isPointed && dist > enemy.attackRange * 1.5) {
+            enemy._chaseStartTime = Date.now() / 1000;
+            enemy.aiState = 'pursuing';
+        }
+    }
+
+    /**
+     * Handle disengaging state — give up chase and return to patrol
+     */
+    handleDisengagingState(enemy, player, distToPlayer) {
+        enemy.deactivateModule('high-1');
+        enemy.target = null;
+        enemy.aiTarget = null;
+        enemy._chaseStartTime = 0;
+        enemy._pursuitReason = '';
+
+        enemy.setAIState('patrol');
+        this.setNewPatrolPoint(enemy);
     }
 
     /**

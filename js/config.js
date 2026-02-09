@@ -322,12 +322,12 @@ export const CONFIG = {
 export const UNIVERSE_LAYOUT = {
     sectors: [
         { id: 'hub', name: 'Central Hub', x: 0, y: 0, difficulty: 'hub', hasStation: true },
-        { id: 'sector-1', name: 'Mining Fields Alpha', x: -1, y: 0, difficulty: 'safe', hasStation: false },
-        { id: 'sector-2', name: 'Mining Fields Beta', x: 1, y: 0, difficulty: 'safe', hasStation: false },
-        { id: 'sector-3', name: 'Frontier Zone', x: 0, y: -1, difficulty: 'normal', hasStation: false },
-        { id: 'sector-4', name: 'Pirate Territory', x: -1, y: -1, difficulty: 'dangerous', hasStation: false },
+        { id: 'sector-1', name: 'Mining Fields Alpha', x: -1, y: 0, difficulty: 'safe', hasStation: true },
+        { id: 'sector-2', name: 'Mining Fields Beta', x: 1, y: 0, difficulty: 'safe', hasStation: true },
+        { id: 'sector-3', name: 'Frontier Zone', x: 0, y: -1, difficulty: 'normal', hasStation: true },
+        { id: 'sector-4', name: 'Pirate Territory', x: -1, y: -1, difficulty: 'dangerous', hasStation: true },
         { id: 'sector-5', name: 'The Abyss', x: 1, y: -1, difficulty: 'deadly', hasStation: true },
-        { id: 'sector-6', name: 'Nebula Expanse', x: 0, y: 1, difficulty: 'normal', hasStation: false },
+        { id: 'sector-6', name: 'Nebula Expanse', x: 0, y: 1, difficulty: 'normal', hasStation: true },
     ],
     gates: [
         { from: 'hub', to: 'sector-1' },

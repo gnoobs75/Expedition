@@ -18,6 +18,10 @@ import { FleetPanelManager } from './FleetPanelManager.js';
 import { CantinaManager } from './CantinaManager.js';
 import { PerformanceMonitor } from '../utils/PerformanceMonitor.js';
 import { HelpSystem } from './HelpSystem.js';
+import { DialogueManager } from './DialogueManager.js';
+import { GuildPanelManager } from './GuildPanelManager.js';
+import { CommercePanelManager } from './CommercePanelManager.js';
+import { QuestTrackerManager } from './QuestTrackerManager.js';
 
 export class UIManager {
     constructor(game) {
@@ -64,6 +68,19 @@ export class UIManager {
         // Help system
         this.helpSystem = new HelpSystem();
 
+        // Dialogue manager
+        this.dialogueManager = new DialogueManager(game);
+        game.dialogueManager = this.dialogueManager;
+
+        // Guild panel manager
+        this.guildPanelManager = new GuildPanelManager(game);
+
+        // Commerce panel manager
+        this.commercePanelManager = new CommercePanelManager(game);
+
+        // Quest tracker
+        this.questTracker = new QuestTrackerManager(game);
+
         // Ship indicator 3D viewer state
         this.shipViewerScene = null;
         this.shipViewerCamera = null;
@@ -79,6 +96,19 @@ export class UIManager {
 
         // Listen for ship switch to update 3D viewer
         game.events.on('ship:switched', () => this.updateShipViewerMesh());
+
+        // Quest/guild visual effects
+        game.events.on('quest:completed', () => {
+            if (game.player) {
+                game.renderer?.effects?.spawn('quest-complete', game.player.x, game.player.y);
+            }
+        });
+
+        game.events.on('target:destroyed', () => {
+            if (game.player) {
+                game.renderer?.effects?.spawn('loot', game.player.x, game.player.y);
+            }
+        });
 
         // Log messages
         this.maxLogMessages = 50;
@@ -268,6 +298,14 @@ export class UIManager {
                 // Update cantina when switching to it
                 if (btn.dataset.tab === 'cantina') {
                     this.cantinaManager?.show(this.game.dockedAt);
+                }
+                // Update guild when switching to it
+                if (btn.dataset.tab === 'guild') {
+                    this.guildPanelManager?.render(document.getElementById('guild-content'));
+                }
+                // Update commerce when switching to it
+                if (btn.dataset.tab === 'commerce') {
+                    this.commercePanelManager?.render(document.getElementById('commerce-content'), this.game.dockedAt);
                 }
             });
         });
@@ -477,6 +515,7 @@ export class UIManager {
         this.panelDragManager.registerPanel('drone-bar');
         this.panelDragManager.registerPanel('performance-monitor');
         this.panelDragManager.registerPanel('fleet-panel');
+        this.panelDragManager.registerPanel('quest-tracker');
 
         // Constrain all panels to viewport after loading saved positions
         requestAnimationFrame(() => this.panelDragManager.constrainAllPanels());
@@ -511,6 +550,9 @@ export class UIManager {
 
         // Update fleet panel
         this.fleetPanelManager?.update(dt);
+
+        // Update quest tracker
+        this.questTracker?.update(dt);
     }
 
     /**
@@ -1297,6 +1339,11 @@ export class UIManager {
                 const dockClass = canDock ? '' : ' disabled';
                 items.push(`<div class="menu-item${dockClass}" data-action="dock">Dock</div>`);
             }
+
+            // Hail NPC ships
+            if (entity.isNPC && entity.role) {
+                items.push(`<div class="menu-item" data-action="hail">Hail</div>`);
+            }
         }
 
         // Bookmark - always available
@@ -1394,6 +1441,9 @@ export class UIManager {
                     this.toast('Too far to dock - approach the station first', 'warning');
                 }
                 break;
+            case 'hail':
+                this.hailNPC(target);
+                break;
         }
 
         this.game.audio?.play('click');
@@ -1469,6 +1519,22 @@ export class UIManager {
 
         // Initialize cantina (generates pilots when docked)
         this.cantinaManager.show(station);
+
+        // Station greeting dialogue (random chance)
+        if (Math.random() < 0.3) {
+            const greetings = [
+                { name: 'Docking Officer', title: 'Station Control', portrait: '👨‍✈️', color: '#88aacc',
+                  text: `Welcome to ${station.name}, capsuleer. All services are available. Fly safe.` },
+                { name: 'Hangar Chief', title: 'Maintenance Crew', portrait: '🔧', color: '#ffaa44',
+                  text: `Your ship's looking a bit roughed up, pilot. Hit the repair bay if you need us.` },
+                { name: 'Intel Officer', title: 'Security Division', portrait: '🛡️', color: '#44aaff',
+                  text: `Pirate activity has been increasing in the outer sectors. Watch your six out there.` },
+                { name: 'Trade Broker', title: 'Market Division', portrait: '💰', color: '#44ff88',
+                  text: `Ore prices are holding steady. The refineries are always buying if you've got cargo to offload.` },
+            ];
+            const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+            setTimeout(() => this.dialogueManager?.open({ ...greeting, options: [{ label: 'Understood', action: 'close' }] }), 500);
+        }
     }
 
     /**
@@ -1557,6 +1623,23 @@ export class UIManager {
     }
 
     /**
+     * Repair ship at station
+     */
+    repairShip() {
+        const station = this.game.dockedAt;
+        if (!station || !this.game.player) return;
+
+        if (station.repairShip(this.game.player)) {
+            this.log('Ship fully repaired', 'system');
+            this.toast('Ship repaired!', 'success');
+            this.game.audio?.play('repair');
+            this.updateShopPanel(station);
+        } else {
+            this.toast('Not enough credits', 'warning');
+        }
+    }
+
+    /**
      * Sell all ore in cargo hold
      */
     sellAllOre() {
@@ -1580,6 +1663,13 @@ export class UIManager {
             return;
         }
 
+        // Notify guild system of ore sold BEFORE clearing cargo
+        for (const [type, data] of Object.entries(player.cargo)) {
+            if (data.units > 0) {
+                this.game.guildSystem?.onOreSold(type, data.units);
+            }
+        }
+
         // Clear cargo
         player.cargo = {};
         player.cargoUsed = 0;
@@ -1590,7 +1680,9 @@ export class UIManager {
         // Log and feedback
         this.log(`Sold ${totalUnits.toLocaleString()} units of ore for ${formatCredits(totalValue)} ISK`, 'mining');
         this.toast(`Sold ore for ${formatCredits(totalValue)} ISK`, 'success');
-        this.game.audio?.play('buy');
+        this.game.audio?.play('sell');
+        // Floating credit popup
+        this.showCreditPopup(totalValue, window.innerWidth / 2, window.innerHeight / 2, 'gain');
 
         // Update display
         this.updateRefineryTab();
@@ -2099,6 +2191,80 @@ export class UIManager {
 
         // Limit visible toasts
         while (container.children.length > 5) {
+            container.removeChild(container.firstChild);
+        }
+    }
+
+    /**
+     * Hail an NPC ship - open contextual dialogue
+     */
+    hailNPC(npc) {
+        if (!npc || !this.dialogueManager) return;
+
+        const dialogues = {
+            miner: [
+                { text: "Hey, capsuleer. Asteroids won't mine themselves. These fields are open to anyone - just don't bring trouble.", portrait: '⛏' },
+                { text: "Watch for pirates in the outer belts. They've been raiding mining ops lately. Stick near security if you're in a hauler.", portrait: '⛏' },
+                { text: "Good ore around here. I've filled my hold twice today already. The station's buying everything.", portrait: '⛏' },
+                { text: "Mining Guild's hiring, if you're interested. Talk to Foreman Kael at the station. Steady work, decent pay.", portrait: '⛏' },
+            ],
+            security: [
+                { text: "Patrol channel is clear. Keep your weapons holstered in safe space, capsuleer. We don't tolerate aggression here.", portrait: '🛡️' },
+                { text: "We've been tracking pirate movements in the outer sectors. Watch yourself out there.", portrait: '🛡️' },
+                { text: "Station security is maintaining perimeter. Report any suspicious activity on the emergency channel.", portrait: '🛡️' },
+                { text: "Commander Vex at the Mercenary Guild is always looking for capable pilots. If you've got combat skills, talk to him.", portrait: '🛡️' },
+            ],
+        };
+
+        const pool = dialogues[npc.role] || dialogues.miner;
+        const chosen = pool[Math.floor(Math.random() * pool.length)];
+        const npcName = npc.name || `${npc.role.charAt(0).toUpperCase() + npc.role.slice(1)} Pilot`;
+
+        this.dialogueManager.open({
+            name: npcName,
+            title: `NPC ${npc.role.charAt(0).toUpperCase() + npc.role.slice(1)}`,
+            portrait: chosen.portrait,
+            color: npc.role === 'security' ? '#44aaff' : '#44ff88',
+            text: chosen.text,
+            options: [{ label: 'Copy that', action: 'close' }],
+        });
+    }
+
+    /**
+     * Flash screen red when player takes heavy damage
+     */
+    damageFlash(intensity = 0.3) {
+        const flash = document.getElementById('damage-flash');
+        if (!flash) return;
+
+        flash.style.background = `radial-gradient(ellipse at center, transparent 40%, rgba(255, 0, 0, ${intensity}) 100%)`;
+        flash.classList.add('active');
+
+        setTimeout(() => {
+            flash.style.transition = 'opacity 0.3s ease-out';
+            flash.classList.remove('active');
+            setTimeout(() => flash.style.transition = 'opacity 0.05s ease-in', 300);
+        }, 50);
+    }
+
+    /**
+     * Show floating credit popup at screen position
+     */
+    showCreditPopup(amount, screenX, screenY, type = 'gain') {
+        const container = document.getElementById('credit-popups');
+        if (!container) return;
+
+        const popup = document.createElement('div');
+        popup.className = `credit-popup ${type}`;
+        popup.textContent = type === 'loss' ? `-${formatCredits(amount)} ISK` : `+${formatCredits(amount)} ISK`;
+        popup.style.left = `${screenX}px`;
+        popup.style.top = `${screenY}px`;
+        container.appendChild(popup);
+
+        setTimeout(() => popup.remove(), 1500);
+
+        // Limit popups
+        while (container.children.length > 8) {
             container.removeChild(container.firstChild);
         }
     }

@@ -411,6 +411,8 @@ export class AutopilotSystem {
 
             this.game.ui?.log('Warp complete', 'warp');
             this.game.audio?.play('warp-end');
+            // Warp arrival flash
+            this.game.renderer?.effects?.spawn('warp-flash', player.x, player.y);
         }, 1000);
     }
 
@@ -432,7 +434,7 @@ export class AutopilotSystem {
 
         // Show warp effect
         document.getElementById('warp-tunnel').classList.remove('hidden');
-        this.game.audio?.play('warp-start');
+        this.game.audio?.play('jump-gate');
 
         // Delay for effect, then change sector
         setTimeout(() => {
@@ -469,6 +471,8 @@ export class AutopilotSystem {
             // Hide warp tunnel
             document.getElementById('warp-tunnel').classList.add('hidden');
             this.game.audio?.play('warp-end');
+            // Arrival flash
+            this.game.renderer?.effects?.spawn('warp-flash', player.x, player.y);
         }, 1500);
     }
 

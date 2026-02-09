@@ -886,6 +886,95 @@ export const EQUIPMENT_DATABASE = {
         droneRangeBonus: 1.15,
         price: 8000,
     },
+
+    // =============================================
+    // GUILD REWARD EQUIPMENT
+    // =============================================
+
+    // Mining Guild rewards
+    'mining-laser-upgrade-1': {
+        name: 'Deep Core Mining Laser I',
+        slot: 'weapon',
+        size: 'medium',
+        category: 'mining',
+        description: 'Guild-issue mining laser with superior yield and range.',
+        miningYield: 150,
+        range: 300,
+        cycleTime: 4,
+        capacitorUse: 12,
+        price: 25000,
+        guildExclusive: 'mining',
+    },
+    'ore-compressor': {
+        name: 'Ore Compression Module I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'mining',
+        description: 'Compresses ore in cargo hold, effectively increasing capacity.',
+        cargoBonus: 1.30,
+        price: 15000,
+        guildExclusive: 'mining',
+    },
+    'mining-drone-augmentor': {
+        name: 'Mining Drone Augmentor I',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'drone',
+        description: 'Guild tech that boosts mining drone yield by 25%.',
+        miningYieldBonus: 1.25,
+        droneMiningBonus: 1.25,
+        price: 20000,
+        guildExclusive: 'mining',
+    },
+
+    // Mercenary Guild rewards
+    'tracking-computer-1': {
+        name: 'Tracking Computer I',
+        slot: 'module',
+        size: 'small',
+        category: 'ewar',
+        description: 'Guild-issue targeting system. Improves tracking speed.',
+        trackingBonus: 1.30,
+        optimalRangeBonus: 1.15,
+        capacitorUse: 3,
+        price: 18000,
+        guildExclusive: 'mercenary',
+    },
+    'target-painter': {
+        name: 'Target Painter I',
+        slot: 'module',
+        size: 'medium',
+        category: 'ewar',
+        description: 'Increases target signature radius, making them easier to hit.',
+        signatureRadiusDebuff: 1.40,
+        range: 1200,
+        cycleTime: 5,
+        capacitorUse: 8,
+        price: 22000,
+        guildExclusive: 'mercenary',
+    },
+    'rapid-fire-mod': {
+        name: 'Rapid Fire Modification I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'damage',
+        description: 'Reduces weapon cycle time at the cost of slight damage reduction.',
+        cycleTimeBonus: 0.80,
+        damageBonus: 0.95,
+        price: 20000,
+        guildExclusive: 'mercenary',
+    },
+    'hardened-shield-emitter': {
+        name: 'Hardened Shield Emitter I',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'tank',
+        description: 'Guild-grade shield hardener. Significant shield HP boost.',
+        shieldBonus: 1.25,
+        shieldResistance: 0.15,
+        price: 25000,
+        guildExclusive: 'mercenary',
+    },
 };
 
 // =============================================

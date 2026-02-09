@@ -45,6 +45,9 @@ export class PlayerShip extends Ship {
         // Update target from game state
         this.target = this.game.lockedTarget;
 
+        // Sync EWAR state for AutopilotSystem compatibility
+        this.warpDisrupted = this.isPointed;
+
         // Check for warnings
         this.checkWarnings();
     }

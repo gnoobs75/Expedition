@@ -40,8 +40,22 @@ export class EnemyShip extends Ship {
             max: enemyConfig?.loot?.max || 200,
         };
 
+        // Pursuit tracking
+        this._chaseStartTime = 0;
+        this._pursuitReason = '';
+
         // Default weapon
         this.fitModule('high-1', 'small-laser');
+
+        // Fit tackle modules based on ship class
+        const shipClass = enemyConfig?.shipClass || 'frigate';
+        if (shipClass === 'cruiser' || shipClass === 'battlecruiser' || shipClass === 'battleship' || shipClass === 'capital') {
+            if (this.midSlots >= 1) this.fitModule('mid-1', 'warp-disruptor');
+            if (this.midSlots >= 2) this.fitModule('mid-2', 'stasis-webifier');
+        } else {
+            // Frigates/destroyers get scrambler
+            if (this.midSlots >= 1) this.fitModule('mid-1', 'warp-scrambler');
+        }
     }
 
     /**
@@ -72,6 +86,7 @@ export class EnemyShip extends Ship {
         if (this.game.player && this.game.player.alive) {
             this.game.addCredits(this.bounty + lootValue);
             this.game.ui?.log(`+${this.bounty} ISK bounty, +${lootValue} ISK loot`, 'combat');
+            this.game.audio?.play('loot-pickup');
         }
 
         super.destroy();

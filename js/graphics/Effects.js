@@ -88,6 +88,21 @@ export class Effects {
             case 'laser':
                 this.spawnLaserEffect(x, y, options);
                 break;
+            case 'quest-complete':
+                this.spawnQuestComplete(x, y, options);
+                break;
+            case 'loot':
+                this.spawnLootPickup(x, y, options);
+                break;
+            case 'missile-trail':
+                this.spawnMissileTrail(x, y, options);
+                break;
+            case 'warp-flash':
+                this.spawnWarpFlash(x, y, options);
+                break;
+            case 'level-up':
+                this.spawnLevelUp(x, y, options);
+                break;
         }
     }
 
@@ -359,6 +374,179 @@ export class Effects {
 
         this.group.add(effect.mesh);
         this.effects.push(effect);
+    }
+
+    /**
+     * Quest completion celebration effect - rising golden sparks
+     */
+    spawnQuestComplete(x, y, options = {}) {
+        const count = 25;
+        this.lightPool?.spawn(x, y, 0xffcc00, 2.5, 0.6, 600);
+
+        for (let i = 0; i < count; i++) {
+            const particle = this.getParticle();
+            if (!particle) break;
+
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 60 + Math.random() * 150;
+
+            particle.position.set(
+                x + (Math.random() - 0.5) * 40,
+                y + (Math.random() - 0.5) * 40,
+                12
+            );
+            particle.scale.setScalar(1 + Math.random() * 2);
+            // Gold/yellow sparkle colors
+            const colors = [0xffcc00, 0xffdd44, 0xffaa00, 0xffffff];
+            particle.material.color.setHex(colors[Math.floor(Math.random() * colors.length)]);
+            particle.material.opacity = 1;
+            particle.visible = true;
+
+            particle.userData.active = true;
+            particle.userData.vx = Math.cos(angle) * speed * 0.3;
+            particle.userData.vy = Math.sin(angle) * speed * 0.5 + 80; // Bias upward
+            particle.userData.life = 0;
+            particle.userData.maxLife = 0.8 + Math.random() * 0.6;
+            particle.userData.fadeOut = true;
+            particle.userData.shrink = true;
+            particle.userData.startScale = particle.scale.x;
+        }
+    }
+
+    /**
+     * Loot pickup sparkle - quick upward sparkle
+     */
+    spawnLootPickup(x, y, options = {}) {
+        const count = 8;
+        for (let i = 0; i < count; i++) {
+            const particle = this.getParticle();
+            if (!particle) break;
+
+            particle.position.set(
+                x + (Math.random() - 0.5) * 20,
+                y + (Math.random() - 0.5) * 20,
+                10
+            );
+            particle.scale.setScalar(1 + Math.random());
+            particle.material.color.setHex(0x44ff88);
+            particle.material.opacity = 0.9;
+            particle.visible = true;
+
+            particle.userData.active = true;
+            particle.userData.vx = (Math.random() - 0.5) * 30;
+            particle.userData.vy = 40 + Math.random() * 60;
+            particle.userData.life = 0;
+            particle.userData.maxLife = 0.4 + Math.random() * 0.3;
+            particle.userData.fadeOut = true;
+            particle.userData.shrink = true;
+            particle.userData.startScale = particle.scale.x;
+        }
+    }
+
+    /**
+     * Missile trail - small smoke puff
+     */
+    spawnMissileTrail(x, y, options = {}) {
+        const particle = this.getParticle();
+        if (!particle) return;
+
+        particle.position.set(x, y, 7);
+        particle.scale.setScalar(2 + Math.random() * 2);
+        particle.material.color.setHex(0x888888);
+        particle.material.opacity = 0.4;
+        particle.visible = true;
+
+        particle.userData.active = true;
+        particle.userData.vx = (Math.random() - 0.5) * 10;
+        particle.userData.vy = (Math.random() - 0.5) * 10;
+        particle.userData.life = 0;
+        particle.userData.maxLife = 0.6;
+        particle.userData.fadeOut = true;
+        particle.userData.shrink = false;
+        particle.userData.startScale = particle.scale.x;
+    }
+
+    /**
+     * Warp arrival flash - bright expanding ring
+     */
+    spawnWarpFlash(x, y, options = {}) {
+        this.lightPool?.spawn(x, y, 0x4488ff, 3.0, 0.6, 400);
+
+        // Central bright flash
+        const flash = this.getParticle();
+        if (flash) {
+            flash.position.set(x, y, 12);
+            flash.scale.setScalar(8);
+            flash.material.color.setHex(0xffffff);
+            flash.material.opacity = 1;
+            flash.visible = true;
+
+            flash.userData.active = true;
+            flash.userData.vx = 0;
+            flash.userData.vy = 0;
+            flash.userData.life = 0;
+            flash.userData.maxLife = 0.3;
+            flash.userData.fadeOut = true;
+            flash.userData.shrink = false;
+            flash.userData.startScale = 8;
+        }
+
+        // Blue expanding ring
+        const ringEffect = {
+            type: 'shockwave',
+            x, y,
+            life: 0,
+            maxLife: 0.6,
+            size: 2,
+            mesh: null,
+        };
+        const ringGeo = new THREE.RingGeometry(10, 14, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0x4488ff,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide,
+        });
+        ringEffect.mesh = new THREE.Mesh(ringGeo, ringMat);
+        ringEffect.mesh.position.set(x, y, 11);
+        this.group.add(ringEffect.mesh);
+        this.effects.push(ringEffect);
+    }
+
+    /**
+     * Level up / rank up effect - spiral particles rising
+     */
+    spawnLevelUp(x, y, options = {}) {
+        const count = 20;
+        const color = options.color || 0xff44ff;
+        this.lightPool?.spawn(x, y, color, 2.0, 0.8, 800);
+
+        for (let i = 0; i < count; i++) {
+            const particle = this.getParticle();
+            if (!particle) break;
+
+            const angle = (i / count) * Math.PI * 4; // Two spirals
+            const radius = 20 + i * 3;
+
+            particle.position.set(
+                x + Math.cos(angle) * radius,
+                y + Math.sin(angle) * radius,
+                10
+            );
+            particle.scale.setScalar(1.5 + Math.random());
+            particle.material.color.setHex(color);
+            particle.material.opacity = 1;
+            particle.visible = true;
+
+            particle.userData.active = true;
+            particle.userData.vx = Math.cos(angle + Math.PI / 2) * 40;
+            particle.userData.vy = Math.sin(angle + Math.PI / 2) * 40 + 30;
+            particle.userData.life = i * 0.03; // Staggered start
+            particle.userData.maxLife = 1.0 + Math.random() * 0.5;
+            particle.userData.fadeOut = true;
+            particle.userData.shrink = true;
+            particle.userData.startScale = particle.scale.x;
+        }
     }
 
     /**

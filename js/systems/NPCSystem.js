@@ -6,6 +6,7 @@
 import { CONFIG } from '../config.js';
 import { NPCShip } from '../entities/NPCShip.js';
 import { EnemyShip } from '../entities/EnemyShip.js';
+import { evaluatePursuit, calculateInterceptPoint, activateTackleModules } from '../utils/PursuitAI.js';
 
 export class NPCSystem {
     constructor(game) {
@@ -112,6 +113,10 @@ export class NPCSystem {
 
             // Set patrol center
             sec.patrolCenter = { x: sec.x, y: sec.y };
+
+            // Fit tackle modules
+            if (sec.midSlots >= 2) sec.fitModule('mid-2', 'warp-scrambler');
+            if (sec.midSlots >= 3) sec.fitModule('mid-3', 'stasis-webifier');
 
             sector.addEntity(sec);
             this.security.push(sec);
@@ -401,6 +406,18 @@ export class NPCSystem {
             case 'engaging':
                 this.securityEngagingState(sec);
                 break;
+            case 'pursuing':
+                this.securityPursuingState(sec);
+                break;
+            case 'intercepting':
+                this.securityInterceptingState(sec);
+                break;
+            case 'tackling':
+                this.securityTacklingState(sec);
+                break;
+            case 'disengaging':
+                this.securityDisengagingState(sec);
+                break;
             case 'returning':
                 this.securityReturningState(sec);
                 break;
@@ -451,6 +468,10 @@ export class NPCSystem {
 
         if (dist < sec.attackRange) {
             sec.aiState = 'engaging';
+        } else if (dist > sec.aggroRange * 1.5) {
+            // Target is far — switch to pursuit mode
+            sec._chaseStartTime = sec._chaseStartTime || (Date.now() / 1000);
+            sec.aiState = 'pursuing';
         } else {
             sec.setDestination(sec.aiTarget.x, sec.aiTarget.y);
             sec.desiredSpeed = sec.maxSpeed;
@@ -466,6 +487,7 @@ export class NPCSystem {
             sec.aiState = 'returning';
             sec.deactivateModule('high-1');
             sec.target = null;
+            sec._chaseStartTime = 0;
             return;
         }
 
@@ -480,13 +502,18 @@ export class NPCSystem {
         const dist = sec.distanceTo(sec.aiTarget);
 
         if (dist > sec.attackRange * 1.5) {
-            // Chase
-            sec.aiState = 'responding';
+            // Target getting away — transition to pursuit
+            sec._chaseStartTime = sec._chaseStartTime || (Date.now() / 1000);
+            sec.aiState = 'pursuing';
             return;
         }
 
         // Orbit and fire
         sec.target = sec.aiTarget;
+
+        // Activate tackle modules
+        activateTackleModules(sec);
+
         const orbitAngle = Math.atan2(sec.y - sec.aiTarget.y, sec.x - sec.aiTarget.x);
         const orbitDist = sec.attackRange * 0.7;
         sec.setDestination(
@@ -504,6 +531,145 @@ export class NPCSystem {
         if (sec.shield < sec.maxShield * 0.7 && !sec.activeModules.has('mid-1')) {
             sec.activateModule('mid-1');
         }
+    }
+
+    /**
+     * Security is pursuing a fleeing target
+     */
+    securityPursuingState(sec) {
+        if (!sec.aiTarget || !sec.aiTarget.alive) {
+            sec.aiState = 'returning';
+            sec.aiTarget = null;
+            sec._chaseStartTime = 0;
+            return;
+        }
+
+        if (sec.hull < sec.maxHull * 0.15) {
+            sec.aiState = 'returning';
+            sec._chaseStartTime = 0;
+            return;
+        }
+
+        sec.target = sec.aiTarget;
+        const result = evaluatePursuit(sec, sec.aiTarget, {
+            chaseStartTime: sec._chaseStartTime || 0,
+            currentTime: Date.now() / 1000,
+            maxChaseTime: 90, // Security is more persistent
+            homePoint: sec.patrolCenter,
+            maxHomeDistance: (sec.patrolRadius || 3000) * 2,
+            allyCount: this.security.filter(s => s.alive && s !== sec).length,
+        });
+
+        sec._pursuitReason = result.reason;
+
+        switch (result.decision) {
+            case 'tackle':
+                sec.aiState = 'tackling';
+                break;
+            case 'intercept': {
+                const intercept = calculateInterceptPoint(sec, sec.aiTarget);
+                if (intercept && sec.initSectorWarp(intercept.x, intercept.y)) {
+                    sec.aiState = 'intercepting';
+                } else {
+                    sec.setDestination(sec.aiTarget.x, sec.aiTarget.y);
+                    sec.desiredSpeed = sec.maxSpeed;
+                }
+                break;
+            }
+            case 'disengage':
+                sec.aiState = 'disengaging';
+                break;
+            case 'continue':
+            default:
+                sec.setDestination(sec.aiTarget.x, sec.aiTarget.y);
+                sec.desiredSpeed = sec.maxSpeed;
+                if (sec.distanceTo(sec.aiTarget) < sec.attackRange) {
+                    sec.aiState = 'engaging';
+                    sec._chaseStartTime = 0;
+                }
+                break;
+        }
+    }
+
+    /**
+     * Security waiting for warp intercept to complete
+     */
+    securityInterceptingState(sec) {
+        if (!sec.aiTarget || !sec.aiTarget.alive) {
+            sec.aiState = 'returning';
+            sec._chaseStartTime = 0;
+            return;
+        }
+
+        sec._pursuitReason = 'Warping to intercept';
+
+        if (sec.sectorWarpState === 'none') {
+            const dist = sec.distanceTo(sec.aiTarget);
+            if (dist <= sec.attackRange * 1.5) {
+                sec.aiState = 'engaging';
+                sec._chaseStartTime = 0;
+            } else if (dist <= sec.aggroRange * 2) {
+                sec.aiState = 'pursuing';
+            } else {
+                sec.aiState = 'disengaging';
+            }
+        } else {
+            sec.setDestination(sec.aiTarget.x, sec.aiTarget.y);
+            sec.desiredSpeed = sec.maxSpeed * 0.3;
+        }
+    }
+
+    /**
+     * Security tackling a hostile — orbit close with point + weapons
+     */
+    securityTacklingState(sec) {
+        if (!sec.aiTarget || !sec.aiTarget.alive) {
+            sec.aiState = 'returning';
+            sec.aiTarget = null;
+            sec._chaseStartTime = 0;
+            return;
+        }
+
+        if (sec.hull < sec.maxHull * 0.15) {
+            sec.aiState = 'returning';
+            return;
+        }
+
+        sec.target = sec.aiTarget;
+        sec._pursuitReason = 'Tackling target';
+
+        activateTackleModules(sec);
+
+        const orbitAngle = Math.atan2(sec.y - sec.aiTarget.y, sec.x - sec.aiTarget.x);
+        const orbitDist = sec.attackRange * 0.5;
+        sec.setDestination(
+            sec.aiTarget.x + Math.cos(orbitAngle + 0.1) * orbitDist,
+            sec.aiTarget.y + Math.sin(orbitAngle + 0.1) * orbitDist
+        );
+        sec.desiredSpeed = sec.maxSpeed * 0.5;
+
+        if (!sec.activeModules.has('high-1')) {
+            sec.activateModule('high-1');
+        }
+
+        // If target breaks free
+        const dist = sec.distanceTo(sec.aiTarget);
+        if (!sec.aiTarget.isPointed && dist > sec.attackRange * 1.5) {
+            sec._chaseStartTime = Date.now() / 1000;
+            sec.aiState = 'pursuing';
+        }
+    }
+
+    /**
+     * Security disengaging — return to patrol
+     */
+    securityDisengagingState(sec) {
+        sec.deactivateModule('high-1');
+        sec.target = null;
+        sec.aiTarget = null;
+        sec._chaseStartTime = 0;
+        sec._pursuitReason = '';
+        sec.aiState = 'returning';
     }
 
     /**
@@ -581,7 +747,28 @@ export class NPCSystem {
         const spawnDist = 2000 + Math.random() * 1000;
 
         this.game.ui?.log(`Pirate activity detected on sensors!`, 'combat');
+        this.game.ui?.toast('Pirate raid detected!', 'error');
         this.broadcastSecurityAlert(targetMiner);
+
+        // Pirate radio chatter (random chance)
+        if (Math.random() < 0.5 && this.game.dialogueManager) {
+            const chatter = [
+                "All units, move in on that miner. Strip the cargo and scrap the hull.",
+                "Easy pickings today, boys. That mining barge doesn't stand a chance.",
+                "Intel says security is spread thin. Hit 'em fast, grab what you can.",
+                "Target acquired. Remember - leave no witnesses.",
+            ];
+            setTimeout(() => {
+                this.game.dialogueManager.open({
+                    name: 'Pirate Comms',
+                    title: 'Intercepted Transmission',
+                    portrait: '☠',
+                    color: '#ff4444',
+                    text: chatter[Math.floor(Math.random() * chatter.length)],
+                    options: [{ label: 'Close channel', action: 'close' }],
+                });
+            }, 1000);
+        }
 
         for (let i = 0; i < count; i++) {
             const angle = spawnAngle + (i - count / 2) * 0.3;
@@ -710,7 +897,9 @@ export class NPCSystem {
 
         for (const e of entities) {
             if (!e.alive) continue;
-            if (e.type !== 'enemy') continue;
+            // Enemy ships and pirate guild ships are both hostile
+            const isHostile = e.type === 'enemy' || (e.type === 'guild' && e.isPirate);
+            if (!isHostile) continue;
             const dx = e.x - entity.x;
             const dy = e.y - entity.y;
             if (dx * dx + dy * dy < rangeSq) {

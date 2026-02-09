@@ -41,6 +41,20 @@ export class Ship extends Entity {
 
         // Signature (for locking)
         this.signatureRadius = options.signatureRadius || 30;
+        this.baseSignatureRadius = this.signatureRadius;
+
+        // EWAR status (set by TackleSystem each tick)
+        this.isPointed = false;
+        this.isWebbed = false;
+        this.webSpeedFactor = 1.0; // 0.4 means 60% web applied
+
+        // Intra-sector warp
+        this.sectorWarpState = 'none'; // none|spooling|cooldown
+        this.sectorWarpTarget = null;
+        this.sectorWarpTimer = 0;
+        this.sectorWarpCooldown = 0;
+        this.sectorWarpSpoolTime = 4;
+        this.sectorWarpCooldownTime = 30;
 
         // Module slots
         this.highSlots = options.highSlots || 3;
@@ -56,6 +70,7 @@ export class Ship extends Entity {
         // Cargo (ore storage)
         this.cargoCapacity = options.cargoCapacity || 100;
         this.cargo = {}; // { oreType: { units: number, volume: number } }
+        this.tradeGoods = {}; // { goodId: { quantity: number, volumePerUnit: number } }
         this.cargoUsed = 0;
 
         // Current target
@@ -115,6 +130,9 @@ export class Ship extends Entity {
         // Update active modules
         this.updateActiveModules(dt);
 
+        // Update intra-sector warp
+        this.updateSectorWarp(dt);
+
         // Update rotation towards desired
         this.updateRotation(dt);
 
@@ -145,12 +163,39 @@ export class Ship extends Entity {
      * Update velocity towards desired speed
      */
     updateVelocity(dt) {
-        // Calculate effective max speed (with afterburner)
+        // Calculate effective max speed (with propmod)
         let effectiveMaxSpeed = this.maxSpeed;
+        let mwdActive = false;
+
         if (this.isModuleActive('afterburner')) {
             const abConfig = getModuleConfig('afterburner');
             if (abConfig) effectiveMaxSpeed *= abConfig.speedBonus;
         }
+        // MWD check (all variants)
+        for (const slotId of this.activeModules) {
+            const [slotType, slotIndex] = this.parseSlotId(slotId);
+            const moduleId = this.modules[slotType]?.[slotIndex];
+            if (moduleId && moduleId.startsWith('microwarpdrive')) {
+                const mwdConfig = getModuleConfig(moduleId);
+                if (mwdConfig) {
+                    effectiveMaxSpeed *= mwdConfig.speedBonus;
+                    mwdActive = true;
+                }
+                break;
+            }
+        }
+
+        // MWD signature bloom
+        if (mwdActive) {
+            const mwdConfig = getModuleConfig('microwarpdrive') || getModuleConfig('microwarpdrive-2');
+            const bloom = mwdConfig?.signatureBloom || 5.0;
+            this.signatureRadius = this.baseSignatureRadius * bloom;
+        } else {
+            this.signatureRadius = this.baseSignatureRadius;
+        }
+
+        // Apply web speed reduction
+        effectiveMaxSpeed *= this.webSpeedFactor;
 
         // Accelerate/decelerate towards desired speed
         const targetSpeed = Math.min(this.desiredSpeed, effectiveMaxSpeed);
@@ -164,6 +209,106 @@ export class Ship extends Entity {
         // Apply speed in direction of rotation
         this.velocity.x = Math.cos(this.rotation) * this.currentSpeed;
         this.velocity.y = Math.sin(this.rotation) * this.currentSpeed;
+    }
+
+    /**
+     * Get effective max speed accounting for propmod + webs, without side effects
+     */
+    getEffectiveMaxSpeed() {
+        let speed = this.maxSpeed;
+        if (this.isModuleActive('afterburner')) {
+            const abConfig = getModuleConfig('afterburner');
+            if (abConfig) speed *= abConfig.speedBonus;
+        }
+        for (const slotId of this.activeModules) {
+            const [slotType, slotIndex] = this.parseSlotId(slotId);
+            const moduleId = this.modules[slotType]?.[slotIndex];
+            if (moduleId && moduleId.startsWith('microwarpdrive')) {
+                const mwdConfig = getModuleConfig(moduleId);
+                if (mwdConfig) speed *= mwdConfig.speedBonus;
+                break;
+            }
+        }
+        speed *= this.webSpeedFactor;
+        return speed;
+    }
+
+    /**
+     * Initiate intra-sector warp to a point
+     */
+    initSectorWarp(x, y) {
+        if (this.sectorWarpState !== 'none') return false;
+        if (this.sectorWarpCooldown > 0) return false;
+        if (this.isPointed) return false;
+
+        const dx = x - this.x;
+        const dy = y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 1000) return false; // Too close to warp
+
+        this.sectorWarpState = 'spooling';
+        this.sectorWarpTarget = { x, y };
+        this.sectorWarpTimer = this.sectorWarpSpoolTime;
+
+        // Warp spool particles
+        this.game.renderer?.effects.spawn('warp-flash', this.x, this.y, {
+            color: 0x4488ff, size: 0.5, lifetime: this.sectorWarpSpoolTime,
+        });
+
+        return true;
+    }
+
+    /**
+     * Update intra-sector warp state
+     */
+    updateSectorWarp(dt) {
+        // Tick cooldown
+        if (this.sectorWarpCooldown > 0) {
+            this.sectorWarpCooldown -= dt;
+        }
+
+        if (this.sectorWarpState === 'spooling') {
+            // Cancel if pointed
+            if (this.isPointed) {
+                this.sectorWarpState = 'none';
+                this.sectorWarpTarget = null;
+                this.sectorWarpTimer = 0;
+                return;
+            }
+
+            this.sectorWarpTimer -= dt;
+            if (this.sectorWarpTimer <= 0) {
+                // Execute warp
+                const target = this.sectorWarpTarget;
+                if (target) {
+                    // Flash at origin
+                    this.game.renderer?.effects.spawn('warp-flash', this.x, this.y, {
+                        color: 0x4488ff, size: 2, lifetime: 0.5,
+                    });
+
+                    // Teleport
+                    this.x = target.x;
+                    this.y = target.y;
+                    this.velocity.x = 0;
+                    this.velocity.y = 0;
+                    this.currentSpeed = 0;
+
+                    // Flash at destination
+                    this.game.renderer?.effects.spawn('warp-flash', this.x, this.y, {
+                        color: 0x4488ff, size: 2, lifetime: 0.5,
+                    });
+
+                    // Drain capacitor
+                    this.capacitor = Math.max(0, this.capacitor - this.maxCapacitor * 0.5);
+
+                    // Set cooldown
+                    this.sectorWarpCooldown = this.sectorWarpCooldownTime;
+                }
+
+                this.sectorWarpState = 'none';
+                this.sectorWarpTarget = null;
+            }
+        }
     }
 
     /**
@@ -468,8 +613,10 @@ export class Ship extends Entity {
         }
 
         // Fire!
-        this.game.combat.fireAt(this, this.target, damage, moduleConfig.range);
-        if (this.isPlayer) this.game.audio?.play('laser');
+        this.game.combat.fireAt(this, this.target, damage, moduleConfig.range, moduleConfig);
+        if (this.isPlayer) {
+            this.game.audio?.play(moduleConfig.category === 'missile' ? 'missile-launch' : 'laser');
+        }
     }
 
     /**
@@ -700,9 +847,69 @@ export class Ship extends Entity {
     clearCargo() {
         const value = this.getCargoValue();
         this.cargo = {};
+        this.tradeGoods = {};
         this.cargoUsed = 0;
         this.game.events.emit('cargo:updated', { ship: this });
         return value;
+    }
+
+    // =============================================
+    // Trade Goods Cargo
+    // =============================================
+
+    /**
+     * Add trade goods to cargo
+     * @param {string} goodId - Trade good identifier
+     * @param {number} quantity - Number of units
+     * @param {number} volumePerUnit - Volume per unit in m³
+     * @returns {number} Number of units actually added
+     */
+    addTradeGood(goodId, quantity, volumePerUnit) {
+        if (!volumePerUnit || volumePerUnit <= 0) return 0;
+        const availableSpace = this.cargoCapacity - this.cargoUsed;
+        const maxUnits = Math.floor(availableSpace / volumePerUnit);
+        const unitsToAdd = Math.min(quantity, maxUnits);
+
+        if (unitsToAdd <= 0) return 0;
+
+        if (!this.tradeGoods) this.tradeGoods = {};
+        if (!this.tradeGoods[goodId]) {
+            this.tradeGoods[goodId] = { quantity: 0, volumePerUnit };
+        }
+
+        this.tradeGoods[goodId].quantity += unitsToAdd;
+        this.cargoUsed += unitsToAdd * volumePerUnit;
+
+        this.game.events.emit('cargo:updated', { ship: this });
+        return unitsToAdd;
+    }
+
+    /**
+     * Remove trade goods from cargo
+     * @returns {number} Number of units actually removed
+     */
+    removeTradeGood(goodId, quantity) {
+        if (!this.tradeGoods?.[goodId]) return 0;
+
+        const data = this.tradeGoods[goodId];
+        const toRemove = Math.min(quantity, data.quantity);
+
+        data.quantity -= toRemove;
+        this.cargoUsed -= toRemove * data.volumePerUnit;
+
+        if (data.quantity <= 0) {
+            delete this.tradeGoods[goodId];
+        }
+
+        this.game.events.emit('cargo:updated', { ship: this });
+        return toRemove;
+    }
+
+    /**
+     * Get quantity of a specific trade good
+     */
+    getTradeGoodQuantity(goodId) {
+        return this.tradeGoods?.[goodId]?.quantity || 0;
     }
 
     // =============================================
@@ -739,7 +946,10 @@ export class Ship extends Entity {
 
             this.game.currentSector?.addEntity(drone);
             this.droneBay.deployed.set(index, drone);
-            if (this.isPlayer) this.game.ui?.log(`Launched ${droneConfig.name}`, 'system');
+            if (this.isPlayer) {
+                this.game.ui?.log(`Launched ${droneConfig.name}`, 'system');
+                this.game.audio?.play('drone-launch');
+            }
         });
     }
 
@@ -770,7 +980,10 @@ export class Ship extends Entity {
 
             // Remove from sector
             droneEntity.destroy();
-            if (this.isPlayer) this.game.ui?.log(`Recalled ${droneEntity.name}`, 'system');
+            if (this.isPlayer) {
+                this.game.ui?.log(`Recalled ${droneEntity.name}`, 'system');
+                this.game.audio?.play('drone-recall');
+            }
         }
     }
 

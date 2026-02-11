@@ -1341,6 +1341,7 @@ export class Ship extends Entity {
      */
     updateDamageVisuals() {
         if (!this.mesh) return;
+        if (this._lodLevel >= 1) return;
 
         const shieldPct = this.shield / this.maxShield;
         const hullPct = this.hull / this.maxHull;

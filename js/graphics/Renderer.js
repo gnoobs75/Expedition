@@ -1026,6 +1026,18 @@ export class Renderer {
      * Update all entity meshes
      */
     updateEntityMeshes() {
+        // Compute LOD pixel scale once per frame
+        const zoom = this.game.camera?.zoom || 100;
+        const viewHeight = 1000000 / zoom;
+        const screenHeight = window.innerHeight;
+        const pixelScale = screenHeight / viewHeight;
+
+        // Gather override targets (never fully cull these)
+        const player = this.game.player;
+        const selected = this.game.selectedTarget;
+        const locked = this.game.lockedTarget;
+        const locking = this.game.lockingTarget;
+
         // Update existing entities
         for (const [entity, mesh] of this.entityMeshes) {
             if (!entity.alive) {
@@ -1033,7 +1045,61 @@ export class Renderer {
                 continue;
             }
 
+            // Compute screen size and assign LOD level
+            const screenSize = (entity.radius || 20) * 2 * pixelScale;
+            let lodLevel;
+            if (screenSize >= 15) {
+                lodLevel = 0; // Full detail
+            } else if (screenSize >= 2) {
+                lodLevel = 1; // Simplified
+            } else {
+                lodLevel = 2; // Culled
+            }
+
+            // Overrides: player always full detail
+            if (entity === player) {
+                lodLevel = 0;
+            }
+            // Selected/locked/locking targets never fully culled
+            if (lodLevel === 2 && (entity === selected || entity === locked || entity === locking)) {
+                lodLevel = 1;
+            }
+
+            entity._lodLevel = lodLevel;
+
+            if (lodLevel === 2) {
+                // Fully culled - hide mesh and shadow, skip updateMesh
+                mesh.visible = false;
+                const shadow = this.entityShadows.get(entity);
+                if (shadow) shadow.visible = false;
+                continue;
+            }
+
+            // Call updateMesh for LOD 0 and LOD 1
             entity.updateMesh();
+
+            if (lodLevel === 1) {
+                // Simplified: hide shadow, hide extra ship children (turrets, etc.)
+                const shadow = this.entityShadows.get(entity);
+                if (shadow) shadow.visible = false;
+
+                // For ships with children (shield overlay at [0], turrets at [1+])
+                // Keep hull mesh visible but hide children beyond index 0
+                if (mesh.children && mesh.children.length > 1) {
+                    for (let i = 1; i < mesh.children.length; i++) {
+                        mesh.children[i].visible = false;
+                    }
+                    entity._lodSimplified = true;
+                }
+            } else if (lodLevel === 0 && entity._lodSimplified) {
+                // Restore previously hidden children
+                if (mesh.children) {
+                    for (let i = 0; i < mesh.children.length; i++) {
+                        mesh.children[i].visible = true;
+                    }
+                }
+                entity._lodSimplified = false;
+            }
         }
 
         // Add meshes for new entities
@@ -1052,6 +1118,8 @@ export class Renderer {
     updateEntityShadows() {
         for (const [entity, shadow] of this.entityShadows) {
             if (!entity.alive) continue;
+            // Skip shadow update for LOD 1+ (already hidden by updateEntityMeshes)
+            if (entity._lodLevel >= 1) continue;
             const r = entity.radius || 20;
             // Shadow offset slightly below entity to simulate light from upper-front
             shadow.position.set(entity.x, entity.y - r * 0.15, -0.5);
@@ -1217,16 +1285,22 @@ export class Renderer {
                     }
                 }
 
-                // Recreate geometry for arc progress
-                this.miningRingMesh.geometry.dispose();
+                // Only recreate geometry when arc or radius changes significantly
                 const arc = Math.max(0.01, progress) * Math.PI * 2;
-                this.miningRingMesh.geometry = new THREE.RingGeometry(r, r + 3, 32, 1, 0, arc);
+                if (!this._lastMiningArc || Math.abs(arc - this._lastMiningArc) > 0.05 || Math.abs(r - (this._lastMiningRingR || 0)) > 1) {
+                    this.miningRingMesh.geometry.dispose();
+                    this.miningRingMesh.geometry = new THREE.RingGeometry(r, r + 3, 32, 1, 0, arc);
+                    this._lastMiningArc = arc;
+                    this._lastMiningRingR = r;
+                }
                 this.miningRingMesh.visible = true;
                 this.miningRingMesh.position.set(asteroid.x, asteroid.y, 3);
                 this.miningRingMesh.rotation.z = -Math.PI / 2; // Start from top
                 this.miningRingMesh.material.opacity = 0.3 + progress * 0.3;
             } else {
                 this.miningRingMesh.visible = false;
+                this._lastMiningArc = 0;
+                this._lastMiningRingR = 0;
             }
         }
 
@@ -1281,16 +1355,22 @@ export class Renderer {
             const progress = Math.min(elapsed / this.game.lockingDuration, 1);
             const r = (lockTarget.radius || 30) + 12;
 
-            // Recreate geometry for arc
-            this.lockProgressMesh.geometry.dispose();
+            // Only recreate geometry when arc or radius changes significantly
             const arc = Math.max(0.01, progress) * Math.PI * 2;
-            this.lockProgressMesh.geometry = new THREE.RingGeometry(r - 2, r, 32, 1, 0, arc);
+            if (!this._lastLockArc || Math.abs(arc - this._lastLockArc) > 0.05 || Math.abs(r - (this._lastLockRingR || 0)) > 1) {
+                this.lockProgressMesh.geometry.dispose();
+                this.lockProgressMesh.geometry = new THREE.RingGeometry(r - 2, r, 32, 1, 0, arc);
+                this._lastLockArc = arc;
+                this._lastLockRingR = r;
+            }
             this.lockProgressMesh.visible = true;
             this.lockProgressMesh.position.set(lockTarget.x, lockTarget.y, 6);
             this.lockProgressMesh.rotation.z = -Math.PI / 2; // Start from top
             this.lockProgressMesh.material.opacity = 0.3 + progress * 0.4;
         } else {
             this.lockProgressMesh.visible = false;
+            this._lastLockArc = 0;
+            this._lastLockRingR = 0;
         }
 
         // Velocity vector line (movement direction from player ship)

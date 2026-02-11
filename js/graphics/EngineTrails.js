@@ -36,6 +36,8 @@ export class EngineTrails {
         const shipsWithTrails = new Set();
         for (const entity of entities) {
             if (!entity.alive) continue;
+            // Skip culled entities (LOD 2)
+            if (entity._lodLevel === 2) continue;
             const isShip = entity.type === 'ship' || entity.type === 'enemy' ||
                 entity.type === 'npc' || entity.type === 'guild' || entity.type === 'fleet';
             if (!isShip) continue;
@@ -296,13 +298,19 @@ export class EngineTrails {
     updateEngineGlows(activeShips) {
         const time = performance.now() * 0.001;
 
-        // Remove glows for entities that are gone
+        // Remove or hide glows for entities that are gone or culled
         for (const [entity, glowData] of this.engineGlows) {
-            if (!entity.alive || !activeShips.has(entity)) {
+            if (!entity.alive) {
+                // Dead entity - fully dispose
                 if (glowData.core) { this.parentGroup.remove(glowData.core); glowData.core.geometry.dispose(); glowData.core.material.dispose(); }
                 if (glowData.outer) { this.parentGroup.remove(glowData.outer); glowData.outer.geometry.dispose(); glowData.outer.material.dispose(); }
                 if (glowData.bloom) { this.parentGroup.remove(glowData.bloom); glowData.bloom.geometry.dispose(); glowData.bloom.material.dispose(); }
                 this.engineGlows.delete(entity);
+            } else if (!activeShips.has(entity)) {
+                // Still alive but LOD-culled or stopped - hide to avoid dispose/recreate churn
+                if (glowData.core) glowData.core.visible = false;
+                if (glowData.outer) glowData.outer.visible = false;
+                if (glowData.bloom) glowData.bloom.visible = false;
             }
         }
 

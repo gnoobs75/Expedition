@@ -119,9 +119,13 @@ export class Ship extends Entity {
         // Regenerate capacitor
         this.capacitor = Math.min(this.maxCapacitor, this.capacitor + this.capacitorRegen * dt);
 
-        // Regenerate shield (passive)
+        // Regenerate shield (passive, boosted by power routing)
         if (this.shield < this.maxShield) {
-            this.shield = Math.min(this.maxShield, this.shield + 1 * dt);
+            let shieldRegenRate = 1;
+            if (this.isPlayer && this.game.powerRouting) {
+                shieldRegenRate *= 0.5 + (this.game.powerRouting.shields / 100) * 1.5;
+            }
+            this.shield = Math.min(this.maxShield, this.shield + shieldRegenRate * dt);
         }
 
         // Update module cooldowns
@@ -149,6 +153,7 @@ export class Ship extends Entity {
     updateRotation(dt) {
         const diff = angleDifference(this.rotation, this.desiredRotation);
         const maxTurn = this.turnSpeed * dt;
+        const prevRotation = this.rotation;
 
         if (Math.abs(diff) < maxTurn) {
             this.rotation = this.desiredRotation;
@@ -157,6 +162,9 @@ export class Ship extends Entity {
         }
 
         this.rotation = normalizeAngle(this.rotation);
+
+        // Track turn rate for banking visual
+        this._turnDelta = angleDifference(prevRotation, this.rotation);
     }
 
     /**
@@ -196,6 +204,11 @@ export class Ship extends Entity {
 
         // Apply web speed reduction
         effectiveMaxSpeed *= this.webSpeedFactor;
+
+        // Power routing: engine power affects max speed for player
+        if (this.isPlayer && this.game.powerRouting) {
+            effectiveMaxSpeed *= 0.7 + (this.game.powerRouting.engines / 100) * 0.9;
+        }
 
         // Accelerate/decelerate towards desired speed
         const targetSpeed = Math.min(this.desiredSpeed, effectiveMaxSpeed);
@@ -281,10 +294,25 @@ export class Ship extends Entity {
                 // Execute warp
                 const target = this.sectorWarpTarget;
                 if (target) {
-                    // Flash at origin
-                    this.game.renderer?.effects.spawn('warp-flash', this.x, this.y, {
-                        color: 0x4488ff, size: 2, lifetime: 0.5,
+                    // Dramatic departure effect at origin
+                    const warpAngle = Math.atan2(target.y - this.y, target.x - this.x);
+                    this.game.renderer?.effects.spawn('warp-departure', this.x, this.y, {
+                        angle: warpAngle,
                     });
+
+                    // Brief warp tunnel for player's sector warp
+                    if (this.isPlayer) {
+                        const tunnel = document.getElementById('warp-tunnel');
+                        const destLabel = document.getElementById('warp-destination');
+                        const warpDestText = document.getElementById('warp-destination-text');
+                        if (tunnel) {
+                            if (destLabel) destLabel.textContent = 'SECTOR WARP';
+                            if (warpDestText) warpDestText.textContent = `WARPING TO: ${target.name || 'TARGET'}`;
+                            tunnel.classList.remove('hidden');
+                            setTimeout(() => tunnel.classList.add('hidden'), 500);
+                        }
+                        this.game.audio?.play('warp-start');
+                    }
 
                     // Teleport
                     this.x = target.x;
@@ -576,6 +604,19 @@ export class Ship extends Entity {
             this.repairShield(moduleConfig.shieldRepair);
         } else if (moduleConfig.armorRepair) {
             this.repairArmor(moduleConfig.armorRepair);
+        } else if (moduleConfig.scanRange) {
+            // Survey scanner
+            const moduleId = this.modules.mid?.[parseInt(slotId.split('-')[1]) - 1] ||
+                             this.modules.high?.[parseInt(slotId.split('-')[1]) - 1];
+            this.game.surveySystem?.initiateScan(this, moduleId || slotId);
+        } else if (moduleConfig.remoteShieldRepair || moduleConfig.remoteArmorRepair) {
+            // Remote repair
+            const moduleId = this.modules.mid?.[parseInt(slotId.split('-')[1]) - 1];
+            if (this.target && this.target.alive) {
+                this.game.logisticsSystem?.applyRemoteRepair(this, this.target, moduleId || slotId);
+            } else if (this.isPlayer) {
+                this.game.ui?.log('No target for remote repair', 'system');
+            }
         }
     }
 
@@ -612,6 +653,11 @@ export class Ship extends Entity {
             }
         }
 
+        // Apply pilot skill damage bonus (player only)
+        if (this.isPlayer && this.skillBonuses?.damage) {
+            damage *= this.skillBonuses.damage;
+        }
+
         // Fire!
         this.game.combat.fireAt(this, this.target, damage, moduleConfig.range, moduleConfig);
         if (this.isPlayer) {
@@ -638,22 +684,41 @@ export class Ship extends Entity {
             return;
         }
 
+        // Apply pilot skill mining yield bonus (player only)
+        let yield_ = moduleConfig.miningYield;
+        if (this.isPlayer && this.skillBonuses?.miningYield) {
+            yield_ *= this.skillBonuses.miningYield;
+        }
+
         // Mine!
-        this.game.mining.mineAsteroid(this, this.target, moduleConfig.miningYield);
+        this.game.mining.mineAsteroid(this, this.target, yield_);
     }
 
     /**
      * Repair shield
      */
     repairShield(amount) {
+        const before = this.shield;
         this.shield = Math.min(this.maxShield, this.shield + amount);
+        // Visual pulse when shield booster cycles
+        const repaired = this.shield - before;
+        if (repaired > 0) {
+            this.game.renderer?.statusEffects?.spawnRepairPulse(this, 'shield');
+            this.game.events.emit('combat:repair', { ship: this, amount: repaired, type: 'shield' });
+        }
     }
 
     /**
      * Repair armor
      */
     repairArmor(amount) {
+        const before = this.armor;
         this.armor = Math.min(this.maxArmor, this.armor + amount);
+        const repaired = this.armor - before;
+        if (repaired > 0) {
+            this.game.renderer?.statusEffects?.spawnRepairPulse(this, 'armor');
+            this.game.events.emit('combat:repair', { ship: this, amount: repaired, type: 'armor' });
+        }
     }
 
     /**
@@ -671,6 +736,8 @@ export class Ship extends Entity {
      * Take damage
      */
     takeDamage(amount, source) {
+        this._lastDamageTime = performance.now();
+        this.lastDamageSource = source;
         let remaining = amount;
 
         // Damage shield first
@@ -946,6 +1013,8 @@ export class Ship extends Entity {
 
             this.game.currentSector?.addEntity(drone);
             this.droneBay.deployed.set(index, drone);
+            // Launch burst visual effect
+            this.game.renderer?.effects?.spawn('drone-launch', drone.x, drone.y, { color: 0x00ffcc });
             if (this.isPlayer) {
                 this.game.ui?.log(`Launched ${droneConfig.name}`, 'system');
                 this.game.audio?.play('drone-launch');
@@ -978,12 +1047,40 @@ export class Ship extends Entity {
             this.droneBay.drones[index].hp = droneEntity.hp;
             this.droneBay.deployed.delete(index);
 
-            // Remove from sector
-            droneEntity.destroy();
+            // Recall beam visual effect
+            this.game.renderer?.effects?.spawn('drone-recall', this.x, this.y, {
+                droneX: droneEntity.x, droneY: droneEntity.y,
+            });
             if (this.isPlayer) {
                 this.game.ui?.log(`Recalled ${droneEntity.name}`, 'system');
                 this.game.audio?.play('drone-recall');
             }
+
+            // Animate drone flying back to ship before removing
+            const ship = this;
+            const startX = droneEntity.x;
+            const startY = droneEntity.y;
+            droneEntity._recalling = true;
+            droneEntity._recallTimer = 0;
+            const recallDuration = 0.6;
+
+            const origUpdate = droneEntity.update.bind(droneEntity);
+            droneEntity.update = function(dt) {
+                this._recallTimer += dt;
+                const t = Math.min(1, this._recallTimer / recallDuration);
+                const ease = t * t; // accelerate toward ship
+                this.x = startX + (ship.x - startX) * ease;
+                this.y = startY + (ship.y - startY) * ease;
+                if (this.mesh) {
+                    this.mesh.position.set(this.x, this.y, 0);
+                    const scale = 1 - t * 0.7;
+                    this.mesh.scale.setScalar(scale);
+                    this.mesh.material && (this.mesh.material.opacity = 1 - t);
+                }
+                if (t >= 1) {
+                    this.destroy();
+                }
+            };
         }
     }
 
@@ -1098,7 +1195,107 @@ export class Ship extends Entity {
         this.shieldOverlay.position.z = 2;
         this.mesh.add(this.shieldOverlay);
 
+        // Add weapon turrets
+        this.addTurretHardpoints();
+
         return this.mesh;
+    }
+
+    /**
+     * Add turret hardpoint meshes to the ship mesh.
+     * Call after createMesh() to mount weapon turrets.
+     */
+    addTurretHardpoints() {
+        if (!this.mesh) return;
+
+        // Count weapon slots with actual weapons fitted
+        const weaponCount = this.highSlots;
+        if (weaponCount <= 0) return;
+
+        this.turretMeshes = [];
+        const r = this.radius;
+        const turretSize = Math.max(1.5, Math.min(r * 0.08, 4));
+
+        // Distribute turrets along hull centerline, spread from front to mid
+        for (let i = 0; i < Math.min(weaponCount, 6); i++) {
+            // Position along ship's forward axis (local x)
+            const t = weaponCount === 1 ? 0.3 : (0.6 - (i / (weaponCount - 1)) * 0.8);
+            const localX = r * t;
+            // Alternate above/below centerline for visual spread
+            const localY = (i % 2 === 0 ? 1 : -1) * r * 0.15 * (1 + Math.floor(i / 2) * 0.3);
+
+            const turretGroup = new THREE.Group();
+            turretGroup.position.set(localX, localY, Math.min(r * 0.1, 6) + 1);
+
+            // Base (small cylinder)
+            const baseGeo = new THREE.CylinderGeometry(turretSize * 0.8, turretSize, turretSize * 0.5, 6);
+            baseGeo.rotateX(Math.PI / 2);
+            const baseMat = new THREE.MeshStandardMaterial({
+                color: 0x556677,
+                emissive: 0x223344,
+                emissiveIntensity: 0.1,
+                roughness: 0.4,
+                metalness: 0.6,
+            });
+            turretGroup.add(new THREE.Mesh(baseGeo, baseMat));
+
+            // Barrel (elongated box)
+            const barrelGeo = new THREE.BoxGeometry(turretSize * 2.5, turretSize * 0.3, turretSize * 0.3);
+            barrelGeo.translate(turretSize * 1.2, 0, 0);
+            const barrelMat = new THREE.MeshStandardMaterial({
+                color: 0x778899,
+                emissive: 0x334455,
+                emissiveIntensity: 0.1,
+                roughness: 0.3,
+                metalness: 0.7,
+            });
+            turretGroup.add(new THREE.Mesh(barrelGeo, barrelMat));
+
+            this.mesh.add(turretGroup);
+            this.turretMeshes.push(turretGroup);
+        }
+    }
+
+    /**
+     * Update turret tracking toward locked target
+     */
+    updateTurretTracking() {
+        if (!this.turretMeshes || this.turretMeshes.length === 0) return;
+
+        const target = this.target;
+        const hasActiveWeapon = this.activeModules.size > 0;
+
+        for (let i = 0; i < this.turretMeshes.length; i++) {
+            const turret = this.turretMeshes[i];
+
+            if (target && target.alive && hasActiveWeapon) {
+                // Calculate angle to target in local space
+                const dx = target.x - this.x;
+                const dy = target.y - this.y;
+                const worldAngle = Math.atan2(dy, dx);
+                const localAngle = worldAngle - this.rotation;
+
+                // Smooth rotation toward target
+                let diff = localAngle - turret.rotation.z;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                turret.rotation.z += diff * 0.15;
+
+                // Glow barrel tip when firing
+                const barrel = turret.children[1];
+                if (barrel?.material) {
+                    barrel.material.emissiveIntensity = 0.3;
+                }
+            } else {
+                // Return to forward-facing (local angle 0)
+                turret.rotation.z *= 0.92;
+
+                const barrel = turret.children[1];
+                if (barrel?.material) {
+                    barrel.material.emissiveIntensity = 0.1;
+                }
+            }
+        }
     }
 
     /**
@@ -1106,9 +1303,35 @@ export class Ship extends Entity {
      */
     updateMesh() {
         if (this.mesh) {
-            this.mesh.position.set(this.x, this.y, 0);
-            this.mesh.rotation.z = this.rotation;
+            // Idle bobbing when nearly stationary
+            let bobX = 0, bobY = 0;
+            if (this.currentSpeed < 5) {
+                const t = performance.now() * 0.001;
+                const bobId = (this.id || 0) * 1.37; // unique phase per ship
+                bobX = Math.sin(t * 0.7 + bobId) * 1.2;
+                bobY = Math.cos(t * 0.5 + bobId * 0.8) * 0.8;
+            }
+            this.mesh.position.set(this.x + bobX, this.y + bobY, 0);
+
+            // Banking effect: tilt mesh on X-axis based on turn rate
+            const turnRate = this._turnDelta || 0;
+            const targetBank = -turnRate * 15; // scale turn delta to visual bank
+            const maxBank = 0.35; // ~20 degrees max
+            this._bankAngle = lerp(this._bankAngle || 0, Math.max(-maxBank, Math.min(maxBank, targetBank)), 0.12);
+            this.mesh.rotation.set(this._bankAngle, 0, this.rotation);
+
+            // Warp stretch effect for player
+            if (this.isPlayer && this.game.autopilot?.warping) {
+                // Stretch along heading, compress perpendicular
+                const stretchFactor = 1.4 + Math.sin(performance.now() * 0.008) * 0.15;
+                this.mesh.scale.set(stretchFactor, 1 / Math.sqrt(stretchFactor), 1);
+            } else if (this._wasWarpStretched) {
+                this.mesh.scale.set(1, 1, 1);
+            }
+            this._wasWarpStretched = this.isPlayer && this.game.autopilot?.warping;
+
             this.mesh.visible = this.visible && this.alive;
+            this.updateTurretTracking();
             this.updateDamageVisuals();
         }
     }

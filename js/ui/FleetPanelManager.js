@@ -105,10 +105,12 @@ export class FleetPanelManager {
             const stateIcon = stateIcons[ship.aiState] || '';
             const pilotName = ship.pilot?.name || '<span class="dim">---</span>';
             const groupLabel = ship.groupId > 0 ? ship.groupId : '-';
+            const overallHp = (ship.shield + ship.armor + ship.hull) / (ship.maxShield + ship.maxArmor + ship.maxHull);
+            const hpDotColor = overallHp > 0.6 ? '#44ff88' : overallHp > 0.3 ? '#ffcc44' : '#ff4444';
 
             html += `
                 <tr class="fleet-row ${selected}" data-fleet-id="${ship.fleetId}">
-                    <td class="fleet-name">${ship.name}</td>
+                    <td class="fleet-name"><span class="fleet-hp-dot" style="background:${hpDotColor}"></span>${ship.name}</td>
                     <td class="fleet-pilot">${pilotName}</td>
                     <td class="fleet-state" style="color:${stateColor}">${stateIcon} ${ship.aiState}</td>
                     <td class="fleet-hp">
@@ -125,12 +127,14 @@ export class FleetPanelManager {
         html += '</tbody></table>';
 
         // Command buttons
+        const currentFormation = this.game.fleetSystem?.formation || 'spread';
         html += `
             <div class="fleet-commands">
                 <button class="fleet-cmd-btn" data-cmd="following" title="Follow Player">Follow</button>
                 <button class="fleet-cmd-btn" data-cmd="attacking" title="Attack Target">Attack</button>
                 <button class="fleet-cmd-btn" data-cmd="mining" title="Mine Nearest">Mine</button>
                 <button class="fleet-cmd-btn" data-cmd="defending" title="Defend Position">Defend</button>
+                <button class="fleet-cmd-btn fleet-formation-btn" data-cmd="formation" title="Cycle Formation">${currentFormation.toUpperCase()}</button>
             </div>
         `;
 
@@ -184,6 +188,11 @@ export class FleetPanelManager {
      * Command selected fleet ships
      */
     commandSelected(command) {
+        if (command === 'formation') {
+            this.game.fleetSystem?.cycleFormation();
+            this.render();
+            return;
+        }
         if (this.selectedFleetIds.size === 0) {
             // Command all
             this.game.fleetSystem?.commandAll(command, this.game.selectedTarget);

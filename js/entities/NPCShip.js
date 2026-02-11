@@ -145,6 +145,10 @@ export class NPCShip extends Ship {
 
         this.mesh.position.set(this.x, this.y, 0);
         this.mesh.rotation.z = this.rotation;
+
+        // Add weapon turrets
+        this.addTurretHardpoints();
+
         return this.mesh;
     }
 }

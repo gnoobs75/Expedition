@@ -12,6 +12,7 @@ import { TRADE_GOODS } from '../data/tradeGoodsDatabase.js';
 import { PIRATE_FACTION_ID, isFactionHostile } from '../data/guildFactionDatabase.js';
 import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
 import { wrappedDistance, wrappedDirection } from '../utils/math.js';
+import { Wreck } from './Wreck.js';
 import { evaluatePursuit, calculateInterceptPoint, activateTackleModules } from '../utils/PursuitAI.js';
 
 let guildIdCounter = 0;
@@ -73,8 +74,14 @@ export class GuildShip extends Ship {
         this.dockingCooldown = 0;
         this.docked = false;
 
-        // Bounty/loot
-        this.bounty = 0;
+        // Bounty/loot - pirates have bounties based on ship value
+        if (this.isPirate) {
+            const shipData = SHIP_DATABASE[this.shipClass];
+            const baseValue = shipData?.price || 5000;
+            this.bounty = Math.floor(baseValue * (0.15 + Math.random() * 0.15));
+        } else {
+            this.bounty = 0;
+        }
         this.lootValue = { min: 50, max: 300 };
 
         // Setup loadout
@@ -114,6 +121,17 @@ export class GuildShip extends Ship {
                 this.fitModule('mid-1', 'shield-booster');
                 if (this.midSlots >= 2) this.fitModule('mid-2', 'stasis-webifier');
                 this.fitModule('low-1', 'damage-mod');
+                break;
+            case 'surveyor':
+                this.fitModule('mid-1', 'survey-scanner-1');
+                if (this.midSlots >= 2) this.fitModule('mid-2', 'afterburner');
+                if (this.highSlots >= 1) this.fitModule('high-1', 'small-laser');
+                break;
+            case 'logistics':
+                this.fitModule('mid-1', 'remote-shield-repairer');
+                if (this.midSlots >= 2) this.fitModule('mid-2', 'remote-armor-repairer');
+                if (this.midSlots >= 3) this.fitModule('mid-3', 'afterburner');
+                this.fitModule('high-1', 'small-laser');
                 break;
         }
     }
@@ -269,6 +287,12 @@ export class GuildShip extends Ship {
                 break;
             case 'disengaging':
                 this.aiDisengage();
+                break;
+            case 'surveying':
+                this.aiSurvey();
+                break;
+            case 'repairing':
+                this.aiRepairAlly();
                 break;
             case 'docking':
                 this.aiDock();
@@ -710,6 +734,141 @@ export class GuildShip extends Ship {
     }
 
     // =========================================
+    // SURVEYOR & LOGISTICS AI
+    // =========================================
+
+    /**
+     * Surveyor AI: Fly to asteroid fields, activate survey scanner, report results
+     */
+    aiSurvey() {
+        // Find nearest asteroid cluster to scan
+        if (!this._surveyTarget) {
+            const entities = this.game.currentSector?.entities || [];
+            let closest = null;
+            let closestDist = Infinity;
+            for (const e of entities) {
+                if (e.type !== 'asteroid' || !e.alive) continue;
+                const d = this.distanceTo(e);
+                if (d < closestDist) {
+                    closestDist = d;
+                    closest = e;
+                }
+            }
+            if (closest) {
+                this._surveyTarget = { x: closest.x, y: closest.y };
+            } else {
+                // No asteroids, wander
+                this._surveyTarget = {
+                    x: CONFIG.SECTOR_SIZE / 2 + (Math.random() - 0.5) * 8000,
+                    y: CONFIG.SECTOR_SIZE / 2 + (Math.random() - 0.5) * 8000,
+                };
+            }
+        }
+
+        const dx = this._surveyTarget.x - this.x;
+        const dy = this._surveyTarget.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 500) {
+            // In position - activate survey scanner
+            this.desiredSpeed = 0;
+            for (let i = 0; i < this.midSlots; i++) {
+                const moduleId = this.modules.mid[i];
+                if (moduleId && moduleId.includes('survey-scanner')) {
+                    const slotId = `mid-${i + 1}`;
+                    if (!this.activeModules.has(slotId)) {
+                        this.activateModule(slotId);
+                    }
+                }
+            }
+            // After a scan completes, pick a new target
+            this._surveyTimer = (this._surveyTimer || 0) + 0.016;
+            if (this._surveyTimer > 15) {
+                this._surveyTimer = 0;
+                this._surveyTarget = null; // Find new field
+            }
+        } else {
+            this.setDestination(this._surveyTarget.x, this._surveyTarget.y);
+            this.desiredSpeed = this.maxSpeed;
+        }
+    }
+
+    /**
+     * Logistics AI: Find damaged allies, orbit, and activate remote repair modules
+     */
+    aiRepairAlly() {
+        const entities = this.game.currentSector?.entities || [];
+        const repairRange = 600;
+
+        // Find most damaged friendly ship
+        if (!this._repairTarget || !this._repairTarget.alive ||
+            (this._repairTarget.shield >= this._repairTarget.maxShield * 0.95 &&
+             this._repairTarget.armor >= this._repairTarget.maxArmor * 0.95)) {
+            let bestTarget = null;
+            let lowestHp = 1.0;
+
+            for (const entity of entities) {
+                if (!entity.alive || entity === this) continue;
+                if (entity.hostility === 'hostile' || entity.type === 'enemy') continue;
+                if (entity.type === 'asteroid' || entity.type === 'station' ||
+                    entity.type === 'warpgate' || entity.type === 'planet') continue;
+
+                const hpPercent = (entity.shield + entity.armor + entity.hull) /
+                    (entity.maxShield + entity.maxArmor + entity.maxHull);
+                if (hpPercent >= 0.9) continue;
+                if (hpPercent < lowestHp) {
+                    lowestHp = hpPercent;
+                    bestTarget = entity;
+                }
+            }
+            this._repairTarget = bestTarget;
+        }
+
+        if (this._repairTarget) {
+            this.target = this._repairTarget;
+            const dist = this.distanceTo(this._repairTarget);
+
+            if (dist > repairRange) {
+                // Approach
+                this.setDestination(this._repairTarget.x, this._repairTarget.y);
+                this.desiredSpeed = this.maxSpeed;
+            } else {
+                // Orbit and repair
+                const orbitAngle = Math.atan2(this.y - this._repairTarget.y, this.x - this._repairTarget.x);
+                const orbitDist = repairRange * 0.5;
+                this.setDestination(
+                    this._repairTarget.x + Math.cos(orbitAngle + 0.1) * orbitDist,
+                    this._repairTarget.y + Math.sin(orbitAngle + 0.1) * orbitDist
+                );
+                this.desiredSpeed = this.maxSpeed * 0.4;
+
+                // Activate remote repair modules
+                for (let i = 0; i < this.midSlots; i++) {
+                    const moduleId = this.modules.mid[i];
+                    if (moduleId && (moduleId.includes('remote-shield') || moduleId.includes('remote-armor'))) {
+                        const slotId = `mid-${i + 1}`;
+                        if (!this.activeModules.has(slotId)) {
+                            this.activateModule(slotId);
+                        }
+                    }
+                }
+            }
+        } else {
+            // No one to repair - follow nearest ally or idle
+            this.desiredSpeed = this.maxSpeed * 0.3;
+            this._logiIdleTimer = (this._logiIdleTimer || 0) + 0.016;
+            if (this._logiIdleTimer > 5) {
+                this._logiIdleTimer = 0;
+                // Wander near center
+                this.setDestination(
+                    CONFIG.SECTOR_SIZE / 2 + (Math.random() - 0.5) * 4000,
+                    CONFIG.SECTOR_SIZE / 2 + (Math.random() - 0.5) * 4000
+                );
+            }
+        }
+    }
+
+    // =========================================
     // PURSUIT AI STATES
     // =========================================
 
@@ -884,20 +1043,31 @@ export class GuildShip extends Ship {
         this.game.guildEconomySystem?.handleGuildShipDestroyed(this);
 
         if (this.isPirate) {
-            // Pirate ship killed - award bounty + loot to player
+            // Pirate ship killed - award bounty to player, drop wreck for salvage
             const pirateBounty = 300 + Math.floor(Math.random() * 1200);
-            const loot = Math.floor(Math.random() * (this.lootValue.max - this.lootValue.min) + this.lootValue.min);
             if (this.game.player?.alive) {
-                this.game.addCredits(pirateBounty + loot);
-                this.game.ui?.log(`Pirate destroyed! +${pirateBounty} ISK bounty, +${loot} ISK loot`, 'combat');
+                this.game.addCredits(pirateBounty);
+                this.game.ui?.log(`Pirate destroyed! +${pirateBounty} ISK bounty`, 'combat');
                 this.game.audio?.play('loot-pickup');
 
-                // Show credit popup
                 if (this.game.input) {
                     const screen = this.game.input.worldToScreen(this.x, this.y);
-                    this.game.ui?.showCreditPopup(pirateBounty + loot, screen.x, screen.y, 'bounty');
+                    this.game.ui?.showCreditPopup(pirateBounty, screen.x, screen.y, 'bounty');
                 }
             }
+
+            // Drop salvageable wreck with loot
+            const loot = Math.floor(Math.random() * (this.lootValue.max - this.lootValue.min) + this.lootValue.min);
+            const wreck = new Wreck(this.game, {
+                x: this.x + (Math.random() - 0.5) * 30,
+                y: this.y + (Math.random() - 0.5) * 30,
+                name: `Wreck of ${this.name}`,
+                credits: loot,
+                salvageMaterials: Math.floor(3 + Math.random() * 6),
+                sourceShipName: this.name,
+                sourceShipClass: this.shipClass,
+            });
+            this.game.currentSector?.addEntity(wreck);
         } else {
             // Legitimate guild ship killed - award small salvage if player nearby
             if (this.game.player?.alive) {
@@ -925,6 +1095,7 @@ export class GuildShip extends Ship {
                 role: factoryRole,
                 size: factorySize,
                 detailLevel: 'low',
+                factionId: this.factionId,
             });
         } catch (e) {
             // Fallback
@@ -951,6 +1122,10 @@ export class GuildShip extends Ship {
 
         this.mesh.position.set(this.x, this.y, 0);
         this.mesh.rotation.z = this.rotation;
+
+        // Add weapon turrets
+        this.addTurretHardpoints();
+
         return this.mesh;
     }
 }

@@ -22,6 +22,8 @@ export const GUILD_FACTIONS = {
             { role: 'miner', shipClass: 'retriever', count: 2 },
             { role: 'hauler', shipClass: 'wreathe', count: 3 },
             { role: 'ratter', shipClass: 'rifter', count: 2 },
+            { role: 'surveyor', shipClass: 'probe', count: 1 },
+            { role: 'logistics', shipClass: 'bantam', count: 1 },
         ],
         aiConfig: {
             miningPriority: 0.7,
@@ -31,7 +33,7 @@ export const GUILD_FACTIONS = {
             preferredTradeSectors: ['sector-1', 'sector-3', 'sector-5'],
             avoidSectors: ['sector-5'], // Too dangerous for miners
         },
-        shipReplacementCosts: { miner: 8000, hauler: 20000, ratter: 12000 },
+        shipReplacementCosts: { miner: 8000, hauler: 20000, ratter: 12000, surveyor: 10000, logistics: 15000 },
     },
 
     'stellar-logistics': {
@@ -48,6 +50,7 @@ export const GUILD_FACTIONS = {
             { role: 'hauler', shipClass: 'mammoth', count: 3 },
             { role: 'hauler', shipClass: 'heron', count: 3 },
             { role: 'ratter', shipClass: 'merlin', count: 3 },
+            { role: 'logistics', shipClass: 'inquisitor', count: 2 },
         ],
         aiConfig: {
             miningPriority: 0.0,
@@ -57,7 +60,7 @@ export const GUILD_FACTIONS = {
             preferredTradeSectors: ['hub', 'sector-1', 'sector-2', 'sector-3', 'sector-6'],
             avoidSectors: ['sector-4', 'sector-5'],
         },
-        shipReplacementCosts: { miner: 8000, hauler: 20000, ratter: 12000 },
+        shipReplacementCosts: { miner: 8000, hauler: 20000, ratter: 12000, logistics: 15000 },
     },
 
     'void-hunters': {
@@ -75,6 +78,8 @@ export const GUILD_FACTIONS = {
             { role: 'ratter', shipClass: 'thorax', count: 2 },
             { role: 'ratter', shipClass: 'corax', count: 2 },
             { role: 'hauler', shipClass: 'heron', count: 2 },
+            { role: 'logistics', shipClass: 'osprey', count: 2 },
+            { role: 'surveyor', shipClass: 'buzzard', count: 1 },
         ],
         aiConfig: {
             miningPriority: 0.0,
@@ -85,7 +90,7 @@ export const GUILD_FACTIONS = {
             avoidSectors: [],
             preferredHuntSectors: ['sector-4', 'sector-5', 'sector-3'],
         },
-        shipReplacementCosts: { miner: 8000, hauler: 15000, ratter: 15000 },
+        shipReplacementCosts: { miner: 8000, hauler: 15000, ratter: 15000, surveyor: 10000, logistics: 18000 },
     },
 
     'frontier-alliance': {
@@ -104,6 +109,8 @@ export const GUILD_FACTIONS = {
             { role: 'hauler', shipClass: 'heron', count: 2 },
             { role: 'ratter', shipClass: 'slasher', count: 2 },
             { role: 'ratter', shipClass: 'rifter', count: 2 },
+            { role: 'surveyor', shipClass: 'helios', count: 1 },
+            { role: 'logistics', shipClass: 'augoror', count: 1 },
         ],
         aiConfig: {
             miningPriority: 0.35,
@@ -114,7 +121,7 @@ export const GUILD_FACTIONS = {
             avoidSectors: ['sector-5'],
             preferredHuntSectors: ['sector-3', 'sector-4'],
         },
-        shipReplacementCosts: { miner: 8000, hauler: 18000, ratter: 12000 },
+        shipReplacementCosts: { miner: 8000, hauler: 18000, ratter: 12000, surveyor: 10000, logistics: 15000 },
     },
     'shadow-cartel': {
         id: 'shadow-cartel',
@@ -171,21 +178,28 @@ const SHIP_NAMES = {
                  'Excavator', 'Grinder', 'Crusher', 'Breaker', 'Tunneler'],
         hauler: ['Mule', 'Ox', 'Loadstar', 'Freighter', 'Bulkhead', 'Carrier', 'Packhorse', 'Sledge'],
         ratter: ['Guardian', 'Shield', 'Ward', 'Bulwark', 'Sentry'],
+        surveyor: ['Geode', 'Assayer', 'Prober', 'Core-Sample'],
+        logistics: ['Patchwork', 'Mender', 'Welder', 'Rigger'],
     },
     'stellar-logistics': {
         hauler: ['Comet', 'Express', 'Arrow', 'Bolt', 'Courier', 'Sprint', 'Dart', 'Relay', 'Transit', 'Vector',
                  'Pathway', 'Conduit', 'Bridge', 'Link'],
         ratter: ['Escort', 'Outrider', 'Vanguard', 'Picket', 'Screen'],
+        logistics: ['Lifeline', 'Medivac', 'Tender', 'Aid', 'Remedy'],
     },
     'void-hunters': {
         ratter: ['Fang', 'Razor', 'Claw', 'Talon', 'Striker', 'Reaper', 'Slayer', 'Hunter', 'Stalker', 'Predator',
                  'Viper', 'Cobra', 'Scorpion', 'Mantis', 'Raptor'],
         hauler: ['Salvage', 'Scrap', 'Haul', 'Grab'],
+        logistics: ['Corpsman', 'Triage', 'Paramedic', 'Trauma'],
+        surveyor: ['Tracker', 'Recon', 'Seeker'],
     },
     'frontier-alliance': {
         miner: ['Pioneer', 'Settler', 'Prospector', 'Homestead', 'Claim'],
         hauler: ['Caravan', 'Wagon', 'Supply', 'Provision', 'Trade'],
         ratter: ['Ranger', 'Scout', 'Patrol', 'Watch', 'Deputy'],
+        surveyor: ['Cartographer', 'Explorer', 'Surveyor', 'Mapper'],
+        logistics: ['Healer', 'Nurse', 'Savior', 'Beacon'],
     },
     'shadow-cartel': {
         raider: ['Shade', 'Wraith', 'Phantom', 'Specter', 'Ghost', 'Shadow', 'Dusk', 'Nightfall',

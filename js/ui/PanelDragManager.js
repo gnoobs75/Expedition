@@ -30,6 +30,10 @@ export class PanelDragManager {
             'ship-indicator': { bottom: 185, left: 20 },
             'drone-bar': { bottom: 185, left: 200 },
             'fleet-panel': { top: 300, left: 10 },
+            'stats-panel': { top: 100, left: 350 },
+            'achievements-panel': { top: 100, right: 10 },
+            'ship-log-panel': { top: 300, right: 10 },
+            'combat-log-panel': { top: 150, left: 350 },
         };
 
         // Storage key - bump version to force reset when layout changes

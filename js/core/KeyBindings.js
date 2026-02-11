@@ -16,6 +16,7 @@ export const DEFAULT_BINDINGS = {
     'lockTarget': { key: 'KeyR', description: 'Lock Target', category: 'Targeting' },
     'unlockTarget': { key: 'KeyT', description: 'Unlock Target', category: 'Targeting' },
     'cycleTargets': { key: 'Tab', description: 'Cycle Targets', category: 'Targeting' },
+    'targetNearestHostile': { key: 'KeyD', description: 'Target Nearest Hostile', category: 'Targeting' },
     'deselectTarget': { key: 'Escape', description: 'Deselect / Close Menu', category: 'Targeting' },
 
     // Modules (High Slots)
@@ -44,6 +45,16 @@ export const DEFAULT_BINDINGS = {
     'toggleQuestTracker': { key: 'KeyJ', description: 'Toggle Quest Tracker', category: 'UI' },
     'spawnBattleEvent': { key: 'KeyP', description: 'Spawn Battle Event (Stress Test)', category: 'UI' },
     'toggleAdminDashboard': { key: 'Backquote', description: 'Toggle Admin Dashboard', category: 'UI' },
+    'toggleEncyclopedia': { key: 'KeyN', description: 'Toggle Codex', category: 'UI' },
+    'toggleMinimap': { key: 'Comma', description: 'Toggle Radar', category: 'UI' },
+    'toggleHelp': { key: 'KeyH', description: 'Keyboard Shortcuts', category: 'UI' },
+    'toggleStats': { key: 'KeyK', description: 'Toggle Statistics', category: 'UI' },
+    'toggleAchievements': { key: 'KeyU', description: 'Toggle Achievements', category: 'UI' },
+    'toggleShipLog': { key: 'KeyL', description: 'Toggle Ship Log', category: 'UI' },
+    'toggleTactical': { key: 'KeyX', description: 'Toggle Tactical Overlay', category: 'UI' },
+    'toggleCombatLog': { key: 'KeyY', description: 'Toggle Combat Log', category: 'UI' },
+    'toggleSensorSweep': { key: 'Semicolon', description: 'Toggle Sensor Sweep', category: 'UI' },
+    'toggleWeaponRange': { key: 'Period', description: 'Toggle Weapon Range', category: 'UI' },
 };
 
 export class KeyBindings {

@@ -786,6 +786,9 @@ export class StationVendorManager {
         this.game.ui?.log(`Purchased ${config.name} for ${formatCredits(config.price)} ISK`, 'system');
         this.game.ui?.updateHUD();
 
+        // Encyclopedia discovery
+        this.game.encyclopedia?.discoverItem('equipment', equipId);
+
         // Refresh
         this.renderEquipment();
     }

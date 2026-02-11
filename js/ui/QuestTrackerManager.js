@@ -59,19 +59,34 @@ export class QuestTrackerManager {
 
         const guildQuests = gs?.activeQuests || [];
         const commerceQuests = cs?.activeQuests || [];
+        const activeBounties = (this.game.ui?.activeBounties || []).filter(b => b.status === 'accepted');
         const allQuests = [...guildQuests, ...commerceQuests];
 
-        if (allQuests.length === 0) {
+        if (allQuests.length === 0 && activeBounties.length === 0) {
             content.innerHTML = `
                 <div class="quest-tracker-empty">
                     No active quests.<br>
-                    <span class="quest-tracker-hint">Visit a station's GUILD or COMMERCE tab to accept quests.</span>
+                    <span class="quest-tracker-hint">Visit a station's GUILD, COMMERCE, or BOUNTY tab to accept quests.</span>
                 </div>
             `;
             return;
         }
 
-        content.innerHTML = allQuests.map(quest => {
+        // Render bounties first
+        const bountyHtml = activeBounties.map(b => `
+            <div class="qt-quest">
+                <div class="qt-quest-header">
+                    <span class="qt-guild-icon" style="color: #ff4444">&#x2620;</span>
+                    <span class="qt-quest-title">Kill ${b.targetName}</span>
+                </div>
+                <div class="qt-objective">
+                    <div class="qt-obj-bar" style="width: 0%"></div>
+                    <span class="qt-obj-text">${b.sectorHint} &bull; ${formatCredits(b.reward)} ISK</span>
+                </div>
+            </div>
+        `).join('');
+
+        content.innerHTML = bountyHtml + allQuests.map(quest => {
             // Determine icon and color based on guild type
             let guildIcon, guildColor;
             if (quest.guild === 'commerce') {

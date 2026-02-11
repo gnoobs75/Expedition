@@ -23,6 +23,10 @@ export class FleetSystem {
 
         // Max fleet size
         this.maxFleetSize = CONFIG.FLEET?.MAX_SIZE || 10;
+
+        // Formation type: 'spread' (default), 'vee', 'line', 'diamond'
+        this.formation = 'spread';
+        this.formationSpacing = 200;
     }
 
     /**
@@ -275,5 +279,84 @@ export class FleetSystem {
             armorPercent: Math.round((ship.armor / ship.maxArmor) * 100),
             alive: ship.alive,
         }));
+    }
+
+    /**
+     * Set fleet formation pattern
+     */
+    setFormation(type) {
+        const valid = ['spread', 'vee', 'line', 'diamond', 'echelon'];
+        if (!valid.includes(type)) return;
+        this.formation = type;
+        this.updateFormationOffsets();
+        this.game.ui?.showToast(`Formation: ${type.toUpperCase()}`, 'system');
+    }
+
+    /**
+     * Cycle to next formation
+     */
+    cycleFormation() {
+        const formations = ['spread', 'vee', 'line', 'diamond', 'echelon'];
+        const idx = formations.indexOf(this.formation);
+        this.setFormation(formations[(idx + 1) % formations.length]);
+    }
+
+    /**
+     * Recalculate formation offsets for all fleet ships
+     */
+    updateFormationOffsets() {
+        const ships = this.game.fleet.ships.filter(s => s.alive);
+        const spacing = this.formationSpacing;
+
+        for (let i = 0; i < ships.length; i++) {
+            const ship = ships[i];
+            switch (this.formation) {
+                case 'vee': {
+                    // V-formation behind player
+                    const side = i % 2 === 0 ? -1 : 1;
+                    const row = Math.floor(i / 2) + 1;
+                    ship.followOffset.x = -row * spacing * 0.7;  // Behind
+                    ship.followOffset.y = side * row * spacing * 0.5;
+                    break;
+                }
+                case 'line': {
+                    // Line abreast (side by side)
+                    const pos = i - (ships.length - 1) / 2;
+                    ship.followOffset.x = 0;
+                    ship.followOffset.y = pos * spacing;
+                    break;
+                }
+                case 'diamond': {
+                    // Diamond pattern
+                    const positions = [
+                        { x: -spacing, y: 0 },             // Behind
+                        { x: 0, y: -spacing },              // Left
+                        { x: 0, y: spacing },               // Right
+                        { x: -spacing * 2, y: 0 },          // Far behind
+                        { x: -spacing, y: -spacing },       // Back-left
+                        { x: -spacing, y: spacing },        // Back-right
+                        { x: -spacing * 2, y: -spacing },
+                        { x: -spacing * 2, y: spacing },
+                        { x: -spacing * 3, y: 0 },
+                        { x: 0, y: 0 },
+                    ];
+                    const pos = positions[i % positions.length];
+                    ship.followOffset.x = pos.x;
+                    ship.followOffset.y = pos.y;
+                    break;
+                }
+                case 'echelon': {
+                    // Staggered diagonal line (all to one side, behind)
+                    ship.followOffset.x = -(i + 1) * spacing * 0.6;
+                    ship.followOffset.y = (i + 1) * spacing * 0.4;
+                    break;
+                }
+                default: { // spread
+                    ship.followOffset.x = (Math.random() - 0.5) * 400;
+                    ship.followOffset.y = (Math.random() - 0.5) * 400;
+                    break;
+                }
+            }
+        }
     }
 }

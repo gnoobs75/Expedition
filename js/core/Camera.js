@@ -197,4 +197,18 @@ export class Camera {
     isTacticalView() {
         return this.zoom > 300;
     }
+
+    /**
+     * Cinematic sector arrival zoom — briefly zoom out then back in
+     */
+    sectorArrivalZoom() {
+        const savedZoom = this.targetZoom;
+        // Immediately pull zoom out
+        this.zoom = savedZoom * 0.55;
+        this.targetZoom = savedZoom * 0.55;
+        // After a brief pause, smoothly zoom back to original
+        setTimeout(() => {
+            this.targetZoom = savedZoom;
+        }, 300);
+    }
 }

@@ -32,6 +32,30 @@ const ROLE_PALETTES = {
     police:     { primary: 0xccddee, secondary: 0x4477cc, accent: 0x88bbff, glow: 0x4488ff, trim: 0xffffff, dark: 0x223355 },
     military:   { primary: 0x4a5566, secondary: 0x607080, accent: 0x7799bb, glow: 0x5588cc, trim: 0x556677, dark: 0x222a33 },
     pirate:     { primary: 0x551111, secondary: 0x882222, accent: 0xee3333, glow: 0xff2200, trim: 0xaa1111, dark: 0x220505 },
+    surveyor:   { primary: 0x226655, secondary: 0x33aa88, accent: 0x55ffbb, glow: 0x00ff88, trim: 0x44cc99, dark: 0x113322 },
+    logistics:  { primary: 0x335577, secondary: 0x4488bb, accent: 0x66ddff, glow: 0x44ccff, trim: 0x55aadd, dark: 0x1a2a44 },
+};
+
+// Faction logo colors for guild ship hull decals
+const FACTION_LOGOS = {
+    'ore-extraction-syndicate': { color: 0xffaa44, glow: 0xffcc66 },
+    'stellar-logistics':       { color: 0x44ddff, glow: 0x66eeff },
+    'void-hunters':            { color: 0xff4466, glow: 0xff6688 },
+    'frontier-alliance':       { color: 0x44ff88, glow: 0x66ffaa },
+    'shadow-cartel':           { color: 0xcc2244, glow: 0xee4466 },
+};
+
+// Universal subsystem colors - distinct from hull palettes so components POP
+const SUBSYSTEM_COLORS = {
+    engine:  { housing: 0x334455, glow: 0x44ccff, trail: 0x2288cc, boost: 0x00eeff },
+    weapon:  { base: 0x883322, barrel: 0x554433, muzzle: 0xff4422, charge: 0xff6600 },
+    sensor:  { dish: 0x226655, receiver: 0x00ffaa, ring: 0x33ddaa, scan: 0x00ff88 },
+    shield:  { emitter: 0x3344aa, glow: 0x6688ff, ring: 0x4466dd, pulse: 0x88aaff },
+    cockpit: { glass: 0x225588, frame: 0x556677, pip: 0x88ddff, glow: 0x44aaff },
+    missile: { tube: 0x443322, warhead: 0xff6622, exhaust: 0xff4400, housing: 0x554433 },
+    drone:   { bay: 0x223344, door: 0x44ddcc, light: 0x33eebb, frame: 0x556666 },
+    power:   { conduit: 0x6622aa, glow: 0xaa44ff, node: 0x8833ee, pulse: 0xcc66ff },
+    cargo:   { container: 0x445566, stripe: 0x66aacc, hatch: 0x557788, frame: 0x778899 },
 };
 
 class ShipMeshFactory {
@@ -39,7 +63,7 @@ class ShipMeshFactory {
      * Generate a ship mesh from ship database config
      */
     generateShipMesh(config) {
-        const { shipId, role, size, detailLevel = 'low' } = config;
+        const { shipId, role, size, detailLevel = 'low', factionId } = config;
         const sizeConfig = SIZE_CONFIGS[size] || SIZE_CONFIGS.frigate;
         const palette = ROLE_PALETTES[role] || ROLE_PALETTES.mercenary;
         const rng = this.createSeededRNG(this.hashString(shipId || 'default'));
@@ -61,6 +85,11 @@ class ShipMeshFactory {
         const detailFn = this.roleDetailGenerators[role];
         if (detailFn) {
             detailFn.call(this, group, sizeConfig, rng, detailLevel, palette, sizeConfig._speedFactor || 1.0);
+        }
+
+        // Add faction decal (guild ships only)
+        if (factionId && FACTION_LOGOS[factionId]) {
+            this.addFactionDecal(group, sizeConfig, factionId);
         }
 
         // Add universal details (running lights, panel greebles)
@@ -217,6 +246,44 @@ class ShipMeshFactory {
                 shape.lineTo(s * 0.18, -s * 0.2 * a);
                 shape.lineTo(s * 0.35, -s * 0.28 * a);
                 shape.lineTo(s * 0.55, -s * 0.08 * a);
+                shape.closePath();
+                break;
+
+            case 'surveyor':
+                // Sleek, narrow scout with sensor dish (wide rear, thin front)
+                shape.moveTo(s * 0.8, 0);
+                shape.lineTo(s * 0.5, s * 0.08 * a);
+                shape.lineTo(s * 0.2, s * 0.15 * a);
+                shape.lineTo(-s * 0.1, s * 0.35 * a);
+                shape.quadraticCurveTo(-s * 0.3, s * 0.45 * a, -s * 0.5, s * 0.38 * a);
+                shape.lineTo(-s * 0.6, s * 0.15 * a);
+                shape.lineTo(-s * 0.55, 0);
+                shape.lineTo(-s * 0.6, -s * 0.15 * a);
+                shape.lineTo(-s * 0.5, -s * 0.38 * a);
+                shape.quadraticCurveTo(-s * 0.3, -s * 0.45 * a, -s * 0.1, -s * 0.35 * a);
+                shape.lineTo(s * 0.2, -s * 0.15 * a);
+                shape.lineTo(s * 0.5, -s * 0.08 * a);
+                shape.closePath();
+                break;
+
+            case 'logistics':
+                // Rounded, cross-shaped support vessel with repair arms
+                shape.moveTo(s * 0.45, 0);
+                shape.lineTo(s * 0.35, s * 0.12 * a);
+                shape.lineTo(s * 0.15, s * 0.2 * a);
+                shape.lineTo(s * 0.1, s * 0.5 * a);
+                shape.lineTo(-s * 0.05, s * 0.55 * a);
+                shape.lineTo(-s * 0.15, s * 0.35 * a);
+                shape.lineTo(-s * 0.35, s * 0.3 * a);
+                shape.lineTo(-s * 0.55, s * 0.18 * a);
+                shape.lineTo(-s * 0.5, 0);
+                shape.lineTo(-s * 0.55, -s * 0.18 * a);
+                shape.lineTo(-s * 0.35, -s * 0.3 * a);
+                shape.lineTo(-s * 0.15, -s * 0.35 * a);
+                shape.lineTo(-s * 0.05, -s * 0.55 * a);
+                shape.lineTo(s * 0.1, -s * 0.5 * a);
+                shape.lineTo(s * 0.15, -s * 0.2 * a);
+                shape.lineTo(s * 0.35, -s * 0.12 * a);
                 shape.closePath();
                 break;
 
@@ -465,6 +532,7 @@ class ShipMeshFactory {
     addHaulerDetails(group, sizeConfig, rng, detailLevel, palette, speedFactor = 1.0) {
         const s = sizeConfig.radius;
         const a = sizeConfig.aspect || 0.5;
+        const cg = SUBSYSTEM_COLORS.cargo;
 
         // Cargo container bays (prominent, multiple)
         const containerCount = Math.floor(sizeConfig.complexity * 2) + 2;
@@ -474,10 +542,10 @@ class ShipMeshFactory {
             const cw = s * 0.22;
             const ch = s * 0.18 * a;
 
-            // Container outline
+            // Container outline - cargo blue-grey
             const cGeo = new THREE.PlaneGeometry(cw, ch);
             const cMat = new THREE.MeshBasicMaterial({
-                color: col === 0 ? palette.secondary : this.lerpColor(palette.secondary, palette.primary, 0.5),
+                color: col === 0 ? cg.container : cg.hatch,
                 transparent: true, opacity: 0.7,
             });
             const container = new THREE.Mesh(cGeo, cMat);
@@ -489,21 +557,38 @@ class ShipMeshFactory {
             container.renderOrder = 2;
             group.add(container);
 
-            // Container detail line
+            // Container stripe - accent color
             const detailGeo = new THREE.PlaneGeometry(cw * 0.8, s * 0.015);
             const detailMat = new THREE.MeshBasicMaterial({
-                color: palette.accent, transparent: true, opacity: 0.4,
+                color: cg.stripe, transparent: true, opacity: 0.5,
             });
             const detail = new THREE.Mesh(detailGeo, detailMat);
             detail.position.set(container.position.x, container.position.y, 0.04);
             detail.renderOrder = 3;
             group.add(detail);
+
+            // Container frame outline
+            const frmMat = new THREE.LineBasicMaterial({
+                color: cg.frame, transparent: true, opacity: 0.3,
+            });
+            const cx = container.position.x, cy = container.position.y;
+            const frmPts = [
+                new THREE.Vector3(cx - cw * 0.48, cy - ch * 0.48, 0.035),
+                new THREE.Vector3(cx + cw * 0.48, cy - ch * 0.48, 0.035),
+                new THREE.Vector3(cx + cw * 0.48, cy + ch * 0.48, 0.035),
+                new THREE.Vector3(cx - cw * 0.48, cy + ch * 0.48, 0.035),
+                new THREE.Vector3(cx - cw * 0.48, cy - ch * 0.48, 0.035),
+            ];
+            const frmGeo = new THREE.BufferGeometry().setFromPoints(frmPts);
+            const frm = new THREE.Line(frmGeo, frmMat);
+            frm.renderOrder = 3;
+            group.add(frm);
         }
 
         // Cargo arm/crane structure
         const craneGeo = new THREE.PlaneGeometry(s * 0.03, s * 0.7 * a);
         const craneMat = new THREE.MeshBasicMaterial({
-            color: palette.trim, transparent: true, opacity: 0.6,
+            color: cg.frame, transparent: true, opacity: 0.6,
         });
         const crane = new THREE.Mesh(craneGeo, craneMat);
         crane.position.set(s * 0.1, 0, 0.05);
@@ -514,7 +599,7 @@ class ShipMeshFactory {
         for (let i = 0; i < 3; i++) {
             const beamGeo = new THREE.PlaneGeometry(s * 0.8, s * 0.02);
             const beamMat = new THREE.MeshBasicMaterial({
-                color: palette.trim, transparent: true, opacity: 0.45,
+                color: cg.frame, transparent: true, opacity: 0.45,
             });
             const beam = new THREE.Mesh(beamGeo, beamMat);
             beam.position.set(-s * 0.15, (i - 1) * s * 0.3 * a, 0.035);
@@ -619,8 +704,9 @@ class ShipMeshFactory {
     addHarvesterDetails(group, sizeConfig, rng, detailLevel, palette, speedFactor = 1.0) {
         const s = sizeConfig.radius;
         const a = sizeConfig.aspect || 0.5;
+        const cg = SUBSYSTEM_COLORS.cargo;
 
-        // Storage tanks (spherical indicators)
+        // Storage tanks (spherical indicators) - cargo colored
         const tankCount = Math.floor(sizeConfig.complexity * 1.5) + 1;
         for (let i = 0; i < tankCount; i++) {
             const tankR = s * (0.1 + rng() * 0.06);
@@ -630,25 +716,37 @@ class ShipMeshFactory {
             // Tank body
             const tankGeo = new THREE.CircleGeometry(tankR, 16);
             const tankMat = new THREE.MeshBasicMaterial({
-                color: palette.secondary, transparent: true, opacity: 0.65,
+                color: cg.container, transparent: true, opacity: 0.65,
             });
             const tank = new THREE.Mesh(tankGeo, tankMat);
             tank.position.set(Math.cos(angle) * dist, Math.sin(angle) * dist, 0.03);
             tank.renderOrder = 2;
             group.add(tank);
 
-            // Tank ring
+            // Tank ring - accent stripe
             const ringGeo = new THREE.RingGeometry(tankR * 0.7, tankR * 0.85, 16);
             const ringMat = new THREE.MeshBasicMaterial({
-                color: palette.trim, transparent: true, opacity: 0.5,
+                color: cg.stripe, transparent: true, opacity: 0.5,
             });
             const ring = new THREE.Mesh(ringGeo, ringMat);
             ring.position.set(tank.position.x, tank.position.y, 0.04);
             ring.renderOrder = 3;
             group.add(ring);
+
+            // Fill indicator on larger tanks
+            if (tankR > s * 0.12) {
+                const fillGeo = new THREE.CircleGeometry(tankR * 0.4, 8);
+                const fillMat = new THREE.MeshBasicMaterial({
+                    color: 0x44ffcc, transparent: true, opacity: 0.2,
+                });
+                const fill = new THREE.Mesh(fillGeo, fillMat);
+                fill.position.set(tank.position.x, tank.position.y, 0.035);
+                fill.renderOrder = 2;
+                group.add(fill);
+            }
         }
 
-        // Collection scoops (front-facing intakes)
+        // Collection scoops (front-facing intakes) - bright green intake glow
         for (let i = 0; i < 2; i++) {
             const side = i === 0 ? 1 : -1;
             const scoopShape = new THREE.Shape();
@@ -666,21 +764,32 @@ class ShipMeshFactory {
             scoop.renderOrder = 2;
             group.add(scoop);
 
-            // Scoop glow
-            const glowGeo = new THREE.CircleGeometry(s * 0.04, 8);
+            // Scoop intake glow - bright teal
+            const glowGeo = new THREE.CircleGeometry(s * 0.045, 8);
             const glowMat = new THREE.MeshBasicMaterial({
-                color: palette.glow, transparent: true, opacity: 0.7,
+                color: 0x44ffcc, transparent: true, opacity: 0.75,
             });
             const glow = new THREE.Mesh(glowGeo, glowMat);
             glow.position.set(s * 0.65, side * s * 0.28 * a, 0.05);
             glow.renderOrder = 4;
             group.add(glow);
+
+            // Scoop glow halo
+            const haloGeo = new THREE.CircleGeometry(s * 0.08, 10);
+            const haloMat = new THREE.MeshBasicMaterial({
+                color: 0x33eebb, transparent: true, opacity: 0.1,
+            });
+            const halo = new THREE.Mesh(haloGeo, haloMat);
+            halo.position.set(s * 0.65, side * s * 0.28 * a, 0.045);
+            halo.renderOrder = 3;
+            group.add(halo);
         }
 
-        // Processing pipes connecting tanks
+        // Processing pipes connecting tanks - power purple conduits
         if (tankCount >= 2) {
+            const pwc = SUBSYSTEM_COLORS.power;
             const pipeLineMat = new THREE.LineBasicMaterial({
-                color: palette.accent, transparent: true, opacity: 0.4,
+                color: pwc.conduit, transparent: true, opacity: 0.45,
             });
             for (let i = 0; i < tankCount - 1; i++) {
                 const a1 = (i / tankCount) * Math.PI * 1.4 - Math.PI * 0.2;
@@ -694,6 +803,18 @@ class ShipMeshFactory {
                 const pipe = new THREE.Line(pipeGeo, pipeLineMat);
                 pipe.renderOrder = 3;
                 group.add(pipe);
+
+                // Pipe junction node
+                const midX = (Math.cos(a1) + Math.cos(a2)) * d * 0.5;
+                const midY = (Math.sin(a1) + Math.sin(a2)) * d * 0.5;
+                const nodeGeo = new THREE.CircleGeometry(s * 0.015, 6);
+                const nodeMat = new THREE.MeshBasicMaterial({
+                    color: pwc.glow, transparent: true, opacity: 0.35,
+                });
+                const node = new THREE.Mesh(nodeGeo, nodeMat);
+                node.position.set(midX, midY, 0.045);
+                node.renderOrder = 3;
+                group.add(node);
             }
         }
 
@@ -842,6 +963,7 @@ class ShipMeshFactory {
     addMilitaryDetails(group, sizeConfig, rng, detailLevel, palette, speedFactor = 1.0) {
         const s = sizeConfig.radius;
         const a = sizeConfig.aspect || 0.5;
+        const shc = SUBSYSTEM_COLORS.shield;
 
         // Layered armor plating
         const armorLayers = Math.floor(sizeConfig.complexity) + 1;
@@ -857,6 +979,39 @@ class ShipMeshFactory {
             armor.position.set(-s * 0.08, 0, 0.03 + i * 0.01);
             armor.renderOrder = 2 + i;
             group.add(armor);
+        }
+
+        // Shield generator emitters (blue/purple glow nodes)
+        for (let side = -1; side <= 1; side += 2) {
+            const sgX = -s * 0.15;
+            const sgY = side * s * 0.28 * a;
+            // Emitter base
+            const sgBaseGeo = new THREE.CircleGeometry(s * 0.06, 8);
+            const sgBaseMat = new THREE.MeshBasicMaterial({
+                color: shc.emitter, transparent: true, opacity: 0.55,
+            });
+            const sgBase = new THREE.Mesh(sgBaseGeo, sgBaseMat);
+            sgBase.position.set(sgX, sgY, 0.05);
+            sgBase.renderOrder = 4;
+            group.add(sgBase);
+            // Shield ring
+            const sgRingGeo = new THREE.RingGeometry(s * 0.06, s * 0.08, 10);
+            const sgRingMat = new THREE.MeshBasicMaterial({
+                color: shc.glow, transparent: true, opacity: 0.3,
+            });
+            const sgRing = new THREE.Mesh(sgRingGeo, sgRingMat);
+            sgRing.position.set(sgX, sgY, 0.052);
+            sgRing.renderOrder = 4;
+            group.add(sgRing);
+            // Core glow
+            const sgCoreGeo = new THREE.CircleGeometry(s * 0.025, 6);
+            const sgCoreMat = new THREE.MeshBasicMaterial({
+                color: shc.pulse, transparent: true, opacity: 0.6,
+            });
+            const sgCore = new THREE.Mesh(sgCoreGeo, sgCoreMat);
+            sgCore.position.set(sgX, sgY, 0.055);
+            sgCore.renderOrder = 5;
+            group.add(sgCore);
         }
 
         // Symmetrical turret platforms with barrels
@@ -880,11 +1035,12 @@ class ShipMeshFactory {
             bridge.renderOrder = 5;
             group.add(bridge);
 
-            // Bridge windows
+            // Bridge windows - cockpit blue glow
+            const bcc = SUBSYSTEM_COLORS.cockpit;
             for (let i = 0; i < 3; i++) {
                 const winGeo = new THREE.PlaneGeometry(s * 0.02, s * 0.04);
                 const winMat = new THREE.MeshBasicMaterial({
-                    color: palette.glow, transparent: true, opacity: 0.6,
+                    color: bcc.glow, transparent: true, opacity: 0.65,
                 });
                 const win = new THREE.Mesh(winGeo, winMat);
                 win.position.set(s * 0.22, (i - 1) * s * 0.05, 0.07);
@@ -951,7 +1107,8 @@ class ShipMeshFactory {
             group.add(plate);
         }
 
-        // Weapon spikes/prongs (menacing protrusions)
+        // Weapon spikes/prongs (menacing protrusions) - weapon red
+        const wsc = SUBSYSTEM_COLORS.weapon;
         const spikeCount = Math.floor(sizeConfig.complexity * 2) + 1;
         for (let i = 0; i < spikeCount; i++) {
             const angle = (i / spikeCount) * Math.PI * 1.5 - Math.PI * 0.3;
@@ -964,16 +1121,16 @@ class ShipMeshFactory {
             ];
             const spikeGeo = new THREE.BufferGeometry().setFromPoints(spikePts);
             const spikeMat = new THREE.LineBasicMaterial({
-                color: palette.accent, transparent: true, opacity: 0.8, linewidth: 2,
+                color: wsc.charge, transparent: true, opacity: 0.8, linewidth: 2,
             });
             const spike = new THREE.Line(spikeGeo, spikeMat);
             spike.renderOrder = 4;
             group.add(spike);
 
-            // Spike tip
+            // Spike tip - bright muzzle red
             const tipGeo = new THREE.CircleGeometry(s * 0.03, 3);
             const tipMat = new THREE.MeshBasicMaterial({
-                color: palette.accent, transparent: true, opacity: 0.7,
+                color: wsc.muzzle, transparent: true, opacity: 0.75,
             });
             const tip = new THREE.Mesh(tipGeo, tipMat);
             tip.position.set(
@@ -996,26 +1153,38 @@ class ShipMeshFactory {
         skull.renderOrder = 4;
         group.add(skull);
 
-        // Skull eyes (menacing glow)
+        // Skull eyes (menacing red glow with weapon subsystem colors)
+        const pwc = SUBSYSTEM_COLORS.weapon;
         for (let side = -1; side <= 1; side += 2) {
+            // Outer socket - dark weapon red
+            const socketGeo = new THREE.RingGeometry(s * 0.04, s * 0.065, 8);
+            const socketMat = new THREE.MeshBasicMaterial({
+                color: pwc.base, transparent: true, opacity: 0.6,
+            });
+            const socket = new THREE.Mesh(socketGeo, socketMat);
+            socket.position.set(s * 0.55, side * s * 0.06 * a, 0.055);
+            socket.renderOrder = 5;
+            group.add(socket);
+
+            // Eye glow - bright muzzle red
             const eyeGeo = new THREE.CircleGeometry(s * 0.04, 8);
             const eyeMat = new THREE.MeshBasicMaterial({
-                color: palette.glow, transparent: true, opacity: 0.9,
+                color: pwc.muzzle, transparent: true, opacity: 0.9,
             });
             const eye = new THREE.Mesh(eyeGeo, eyeMat);
             eye.position.set(s * 0.55, side * s * 0.06 * a, 0.06);
             eye.renderOrder = 5;
             group.add(eye);
 
-            // Eye socket ring
-            const socketGeo = new THREE.RingGeometry(s * 0.04, s * 0.06, 8);
-            const socketMat = new THREE.MeshBasicMaterial({
-                color: palette.accent, transparent: true, opacity: 0.5,
+            // Eye glow halo
+            const haloGeo = new THREE.CircleGeometry(s * 0.07, 10);
+            const haloMat = new THREE.MeshBasicMaterial({
+                color: pwc.muzzle, transparent: true, opacity: 0.12,
             });
-            const socket = new THREE.Mesh(socketGeo, socketMat);
-            socket.position.set(s * 0.55, side * s * 0.06 * a, 0.055);
-            socket.renderOrder = 5;
-            group.add(socket);
+            const halo = new THREE.Mesh(haloGeo, haloMat);
+            halo.position.set(s * 0.55, side * s * 0.06 * a, 0.052);
+            halo.renderOrder = 4;
+            group.add(halo);
         }
 
         // Crude weapon mounts (asymmetric, bolted-on)
@@ -1047,43 +1216,73 @@ class ShipMeshFactory {
      * Engine nacelles with inner glow ring and exhaust cone
      */
     addEngineNacelles(group, s, positions, palette, detailLevel, speedFactor = 1.0) {
+        const ec = SUBSYSTEM_COLORS.engine;
         for (const pos of positions) {
             // Engine size scales with speed factor - fast ships have huge engines
             const nacSize = s * 0.1 * speedFactor;
 
-            // Engine housing (outer ring)
-            const housingGeo = new THREE.RingGeometry(nacSize * 0.6, nacSize, 12);
+            // Outer housing ring - dark metallic
+            const housingGeo = new THREE.RingGeometry(nacSize * 0.6, nacSize, 16);
             const housingMat = new THREE.MeshBasicMaterial({
-                color: palette.trim || palette.secondary,
-                transparent: true, opacity: 0.75,
+                color: ec.housing, transparent: true, opacity: 0.8,
             });
             const housing = new THREE.Mesh(housingGeo, housingMat);
             housing.position.set(pos.x, pos.y, 0.02);
             housing.renderOrder = 2;
             group.add(housing);
 
-            // Inner glow (engine flame) - brighter for fast ships
-            const glowGeo = new THREE.CircleGeometry(nacSize * 0.55, 12);
+            // Mid ring - accent colored heat ring
+            const midRingGeo = new THREE.RingGeometry(nacSize * 0.5, nacSize * 0.62, 16);
+            const midRingMat = new THREE.MeshBasicMaterial({
+                color: ec.boost, transparent: true, opacity: 0.4,
+            });
+            const midRing = new THREE.Mesh(midRingGeo, midRingMat);
+            midRing.position.set(pos.x, pos.y, 0.025);
+            midRing.renderOrder = 2;
+            group.add(midRing);
+
+            // Inner glow (engine flame) - bright cyan/blue
+            const glowGeo = new THREE.CircleGeometry(nacSize * 0.48, 16);
             const glowMat = new THREE.MeshBasicMaterial({
-                color: palette.glow,
-                transparent: true, opacity: Math.min(0.9, 0.5 + speedFactor * 0.2),
+                color: ec.glow,
+                transparent: true, opacity: Math.min(0.95, 0.6 + speedFactor * 0.2),
             });
             const glow = new THREE.Mesh(glowGeo, glowMat);
             glow.position.set(pos.x, pos.y, 0.03);
             glow.renderOrder = 3;
             group.add(glow);
 
-            // Exhaust trail hint (larger for fast ships)
-            const trailLen = nacSize * (1.0 + speedFactor * 0.5);
-            const trailGeo = new THREE.PlaneGeometry(trailLen, nacSize * 0.3);
+            // Hot core center - white hot
+            const coreGeo = new THREE.CircleGeometry(nacSize * 0.18, 8);
+            const coreMat = new THREE.MeshBasicMaterial({
+                color: 0xffffff, transparent: true, opacity: 0.7 + speedFactor * 0.1,
+            });
+            const core = new THREE.Mesh(coreGeo, coreMat);
+            core.position.set(pos.x, pos.y, 0.035);
+            core.renderOrder = 4;
+            group.add(core);
+
+            // Exhaust trail - vivid blue glow
+            const trailLen = nacSize * (1.2 + speedFactor * 0.6);
+            const trailGeo = new THREE.PlaneGeometry(trailLen, nacSize * 0.35);
             const trailMat = new THREE.MeshBasicMaterial({
-                color: palette.glow,
-                transparent: true, opacity: 0.15 + speedFactor * 0.1,
+                color: ec.trail,
+                transparent: true, opacity: 0.2 + speedFactor * 0.12,
             });
             const trail = new THREE.Mesh(trailGeo, trailMat);
             trail.position.set(pos.x - trailLen * 0.4, pos.y, 0.01);
             trail.renderOrder = 1;
             group.add(trail);
+
+            // Outer exhaust glow halo
+            const haloGeo = new THREE.PlaneGeometry(trailLen * 0.6, nacSize * 0.7);
+            const haloMat = new THREE.MeshBasicMaterial({
+                color: ec.glow, transparent: true, opacity: 0.06 + speedFactor * 0.04,
+            });
+            const halo = new THREE.Mesh(haloGeo, haloMat);
+            halo.position.set(pos.x - trailLen * 0.2, pos.y, 0.005);
+            halo.renderOrder = 0;
+            group.add(halo);
         }
     }
 
@@ -1091,69 +1290,123 @@ class ShipMeshFactory {
      * Small maneuvering thruster
      */
     addSmallThruster(group, x, y, palette) {
-        const tGeo = new THREE.CircleGeometry(3, 8);
+        const ec = SUBSYSTEM_COLORS.engine;
+        // Outer housing
+        const housingGeo = new THREE.RingGeometry(2, 4, 8);
+        const housingMat = new THREE.MeshBasicMaterial({
+            color: ec.housing, transparent: true, opacity: 0.6,
+        });
+        const housing = new THREE.Mesh(housingGeo, housingMat);
+        housing.position.set(x, y, 0.025);
+        housing.renderOrder = 2;
+        group.add(housing);
+
+        // Inner glow
+        const tGeo = new THREE.CircleGeometry(2.2, 8);
         const tMat = new THREE.MeshBasicMaterial({
-            color: palette.glow, transparent: true, opacity: 0.5,
+            color: ec.glow, transparent: true, opacity: 0.65,
         });
         const thruster = new THREE.Mesh(tGeo, tMat);
         thruster.position.set(x, y, 0.03);
         thruster.renderOrder = 3;
         group.add(thruster);
+
+        // Hot center
+        const coreGeo = new THREE.CircleGeometry(0.8, 6);
+        const coreMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff, transparent: true, opacity: 0.5,
+        });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        core.position.set(x, y, 0.035);
+        core.renderOrder = 4;
+        group.add(core);
     }
 
     /**
      * Enhanced cockpit with canopy frame
      */
     addCockpit(group, x, y, size, color, detailLevel) {
-        // Canopy glass
+        const cc = SUBSYSTEM_COLORS.cockpit;
+        // Outer frame ring - metallic
+        const outerGeo = new THREE.RingGeometry(size * 0.9, size * 1.15, 12);
+        const outerMat = new THREE.MeshBasicMaterial({
+            color: cc.frame, transparent: true, opacity: 0.55,
+        });
+        const outer = new THREE.Mesh(outerGeo, outerMat);
+        outer.position.set(x, y, 0.058);
+        outer.renderOrder = 5;
+        group.add(outer);
+
+        // Canopy glass - translucent blue
         const cockpitGeo = new THREE.CircleGeometry(size, 12);
         const cockpitMat = new THREE.MeshBasicMaterial({
-            color: color, transparent: true, opacity: 0.75,
+            color: cc.glass, transparent: true, opacity: 0.7,
         });
         const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
         cockpit.position.set(x, y, 0.06);
         cockpit.renderOrder = 5;
         group.add(cockpit);
 
-        // Canopy frame ring
-        const frameGeo = new THREE.RingGeometry(size * 0.85, size * 1.05, 12);
+        // Inner canopy glow ring
+        const frameGeo = new THREE.RingGeometry(size * 0.5, size * 0.7, 12);
         const frameMat = new THREE.MeshBasicMaterial({
-            color: 0x666666, transparent: true, opacity: 0.5,
+            color: cc.glow, transparent: true, opacity: 0.3,
         });
         const frame = new THREE.Mesh(frameGeo, frameMat);
         frame.position.set(x, y, 0.065);
         frame.renderOrder = 5;
         group.add(frame);
 
-        // Center pip (pilot indicator)
-        const pipGeo = new THREE.CircleGeometry(size * 0.2, 8);
+        // HUD pip - bright cockpit indicator
+        const pipGeo = new THREE.CircleGeometry(size * 0.22, 8);
         const pipMat = new THREE.MeshBasicMaterial({
-            color: 0xffffff, transparent: true, opacity: 0.4,
+            color: cc.pip, transparent: true, opacity: 0.6,
         });
         const pip = new THREE.Mesh(pipGeo, pipMat);
         pip.position.set(x, y, 0.07);
         pip.renderOrder = 6;
         group.add(pip);
+
+        // HUD center dot
+        const dotGeo = new THREE.CircleGeometry(size * 0.08, 6);
+        const dotMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff, transparent: true, opacity: 0.5,
+        });
+        const dot = new THREE.Mesh(dotGeo, dotMat);
+        dot.position.set(x, y, 0.075);
+        dot.renderOrder = 6;
+        group.add(dot);
     }
 
     /**
      * Turret mount with base and barrel indication
      */
     addTurretMount(group, x, y, size, color, detailLevel) {
-        // Turret base
+        const wc = SUBSYSTEM_COLORS.weapon;
+        // Mounting plate - dark base
+        const plateGeo = new THREE.CircleGeometry(size * 1.1, 8);
+        const plateMat = new THREE.MeshBasicMaterial({
+            color: wc.base, transparent: true, opacity: 0.5,
+        });
+        const plate = new THREE.Mesh(plateGeo, plateMat);
+        plate.position.set(x, y, 0.045);
+        plate.renderOrder = 3;
+        group.add(plate);
+
+        // Turret base - weapon red
         const baseGeo = new THREE.CircleGeometry(size, 8);
         const baseMat = new THREE.MeshBasicMaterial({
-            color: color, transparent: true, opacity: 0.65,
+            color: wc.charge, transparent: true, opacity: 0.65,
         });
         const base = new THREE.Mesh(baseGeo, baseMat);
         base.position.set(x, y, 0.05);
         base.renderOrder = 4;
         group.add(base);
 
-        // Turret ring
-        const ringGeo = new THREE.RingGeometry(size * 0.6, size * 0.85, 8);
+        // Rotation ring
+        const ringGeo = new THREE.RingGeometry(size * 0.55, size * 0.8, 8);
         const ringMat = new THREE.MeshBasicMaterial({
-            color: 0x888888, transparent: true, opacity: 0.4,
+            color: wc.barrel, transparent: true, opacity: 0.45,
         });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.position.set(x, y, 0.055);
@@ -1165,47 +1418,85 @@ class ShipMeshFactory {
      * Weapon hardpoint with barrel(s)
      */
     addWeaponHardpoint(group, x, y, size, palette, rng, side) {
+        const wc = SUBSYSTEM_COLORS.weapon;
         // Turret base
-        this.addTurretMount(group, x, y, size, palette.accent, 'low');
+        this.addTurretMount(group, x, y, size, wc.charge, 'low');
 
-        // Weapon barrel (extends forward)
-        const barrelLen = size * 1.8;
-        const barrelGeo = new THREE.PlaneGeometry(barrelLen, size * 0.2);
-        const barrelMat = new THREE.MeshBasicMaterial({
-            color: palette.trim || 0x666666,
-            transparent: true, opacity: 0.7,
+        // Twin barrels (extends forward) - dark metallic
+        const barrelLen = size * 2.0;
+        const barrelSpacing = size * 0.12;
+        for (let b = -1; b <= 1; b += 2) {
+            const barrelGeo = new THREE.PlaneGeometry(barrelLen, size * 0.12);
+            const barrelMat = new THREE.MeshBasicMaterial({
+                color: wc.barrel, transparent: true, opacity: 0.75,
+            });
+            const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+            barrel.position.set(x + barrelLen * 0.45, y + b * barrelSpacing, 0.06);
+            barrel.renderOrder = 5;
+            group.add(barrel);
+        }
+
+        // Barrel jacket / heat shroud
+        const jacketGeo = new THREE.PlaneGeometry(barrelLen * 0.4, size * 0.35);
+        const jacketMat = new THREE.MeshBasicMaterial({
+            color: wc.base, transparent: true, opacity: 0.4,
         });
-        const barrel = new THREE.Mesh(barrelGeo, barrelMat);
-        barrel.position.set(x + barrelLen * 0.45, y, 0.06);
-        barrel.renderOrder = 5;
-        group.add(barrel);
+        const jacket = new THREE.Mesh(jacketGeo, jacketMat);
+        jacket.position.set(x + barrelLen * 0.2, y, 0.055);
+        jacket.renderOrder = 4;
+        group.add(jacket);
 
-        // Muzzle indicator
-        const muzzleGeo = new THREE.CircleGeometry(size * 0.15, 6);
+        // Muzzle flash point - bright red-orange
+        const muzzleGeo = new THREE.CircleGeometry(size * 0.18, 6);
         const muzzleMat = new THREE.MeshBasicMaterial({
-            color: palette.glow, transparent: true, opacity: 0.5,
+            color: wc.muzzle, transparent: true, opacity: 0.7,
         });
         const muzzle = new THREE.Mesh(muzzleGeo, muzzleMat);
-        muzzle.position.set(x + barrelLen * 0.9, y, 0.065);
+        muzzle.position.set(x + barrelLen * 0.92, y, 0.065);
         muzzle.renderOrder = 5;
         group.add(muzzle);
+
+        // Muzzle glow halo
+        const haloGeo = new THREE.CircleGeometry(size * 0.3, 8);
+        const haloMat = new THREE.MeshBasicMaterial({
+            color: wc.muzzle, transparent: true, opacity: 0.15,
+        });
+        const halo = new THREE.Mesh(haloGeo, haloMat);
+        halo.position.set(x + barrelLen * 0.92, y, 0.06);
+        halo.renderOrder = 4;
+        group.add(halo);
     }
 
     /**
      * Mining drill assembly
      */
     addMiningDrill(group, x, y, size, palette, rng) {
-        // Drill housing
+        // Drill housing - industrial yellow-brown
         const housingGeo = new THREE.PlaneGeometry(size * 1.5, size * 1.2);
         const housingMat = new THREE.MeshBasicMaterial({
-            color: palette.secondary, transparent: true, opacity: 0.6,
+            color: 0x665522, transparent: true, opacity: 0.6,
         });
         const housing = new THREE.Mesh(housingGeo, housingMat);
         housing.position.set(x, y, 0.04);
         housing.renderOrder = 3;
         group.add(housing);
 
-        // Drill tip (triangular)
+        // Housing frame lines
+        const frameMat = new THREE.LineBasicMaterial({
+            color: 0x887744, transparent: true, opacity: 0.4,
+        });
+        const framePts = [
+            new THREE.Vector3(x - size * 0.7, y - size * 0.55, 0.045),
+            new THREE.Vector3(x + size * 0.5, y - size * 0.55, 0.045),
+            new THREE.Vector3(x + size * 0.5, y + size * 0.55, 0.045),
+            new THREE.Vector3(x - size * 0.7, y + size * 0.55, 0.045),
+        ];
+        const frameGeo = new THREE.BufferGeometry().setFromPoints(framePts);
+        const frame = new THREE.Line(frameGeo, frameMat);
+        frame.renderOrder = 3;
+        group.add(frame);
+
+        // Drill tip (triangular) - bright gold
         const drillShape = new THREE.Shape();
         drillShape.moveTo(size * 1.0, 0);
         drillShape.lineTo(0, size * 0.4);
@@ -1213,40 +1504,72 @@ class ShipMeshFactory {
         drillShape.closePath();
         const drillGeo = new THREE.ShapeGeometry(drillShape);
         const drillMat = new THREE.MeshBasicMaterial({
-            color: palette.accent, transparent: true, opacity: 0.7,
+            color: 0xffcc00, transparent: true, opacity: 0.7,
         });
         const drill = new THREE.Mesh(drillGeo, drillMat);
         drill.position.set(x + size * 0.5, y, 0.05);
         drill.renderOrder = 4;
         group.add(drill);
 
-        // Laser emitter glow
-        const emitterGeo = new THREE.CircleGeometry(size * 0.15, 8);
+        // Drill rotation ring
+        const ringGeo = new THREE.RingGeometry(size * 0.3, size * 0.45, 8);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0xddaa22, transparent: true, opacity: 0.4,
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.set(x + size * 0.3, y, 0.055);
+        ring.renderOrder = 4;
+        group.add(ring);
+
+        // Laser emitter glow - bright green mining laser
+        const emitterGeo = new THREE.CircleGeometry(size * 0.18, 8);
         const emitterMat = new THREE.MeshBasicMaterial({
-            color: palette.glow, transparent: true, opacity: 0.8,
+            color: 0x66ff88, transparent: true, opacity: 0.85,
         });
         const emitter = new THREE.Mesh(emitterGeo, emitterMat);
         emitter.position.set(x + size * 1.2, y, 0.06);
         emitter.renderOrder = 5;
         group.add(emitter);
+
+        // Emitter glow halo
+        const haloGeo = new THREE.CircleGeometry(size * 0.35, 10);
+        const haloMat = new THREE.MeshBasicMaterial({
+            color: 0x44ff66, transparent: true, opacity: 0.12,
+        });
+        const halo = new THREE.Mesh(haloGeo, haloMat);
+        halo.position.set(x + size * 1.2, y, 0.055);
+        halo.renderOrder = 4;
+        group.add(halo);
     }
 
     /**
      * Drone bay indicator
      */
     addDroneBay(group, x, y, size, palette) {
+        const dc = SUBSYSTEM_COLORS.drone;
+        // Bay interior - dark recessed area
         const bayGeo = new THREE.PlaneGeometry(size * 1.5, size);
         const bayMat = new THREE.MeshBasicMaterial({
-            color: palette.dark, transparent: true, opacity: 0.5,
+            color: dc.bay, transparent: true, opacity: 0.55,
         });
         const bay = new THREE.Mesh(bayGeo, bayMat);
         bay.position.set(x, y, 0.04);
         bay.renderOrder = 3;
         group.add(bay);
 
-        // Bay door lines
+        // Bay frame
+        const frameGeo = new THREE.RingGeometry(size * 0.65, size * 0.8, 4);
+        const frameMat = new THREE.MeshBasicMaterial({
+            color: dc.frame, transparent: true, opacity: 0.4,
+        });
+        const frame = new THREE.Mesh(frameGeo, frameMat);
+        frame.position.set(x, y, 0.042);
+        frame.renderOrder = 3;
+        group.add(frame);
+
+        // Bay door lines - teal colored
         const doorMat = new THREE.LineBasicMaterial({
-            color: palette.accent, transparent: true, opacity: 0.4,
+            color: dc.door, transparent: true, opacity: 0.5,
         });
         for (let i = 0; i < 3; i++) {
             const doorPts = [
@@ -1258,73 +1581,128 @@ class ShipMeshFactory {
             door.renderOrder = 4;
             group.add(door);
         }
+
+        // Status lights on bay doors
+        for (let i = 0; i < 2; i++) {
+            const lightGeo = new THREE.CircleGeometry(size * 0.06, 6);
+            const lightMat = new THREE.MeshBasicMaterial({
+                color: dc.light, transparent: true, opacity: 0.7,
+            });
+            const light = new THREE.Mesh(lightGeo, lightMat);
+            light.position.set(x - size * 0.3 + i * size * 0.6, y - size * 0.3, 0.055);
+            light.renderOrder = 4;
+            group.add(light);
+        }
     }
 
     /**
      * Sensor/radar dish
      */
     addSensorDish(group, x, y, size, palette) {
-        // Dish body
+        const sc = SUBSYSTEM_COLORS.sensor;
+        // Dish body - teal/green
         const dishGeo = new THREE.RingGeometry(size * 0.3, size, 12);
         const dishMat = new THREE.MeshBasicMaterial({
-            color: palette.accent, transparent: true, opacity: 0.55,
+            color: sc.dish, transparent: true, opacity: 0.55,
         });
         const dish = new THREE.Mesh(dishGeo, dishMat);
         dish.position.set(x, y, 0.06);
         dish.renderOrder = 5;
         group.add(dish);
 
-        // Center receiver
-        const recGeo = new THREE.CircleGeometry(size * 0.25, 8);
+        // Outer scan ring - pulsing indicator
+        const outerGeo = new THREE.RingGeometry(size * 0.95, size * 1.15, 12);
+        const outerMat = new THREE.MeshBasicMaterial({
+            color: sc.ring, transparent: true, opacity: 0.25,
+        });
+        const outer = new THREE.Mesh(outerGeo, outerMat);
+        outer.position.set(x, y, 0.058);
+        outer.renderOrder = 5;
+        group.add(outer);
+
+        // Center receiver - bright green
+        const recGeo = new THREE.CircleGeometry(size * 0.28, 8);
         const recMat = new THREE.MeshBasicMaterial({
-            color: palette.glow, transparent: true, opacity: 0.6,
+            color: sc.receiver, transparent: true, opacity: 0.7,
         });
         const rec = new THREE.Mesh(recGeo, recMat);
         rec.position.set(x, y, 0.065);
         rec.renderOrder = 5;
         group.add(rec);
+
+        // Receiver glow halo
+        const glowGeo = new THREE.CircleGeometry(size * 0.5, 10);
+        const glowMat = new THREE.MeshBasicMaterial({
+            color: sc.scan, transparent: true, opacity: 0.1,
+        });
+        const glow = new THREE.Mesh(glowGeo, glowMat);
+        glow.position.set(x, y, 0.062);
+        glow.renderOrder = 5;
+        group.add(glow);
     }
 
     /**
      * Tractor beam emitter (salvager-specific)
      */
     addTractorEmitter(group, x, y, size, palette) {
-        // Emitter housing
+        const pc = SUBSYSTEM_COLORS.power;
+        // Emitter housing - dark purple base
         const housingGeo = new THREE.CircleGeometry(size, 8);
         const housingMat = new THREE.MeshBasicMaterial({
-            color: palette.secondary, transparent: true, opacity: 0.6,
+            color: pc.conduit, transparent: true, opacity: 0.6,
         });
         const housing = new THREE.Mesh(housingGeo, housingMat);
         housing.position.set(x, y, 0.04);
         housing.renderOrder = 3;
         group.add(housing);
 
-        // Inner emitter glow
+        // Outer energy ring
+        const outerGeo = new THREE.RingGeometry(size * 0.7, size * 0.9, 8);
+        const outerMat = new THREE.MeshBasicMaterial({
+            color: pc.node, transparent: true, opacity: 0.35,
+        });
+        const outer = new THREE.Mesh(outerGeo, outerMat);
+        outer.position.set(x, y, 0.042);
+        outer.renderOrder = 3;
+        group.add(outer);
+
+        // Inner emitter glow - bright purple
         const glowGeo = new THREE.CircleGeometry(size * 0.5, 8);
         const glowMat = new THREE.MeshBasicMaterial({
-            color: palette.glow, transparent: true, opacity: 0.7,
+            color: pc.glow, transparent: true, opacity: 0.75,
         });
         const glow = new THREE.Mesh(glowGeo, glowMat);
         glow.position.set(x, y, 0.05);
         glow.renderOrder = 4;
         group.add(glow);
 
-        // Emitter ring
-        const ringGeo = new THREE.RingGeometry(size * 0.55, size * 0.75, 8);
+        // Emitter ring - bright pulse
+        const ringGeo = new THREE.RingGeometry(size * 0.5, size * 0.65, 8);
         const ringMat = new THREE.MeshBasicMaterial({
-            color: palette.glow, transparent: true, opacity: 0.35,
+            color: pc.pulse, transparent: true, opacity: 0.3,
         });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.position.set(x, y, 0.045);
         ring.renderOrder = 4;
         group.add(ring);
+
+        // Center hot point
+        const coreGeo = new THREE.CircleGeometry(size * 0.15, 6);
+        const coreMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff, transparent: true, opacity: 0.5,
+        });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        core.position.set(x, y, 0.055);
+        core.renderOrder = 5;
+        group.add(core);
     }
 
     /**
      * Utility arm (salvager crane)
      */
     addUtilityArm(group, x, y, length, side, palette, rng) {
-        // Arm segments
+        const cc = SUBSYSTEM_COLORS.cargo;
+        // Arm segments - industrial grey-blue
         const segCount = 2;
         const segLen = length / segCount;
         const armAngle = side * (Math.PI / 5 + rng() * Math.PI / 8);
@@ -1342,16 +1720,16 @@ class ShipMeshFactory {
             ];
             const segGeo = new THREE.BufferGeometry().setFromPoints(pts);
             const segMat = new THREE.LineBasicMaterial({
-                color: palette.trim, transparent: true, opacity: 0.6,
+                color: cc.frame, transparent: true, opacity: 0.65,
             });
             const seg = new THREE.Line(segGeo, segMat);
             seg.renderOrder = 4;
             group.add(seg);
 
-            // Joint
-            const jointGeo = new THREE.CircleGeometry(2, 6);
+            // Joint - bright accent
+            const jointGeo = new THREE.CircleGeometry(2.5, 6);
             const jointMat = new THREE.MeshBasicMaterial({
-                color: palette.accent, transparent: true, opacity: 0.5,
+                color: cc.stripe, transparent: true, opacity: 0.6,
             });
             const joint = new THREE.Mesh(jointGeo, jointMat);
             joint.position.set(nextX, nextY, 0.055);
@@ -1362,70 +1740,116 @@ class ShipMeshFactory {
             curY = nextY;
         }
 
-        // Claw/tool at end
-        const toolGeo = new THREE.CircleGeometry(3, 4);
+        // Claw/tool at end - bright salvager orange glow
+        const toolGeo = new THREE.CircleGeometry(3.5, 4);
         const toolMat = new THREE.MeshBasicMaterial({
-            color: palette.glow, transparent: true, opacity: 0.6,
+            color: 0xff9944, transparent: true, opacity: 0.7,
         });
         const tool = new THREE.Mesh(toolGeo, toolMat);
         tool.position.set(curX, curY, 0.06);
         tool.renderOrder = 5;
         group.add(tool);
+
+        // Tool glow
+        const glowGeo = new THREE.CircleGeometry(5, 6);
+        const glowMat = new THREE.MeshBasicMaterial({
+            color: 0xff9944, transparent: true, opacity: 0.12,
+        });
+        const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+        glowMesh.position.set(curX, curY, 0.055);
+        glowMesh.renderOrder = 4;
+        group.add(glowMesh);
     }
 
     /**
      * Scanner array (police-specific)
      */
     addScannerArray(group, x, y, length, side, palette) {
-        // Antenna mast
+        const sc = SUBSYSTEM_COLORS.sensor;
+        // Antenna mast - sensor teal
         const mastPts = [
             new THREE.Vector3(x, y, 0.05),
             new THREE.Vector3(x, y + side * length, 0.05),
         ];
         const mastGeo = new THREE.BufferGeometry().setFromPoints(mastPts);
         const mastMat = new THREE.LineBasicMaterial({
-            color: palette.accent, transparent: true, opacity: 0.6,
+            color: sc.ring, transparent: true, opacity: 0.6,
         });
         const mast = new THREE.Line(mastGeo, mastMat);
         mast.renderOrder = 4;
         group.add(mast);
 
-        // Tip emitter
-        const tipGeo = new THREE.CircleGeometry(3, 8);
+        // Cross-bar at midpoint
+        const midY = y + side * length * 0.6;
+        const crossPts = [
+            new THREE.Vector3(x - 4, midY, 0.05),
+            new THREE.Vector3(x + 4, midY, 0.05),
+        ];
+        const crossGeo = new THREE.BufferGeometry().setFromPoints(crossPts);
+        const crossMat = new THREE.LineBasicMaterial({
+            color: sc.dish, transparent: true, opacity: 0.5,
+        });
+        const cross = new THREE.Line(crossGeo, crossMat);
+        cross.renderOrder = 4;
+        group.add(cross);
+
+        // Tip emitter - bright green
+        const tipGeo = new THREE.CircleGeometry(3.5, 8);
         const tipMat = new THREE.MeshBasicMaterial({
-            color: palette.glow, transparent: true, opacity: 0.85,
+            color: sc.receiver, transparent: true, opacity: 0.85,
         });
         const tip = new THREE.Mesh(tipGeo, tipMat);
         tip.position.set(x, y + side * length, 0.06);
         tip.renderOrder = 5;
         group.add(tip);
+
+        // Tip scan glow
+        const glowGeo = new THREE.CircleGeometry(6, 8);
+        const glowMat = new THREE.MeshBasicMaterial({
+            color: sc.scan, transparent: true, opacity: 0.1,
+        });
+        const glow = new THREE.Mesh(glowGeo, glowMat);
+        glow.position.set(x, y + side * length, 0.055);
+        glow.renderOrder = 4;
+        group.add(glow);
     }
 
     /**
      * Communication/navigation antenna
      */
     addAntenna(group, x, y, length, palette, rng) {
+        const sc = SUBSYSTEM_COLORS.sensor;
         const angle = Math.PI / 2 + (rng() - 0.5) * 0.4;
         const endX = x + Math.cos(angle) * length * 0.3;
         const endY = y + Math.sin(angle) * length;
 
+        // Antenna mast
         const antPts = [
             new THREE.Vector3(x, y, 0.05),
             new THREE.Vector3(endX, endY, 0.05),
         ];
         const antGeo = new THREE.BufferGeometry().setFromPoints(antPts);
         const antMat = new THREE.LineBasicMaterial({
-            color: palette.trim || 0x888888,
-            transparent: true, opacity: 0.5,
+            color: sc.dish, transparent: true, opacity: 0.55,
         });
         const ant = new THREE.Line(antGeo, antMat);
         ant.renderOrder = 4;
         group.add(ant);
 
-        // Tip indicator
-        const tipGeo = new THREE.CircleGeometry(1.5, 6);
+        // Base mount
+        const baseGeo = new THREE.CircleGeometry(2, 6);
+        const baseMat = new THREE.MeshBasicMaterial({
+            color: sc.ring, transparent: true, opacity: 0.3,
+        });
+        const base = new THREE.Mesh(baseGeo, baseMat);
+        base.position.set(x, y, 0.052);
+        base.renderOrder = 4;
+        group.add(base);
+
+        // Tip indicator - bright green receiver
+        const tipGeo = new THREE.CircleGeometry(2, 6);
         const tipMat = new THREE.MeshBasicMaterial({
-            color: palette.glow, transparent: true, opacity: 0.6,
+            color: sc.receiver, transparent: true, opacity: 0.7,
         });
         const tip = new THREE.Mesh(tipGeo, tipMat);
         tip.position.set(endX, endY, 0.06);
@@ -1437,33 +1861,60 @@ class ShipMeshFactory {
      * Missile bay (forward-facing missile tubes)
      */
     addMissileBay(group, x, y, s, palette, rng) {
+        const mc = SUBSYSTEM_COLORS.missile;
         const tubeCount = 2 + Math.floor(rng() * 2);
+
+        // Bay housing background
+        const bayH = s * 0.035 * tubeCount + s * 0.02;
+        const bayGeo = new THREE.PlaneGeometry(s * 0.1, bayH);
+        const bayMat = new THREE.MeshBasicMaterial({
+            color: mc.housing, transparent: true, opacity: 0.4,
+        });
+        const bay = new THREE.Mesh(bayGeo, bayMat);
+        bay.position.set(x, y, 0.045);
+        bay.renderOrder = 3;
+        group.add(bay);
+
         for (let i = 0; i < tubeCount; i++) {
-            const tubeGeo = new THREE.PlaneGeometry(s * 0.08, s * 0.025);
+            const ty = y + (i - (tubeCount - 1) / 2) * s * 0.035;
+
+            // Tube body - dark
+            const tubeGeo = new THREE.PlaneGeometry(s * 0.08, s * 0.022);
             const tubeMat = new THREE.MeshBasicMaterial({
-                color: palette.dark, transparent: true, opacity: 0.6,
+                color: mc.tube, transparent: true, opacity: 0.65,
             });
             const tube = new THREE.Mesh(tubeGeo, tubeMat);
-            tube.position.set(x, y + (i - (tubeCount - 1) / 2) * s * 0.035, 0.05);
+            tube.position.set(x, ty, 0.05);
             tube.renderOrder = 4;
             group.add(tube);
 
-            // Warhead tip
-            const tipGeo = new THREE.CircleGeometry(s * 0.01, 4);
+            // Warhead tip - bright orange
+            const tipGeo = new THREE.CircleGeometry(s * 0.012, 4);
             const tipMat = new THREE.MeshBasicMaterial({
-                color: palette.accent, transparent: true, opacity: 0.6,
+                color: mc.warhead, transparent: true, opacity: 0.75,
             });
             const tip = new THREE.Mesh(tipGeo, tipMat);
-            tip.position.set(x + s * 0.04, y + (i - (tubeCount - 1) / 2) * s * 0.035, 0.055);
+            tip.position.set(x + s * 0.04, ty, 0.055);
             tip.renderOrder = 4;
             group.add(tip);
         }
+
+        // Bay status light
+        const lightGeo = new THREE.CircleGeometry(s * 0.008, 6);
+        const lightMat = new THREE.MeshBasicMaterial({
+            color: mc.exhaust, transparent: true, opacity: 0.6,
+        });
+        const light = new THREE.Mesh(lightGeo, lightMat);
+        light.position.set(x - s * 0.04, y - bayH * 0.4, 0.055);
+        light.renderOrder = 4;
+        group.add(light);
     }
 
     /**
      * Wing fins (mercenary/fighter ships)
      */
     addWingFins(group, s, palette, rng, style, aspect = 0.5) {
+        const wc = SUBSYSTEM_COLORS.weapon;
         const fa = aspect;
         for (let side = -1; side <= 1; side += 2) {
             const finShape = new THREE.Shape();
@@ -1485,7 +1936,7 @@ class ShipMeshFactory {
             fin.renderOrder = 1;
             group.add(fin);
 
-            // Fin edge highlight
+            // Fin leading edge - weapon red accent
             const edgePts = [
                 new THREE.Vector3(s * 0.1, side * s * 0.4 * fa, 0.015),
                 new THREE.Vector3(-s * 0.15, side * s * 0.55 * fa, 0.015),
@@ -1493,11 +1944,21 @@ class ShipMeshFactory {
             ];
             const edgeGeo = new THREE.BufferGeometry().setFromPoints(edgePts);
             const edgeMat = new THREE.LineBasicMaterial({
-                color: palette.accent, transparent: true, opacity: 0.4,
+                color: wc.charge, transparent: true, opacity: 0.45,
             });
             const edge = new THREE.Line(edgeGeo, edgeMat);
             edge.renderOrder = 2;
             group.add(edge);
+
+            // Wingtip light
+            const tipGeo = new THREE.CircleGeometry(s * 0.012, 6);
+            const tipMat = new THREE.MeshBasicMaterial({
+                color: wc.muzzle, transparent: true, opacity: 0.6,
+            });
+            const tipLight = new THREE.Mesh(tipGeo, tipMat);
+            tipLight.position.set(-s * 0.15, side * s * 0.55 * fa, 0.02);
+            tipLight.renderOrder = 2;
+            group.add(tipLight);
         }
     }
 
@@ -1560,45 +2021,66 @@ class ShipMeshFactory {
     addPanelGreebles(group, sizeConfig, rng, palette, role) {
         const s = sizeConfig.radius;
         const a = sizeConfig.aspect || 0.5;
+        const pc = SUBSYSTEM_COLORS.power;
+        const cc = SUBSYSTEM_COLORS.cargo;
         const greebleCount = Math.floor(sizeConfig.complexity * 3) + 2;
 
         for (let i = 0; i < greebleCount; i++) {
-            const gType = Math.floor(rng() * 4);
+            const gType = Math.floor(rng() * 5);
             const gx = (rng() - 0.4) * s * 0.7;
             const gy = (rng() - 0.5) * s * 0.5 * a;
 
             switch (gType) {
                 case 0: {
-                    // Vent/grille
+                    // Heat vent/grille - dark with glow stripe
                     const ventW = s * (0.04 + rng() * 0.04);
                     const ventH = s * (0.02 + rng() * 0.02);
                     const ventGeo = new THREE.PlaneGeometry(ventW, ventH);
                     const ventMat = new THREE.MeshBasicMaterial({
-                        color: palette.dark, transparent: true, opacity: 0.4,
+                        color: palette.dark, transparent: true, opacity: 0.45,
                     });
                     const vent = new THREE.Mesh(ventGeo, ventMat);
                     vent.position.set(gx, gy, 0.04);
                     vent.renderOrder = 3;
                     group.add(vent);
+                    // Vent glow line
+                    const glowGeo = new THREE.PlaneGeometry(ventW * 0.8, ventH * 0.15);
+                    const glowMat = new THREE.MeshBasicMaterial({
+                        color: pc.glow, transparent: true, opacity: 0.2,
+                    });
+                    const glow = new THREE.Mesh(glowGeo, glowMat);
+                    glow.position.set(gx, gy, 0.042);
+                    glow.renderOrder = 3;
+                    group.add(glow);
                     break;
                 }
                 case 1: {
-                    // Access port (small circle)
+                    // Access port - with indicator light
                     const portGeo = new THREE.CircleGeometry(s * 0.015, 6);
                     const portMat = new THREE.MeshBasicMaterial({
-                        color: palette.trim, transparent: true, opacity: 0.4,
+                        color: cc.hatch, transparent: true, opacity: 0.45,
                     });
                     const port = new THREE.Mesh(portGeo, portMat);
                     port.position.set(gx, gy, 0.04);
                     port.renderOrder = 3;
                     group.add(port);
+                    // Status LED
+                    const ledGeo = new THREE.CircleGeometry(s * 0.005, 4);
+                    const ledMat = new THREE.MeshBasicMaterial({
+                        color: rng() > 0.5 ? 0x44ff44 : 0xff4444,
+                        transparent: true, opacity: 0.5,
+                    });
+                    const led = new THREE.Mesh(ledGeo, ledMat);
+                    led.position.set(gx + s * 0.02, gy, 0.042);
+                    led.renderOrder = 3;
+                    group.add(led);
                     break;
                 }
                 case 2: {
-                    // Equipment box
+                    // Equipment module box
                     const boxGeo = new THREE.PlaneGeometry(s * 0.035, s * 0.025);
                     const boxMat = new THREE.MeshBasicMaterial({
-                        color: palette.secondary, transparent: true, opacity: 0.35,
+                        color: cc.container, transparent: true, opacity: 0.38,
                     });
                     const box = new THREE.Mesh(boxGeo, boxMat);
                     box.position.set(gx, gy, 0.04);
@@ -1608,18 +2090,30 @@ class ShipMeshFactory {
                     break;
                 }
                 case 3: {
-                    // Pipe/conduit line
+                    // Power conduit line - purple glow
                     const pipePts = [
                         new THREE.Vector3(gx, gy, 0.04),
                         new THREE.Vector3(gx + (rng() - 0.5) * s * 0.08, gy + (rng() - 0.5) * s * 0.06, 0.04),
                     ];
                     const pipeGeo = new THREE.BufferGeometry().setFromPoints(pipePts);
                     const pipeMat = new THREE.LineBasicMaterial({
-                        color: palette.trim, transparent: true, opacity: 0.3,
+                        color: pc.conduit, transparent: true, opacity: 0.35,
                     });
                     const pipe = new THREE.Line(pipeGeo, pipeMat);
                     pipe.renderOrder = 3;
                     group.add(pipe);
+                    break;
+                }
+                case 4: {
+                    // Power node junction
+                    const nodeGeo = new THREE.CircleGeometry(s * 0.01, 6);
+                    const nodeMat = new THREE.MeshBasicMaterial({
+                        color: pc.node, transparent: true, opacity: 0.35,
+                    });
+                    const node = new THREE.Mesh(nodeGeo, nodeMat);
+                    node.position.set(gx, gy, 0.04);
+                    node.renderOrder = 3;
+                    group.add(node);
                     break;
                 }
             }
@@ -1916,6 +2410,223 @@ class ShipMeshFactory {
                 }
             );
         });
+    }
+
+    // =============================================
+    // FACTION DECALS
+    // =============================================
+
+    /**
+     * Add faction logo decals to both sides of the hull
+     */
+    addFactionDecal(group, sizeConfig, factionId) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const logo = FACTION_LOGOS[factionId];
+        const decalSize = s * 0.12;
+        const xPos = -s * 0.15;
+
+        for (const side of [1, -1]) {
+            const yPos = side * s * 0.22 * a;
+
+            // Dark circular backing plate
+            const backGeo = new THREE.CircleGeometry(decalSize * 1.2, 16);
+            const backMat = new THREE.MeshBasicMaterial({
+                color: 0x111111, transparent: true, opacity: 0.5,
+            });
+            const back = new THREE.Mesh(backGeo, backMat);
+            back.position.set(xPos, yPos, 0.048);
+            back.renderOrder = 4;
+            group.add(back);
+
+            // Faction-colored border ring
+            const ringGeo = new THREE.RingGeometry(decalSize * 1.05, decalSize * 1.2, 24);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: logo.color, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.position.set(xPos, yPos, 0.049);
+            ring.renderOrder = 4;
+            group.add(ring);
+
+            // Logo geometry
+            this.drawFactionLogo(group, xPos, yPos, decalSize, factionId);
+
+            // Subtle glow halo
+            const glowGeo = new THREE.CircleGeometry(decalSize * 1.6, 16);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: logo.glow, transparent: true, opacity: 0.08,
+            });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            glow.position.set(xPos, yPos, 0.047);
+            glow.renderOrder = 4;
+            group.add(glow);
+        }
+    }
+
+    /**
+     * Draw faction-specific logo shapes
+     */
+    drawFactionLogo(group, x, y, size, factionId) {
+        const logo = FACTION_LOGOS[factionId];
+        const mat = new THREE.MeshBasicMaterial({
+            color: logo.color, transparent: true, opacity: 0.85,
+        });
+        const z = 0.050;
+
+        switch (factionId) {
+            case 'ore-extraction-syndicate': {
+                // Crossed pickaxes: two diagonal lines with diamond heads
+                const lineW = size * 0.08;
+                const lineL = size * 1.4;
+                for (const angle of [Math.PI / 4, -Math.PI / 4]) {
+                    const lineGeo = new THREE.PlaneGeometry(lineL, lineW);
+                    const line = new THREE.Mesh(lineGeo, mat);
+                    line.position.set(x, y, z);
+                    line.rotation.z = angle;
+                    line.renderOrder = 5;
+                    group.add(line);
+                }
+                // Diamond heads at upper tips
+                for (const dir of [1, -1]) {
+                    const headShape = new THREE.Shape();
+                    const hs = size * 0.2;
+                    headShape.moveTo(0, hs);
+                    headShape.lineTo(hs * 0.6, 0);
+                    headShape.lineTo(0, -hs);
+                    headShape.lineTo(-hs * 0.6, 0);
+                    headShape.closePath();
+                    const headGeo = new THREE.ShapeGeometry(headShape);
+                    const head = new THREE.Mesh(headGeo, mat);
+                    const tipX = x + Math.cos(dir * Math.PI / 4) * lineL * 0.45;
+                    const tipY = y + Math.sin(dir * Math.PI / 4) * lineL * 0.45;
+                    head.position.set(tipX, tipY, z);
+                    head.rotation.z = dir * Math.PI / 4;
+                    head.renderOrder = 5;
+                    group.add(head);
+                }
+                break;
+            }
+            case 'stellar-logistics': {
+                // Trade diamond: rotated square with arrow wings
+                const dShape = new THREE.Shape();
+                const ds = size * 0.55;
+                dShape.moveTo(0, ds);
+                dShape.lineTo(ds, 0);
+                dShape.lineTo(0, -ds);
+                dShape.lineTo(-ds, 0);
+                dShape.closePath();
+                const dGeo = new THREE.ShapeGeometry(dShape);
+                const diamond = new THREE.Mesh(dGeo, mat);
+                diamond.position.set(x, y, z);
+                diamond.renderOrder = 5;
+                group.add(diamond);
+                // Arrow wings extending left/right
+                for (const dir of [1, -1]) {
+                    const wingShape = new THREE.Shape();
+                    const ws = size * 0.3;
+                    wingShape.moveTo(0, 0);
+                    wingShape.lineTo(dir * ws * 1.5, 0);
+                    wingShape.lineTo(dir * ws * 1.0, ws * 0.25);
+                    wingShape.lineTo(dir * ws * 0.3, ws * 0.08);
+                    wingShape.closePath();
+                    const wingGeo = new THREE.ShapeGeometry(wingShape);
+                    const wing = new THREE.Mesh(wingGeo, mat);
+                    wing.position.set(x, y, z);
+                    wing.renderOrder = 5;
+                    group.add(wing);
+                }
+                break;
+            }
+            case 'void-hunters': {
+                // Targeting reticle: circle with 4 crosshair lines + center dot
+                const reticleGeo = new THREE.RingGeometry(size * 0.5, size * 0.6, 24);
+                const reticle = new THREE.Mesh(reticleGeo, mat);
+                reticle.position.set(x, y, z);
+                reticle.renderOrder = 5;
+                group.add(reticle);
+                // 4 crosshair lines pointing inward with gap
+                for (let i = 0; i < 4; i++) {
+                    const angle = i * Math.PI / 2;
+                    const lineGeo = new THREE.PlaneGeometry(size * 0.35, size * 0.06);
+                    const line = new THREE.Mesh(lineGeo, mat);
+                    const dist = size * 0.72;
+                    line.position.set(
+                        x + Math.cos(angle) * dist,
+                        y + Math.sin(angle) * dist,
+                        z
+                    );
+                    line.rotation.z = angle;
+                    line.renderOrder = 5;
+                    group.add(line);
+                }
+                // Bright center dot
+                const dotGeo = new THREE.CircleGeometry(size * 0.12, 8);
+                const dotMat = new THREE.MeshBasicMaterial({
+                    color: 0xffffff, transparent: true, opacity: 0.9,
+                });
+                const dot = new THREE.Mesh(dotGeo, dotMat);
+                dot.position.set(x, y, z + 0.001);
+                dot.renderOrder = 5;
+                group.add(dot);
+                break;
+            }
+            case 'frontier-alliance': {
+                // 5-pointed star
+                const starShape = new THREE.Shape();
+                const outerR = size * 0.7;
+                const innerR = size * 0.3;
+                for (let i = 0; i < 5; i++) {
+                    const outerAngle = (i * 2 * Math.PI / 5) - Math.PI / 2;
+                    const innerAngle = outerAngle + Math.PI / 5;
+                    const ox = Math.cos(outerAngle) * outerR;
+                    const oy = Math.sin(outerAngle) * outerR;
+                    const ix = Math.cos(innerAngle) * innerR;
+                    const iy = Math.sin(innerAngle) * innerR;
+                    if (i === 0) starShape.moveTo(ox, oy);
+                    else starShape.lineTo(ox, oy);
+                    starShape.lineTo(ix, iy);
+                }
+                starShape.closePath();
+                const starGeo = new THREE.ShapeGeometry(starShape);
+                const star = new THREE.Mesh(starGeo, mat);
+                star.position.set(x, y, z);
+                star.renderOrder = 5;
+                group.add(star);
+                break;
+            }
+            case 'shadow-cartel': {
+                // Death mark: X-cross with center circle + two eye dots
+                const lineW = size * 0.1;
+                const lineL = size * 1.2;
+                for (const angle of [Math.PI / 4, -Math.PI / 4]) {
+                    const lineGeo = new THREE.PlaneGeometry(lineL, lineW);
+                    const line = new THREE.Mesh(lineGeo, mat);
+                    line.position.set(x, y, z);
+                    line.rotation.z = angle;
+                    line.renderOrder = 5;
+                    group.add(line);
+                }
+                // Center circle
+                const circGeo = new THREE.RingGeometry(size * 0.22, size * 0.32, 16);
+                const circ = new THREE.Mesh(circGeo, mat);
+                circ.position.set(x, y, z + 0.001);
+                circ.renderOrder = 5;
+                group.add(circ);
+                // Two "eye" dots above center
+                for (const dir of [-1, 1]) {
+                    const eyeGeo = new THREE.CircleGeometry(size * 0.09, 8);
+                    const eyeMat = new THREE.MeshBasicMaterial({
+                        color: 0xff4466, transparent: true, opacity: 0.9,
+                    });
+                    const eye = new THREE.Mesh(eyeGeo, eyeMat);
+                    eye.position.set(x + dir * size * 0.2, y + size * 0.25, z + 0.001);
+                    eye.renderOrder = 5;
+                    group.add(eye);
+                }
+                break;
+            }
+        }
     }
 
     // =============================================

@@ -251,6 +251,12 @@ export class GuildEconomySystem {
             case 'fleeing':
                 this.simFleeing(ship, dt);
                 break;
+            case 'surveying':
+                this.simSurveying(ship, dt);
+                break;
+            case 'repairing':
+                this.simRepairing(ship, dt);
+                break;
         }
     }
 
@@ -299,6 +305,12 @@ export class GuildEconomySystem {
                 break;
             case 'raid':
                 ship.aiState = 'raiding';
+                break;
+            case 'survey':
+                ship.aiState = 'surveying';
+                break;
+            case 'support':
+                ship.aiState = 'repairing';
                 break;
             default:
                 ship.aiState = 'idle';
@@ -652,6 +664,32 @@ export class GuildEconomySystem {
         ship.aiState = 'idle';
     }
 
+    simSurveying(ship, dt) {
+        // Abstract surveyor cycles: scan for 15s, then move to new sector
+        ship._surveyProgress = (ship._surveyProgress || 0) + dt / 15;
+        if (ship._surveyProgress >= 1.0) {
+            ship._surveyProgress = 0;
+            // "Scanned" a sector - go idle to get reassigned (new sector)
+            ship.currentTask = null;
+            ship.aiState = 'idle';
+        }
+    }
+
+    simRepairing(ship, dt) {
+        // Abstract logistics ships patrol their sector, "healing" other ships
+        ship._repairProgress = (ship._repairProgress || 0) + dt / 10;
+        if (ship._repairProgress >= 1.0) {
+            ship._repairProgress = 0;
+            // Heal 10% HP to all same-faction ships in this sector
+            for (const ally of this.abstractShips.values()) {
+                if (ally.factionId === ship.factionId && ally.sectorId === ship.sectorId && ally !== ship) {
+                    ally.shield = Math.min(ally.maxShield, ally.shield + ally.maxShield * 0.1);
+                    ally.armor = Math.min(ally.maxArmor, ally.armor + ally.maxArmor * 0.1);
+                }
+            }
+        }
+    }
+
     // =========================================
     // FACTION AI
     // =========================================
@@ -708,6 +746,12 @@ export class GuildEconomySystem {
                 break;
             case 'bomber':
                 this.assignAmbushTask(ship, config, isAbstract);
+                break;
+            case 'surveyor':
+                this.assignSurveyTask(ship, config, isAbstract);
+                break;
+            case 'logistics':
+                this.assignLogisticsTask(ship, config, isAbstract);
                 break;
         }
     }
@@ -919,12 +963,66 @@ export class GuildEconomySystem {
         }
     }
 
+    assignSurveyTask(ship, config, isAbstract) {
+        // Surveyors scan mining sectors for asteroid fields
+        const miningSectors = config.aiConfig.preferredMiningSectors || ['sector-1', 'sector-2'];
+        const avoid = config.aiConfig.avoidSectors || [];
+        const candidates = miningSectors.filter(s => !avoid.includes(s));
+        const targetSector = candidates.length > 0
+            ? candidates[Math.floor(Math.random() * candidates.length)]
+            : (config.homeStation || 'hub');
+
+        const task = { type: 'survey', targetSector };
+        ship.currentTask = task;
+
+        const startSector = isAbstract ? ship.sectorId : (this.game.currentSector?.id || config.homeStation || 'hub');
+        if (startSector !== targetSector) {
+            const path = this.findPath(startSector, targetSector);
+            if (path && path.length > 0) {
+                ship.sectorPath = path;
+                ship.pathIndex = 0;
+                ship.aiState = 'traveling';
+            } else {
+                ship.aiState = 'surveying';
+            }
+        } else {
+            ship.aiState = 'surveying';
+        }
+    }
+
+    assignLogisticsTask(ship, config, isAbstract) {
+        // Logistics ships follow combat fleets or patrol mining sectors
+        const combatSectors = config.aiConfig.preferredHuntSectors || config.aiConfig.preferredMiningSectors || ['hub'];
+        const avoid = config.aiConfig.avoidSectors || [];
+        const candidates = combatSectors.filter(s => !avoid.includes(s));
+        const targetSector = candidates.length > 0
+            ? candidates[Math.floor(Math.random() * candidates.length)]
+            : (config.homeStation || 'hub');
+
+        const task = { type: 'support', targetSector };
+        ship.currentTask = task;
+
+        const startSector = isAbstract ? ship.sectorId : (this.game.currentSector?.id || config.homeStation || 'hub');
+        if (startSector !== targetSector) {
+            const path = this.findPath(startSector, targetSector);
+            if (path && path.length > 0) {
+                ship.sectorPath = path;
+                ship.pathIndex = 0;
+                ship.aiState = 'traveling';
+            } else {
+                ship.aiState = 'repairing';
+            }
+        } else {
+            ship.aiState = 'repairing';
+        }
+    }
+
     replaceDeadShips(factionId, faction) {
         const config = GUILD_FACTIONS[factionId];
         if (!config) return;
 
         // Count current ships by role
-        const counts = { miner: 0, hauler: 0, ratter: 0, raider: 0, bomber: 0 };
+        const counts = { miner: 0, hauler: 0, ratter: 0, raider: 0, bomber: 0, surveyor: 0, logistics: 0 };
         for (const ship of this.abstractShips.values()) {
             if (ship.factionId === factionId && counts[ship.role] !== undefined) counts[ship.role]++;
         }
@@ -1530,6 +1628,8 @@ export class GuildEconomySystem {
             case 'hunt': return `Hunting in ${this.getSectorName(task.targetSector || ship.sectorId)}`;
             case 'raid': return `Raiding ${this.getSectorName(task.targetSector || ship.sectorId)}`;
             case 'repair': return 'Returning for repairs';
+            case 'survey': return `Surveying ${this.getSectorName(task.targetSector || ship.sectorId)}`;
+            case 'support': return `Logistics in ${this.getSectorName(task.targetSector || ship.sectorId)}`;
             default: return task.type;
         }
     }

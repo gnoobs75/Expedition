@@ -1,10 +1,13 @@
 // =============================================
-// Sector Map Manager
-// Handles full-screen map with Local and Universe tabs
+// Sector Map Manager - POLISHED
+// Rich tactical map with entity icons, range rings,
+// asteroid field overlays, survey heatmaps, tooltips,
+// D-scan cone, fleet positions, and detailed universe view.
 // =============================================
 
 import { CONFIG, UNIVERSE_LAYOUT } from '../config.js';
-import { formatDistance } from '../utils/math.js';
+import { formatDistance, formatCredits } from '../utils/math.js';
+import { GUILD_FACTIONS } from '../data/guildFactionDatabase.js';
 
 export class SectorMapManager {
     constructor(game) {
@@ -22,135 +25,122 @@ export class SectorMapManager {
         this.localPan = { x: 0, y: 0 };
         this.isDragging = false;
         this.dragStart = { x: 0, y: 0 };
+        this.dragMoved = false;
 
         // State
         this.visible = false;
         this.activeTab = 'local';
         this.animationId = null;
+        this.animTime = 0;
 
         // Hover states
         this.hoveredEntity = null;
         this.hoveredSector = null;
+        this.mousePos = { x: 0, y: 0 };
+
+        // Overlay toggles
+        this.showRangeRings = true;
+        this.showSurveyData = true;
+        this.showDscan = false;
+        this.dscanAngle = 0;
+        this.showAsteroidFields = true;
 
         // Flag to prevent duplicate control button listeners
         this.controlsInitialized = false;
 
+        // Tooltip element
+        this.tooltip = null;
+
         // Cache DOM elements
         this.cacheElements();
-
-        // Setup event listeners
+        this.createTooltip();
         this.setupEventListeners();
     }
 
-    /**
-     * Cache DOM element references
-     */
     cacheElements() {
         this.modal = document.getElementById('sector-map-modal');
         this.localCanvas = document.getElementById('local-map-canvas');
         this.universeCanvas = document.getElementById('universe-map-canvas');
     }
 
-    /**
-     * Setup event listeners
-     */
+    createTooltip() {
+        this.tooltip = document.createElement('div');
+        this.tooltip.className = 'map-tooltip hidden';
+        document.body.appendChild(this.tooltip);
+    }
+
     setupEventListeners() {
         if (!this.modal) return;
 
-        // Close button
         const closeBtn = document.getElementById('sector-map-close');
         closeBtn?.addEventListener('click', () => this.hide());
 
-        // Tab buttons
         this.modal.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                // Update active tab button
                 this.modal.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-
-                // Show corresponding tab content
                 this.modal.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 const tabId = `map-tab-${btn.dataset.tab}`;
                 document.getElementById(tabId)?.classList.add('active');
-
                 this.activeTab = btn.dataset.tab;
                 this.render();
                 this.game.audio?.play('click');
             });
         });
 
-        // Close on Escape key
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Escape' && this.visible) {
                 e.stopPropagation();
                 this.hide();
             }
         });
-
-        // Setup canvas interactions after modal is shown
     }
 
-    /**
-     * Initialize canvas contexts and interactions
-     */
     initCanvases() {
-        // Local map canvas - only setup once
         if (this.localCanvas && !this.localCtx) {
             this.localCanvas.width = this.localCanvas.parentElement?.clientWidth || 800;
             this.localCanvas.height = this.localCanvas.parentElement?.clientHeight || 500;
             this.localCtx = this.localCanvas.getContext('2d');
 
-            // Local map interactions
             this.localCanvas.addEventListener('wheel', (e) => this.handleLocalZoom(e));
             this.localCanvas.addEventListener('mousedown', (e) => this.handleLocalMouseDown(e));
             this.localCanvas.addEventListener('mousemove', (e) => this.handleLocalMouseMove(e));
             this.localCanvas.addEventListener('mouseup', () => this.handleLocalMouseUp());
-            this.localCanvas.addEventListener('mouseleave', () => this.handleLocalMouseUp());
+            this.localCanvas.addEventListener('mouseleave', () => { this.handleLocalMouseUp(); this.hideTooltip(); });
             this.localCanvas.addEventListener('click', (e) => this.handleLocalClick(e));
             this.localCanvas.addEventListener('contextmenu', (e) => this.handleLocalRightClick(e));
         }
 
-        // Universe map canvas - only setup once
         if (this.universeCanvas && !this.universeCtx) {
             this.universeCanvas.width = this.universeCanvas.parentElement?.clientWidth || 800;
             this.universeCanvas.height = this.universeCanvas.parentElement?.clientHeight || 500;
             this.universeCtx = this.universeCanvas.getContext('2d');
 
-            // Universe map interactions
             this.universeCanvas.addEventListener('click', (e) => this.handleUniverseClick(e));
             this.universeCanvas.addEventListener('mousemove', (e) => this.handleUniverseHover(e));
+            this.universeCanvas.addEventListener('mouseleave', () => this.hideTooltip());
         }
 
-        // Zoom controls - only setup once
         if (!this.controlsInitialized) {
             this.controlsInitialized = true;
             document.getElementById('local-zoom-in')?.addEventListener('click', () => {
-                this.localZoom = Math.min(5.0, this.localZoom * 1.5);
-                this.renderLocalMap();
+                this.localZoom = Math.min(8.0, this.localZoom * 1.5);
             });
             document.getElementById('local-zoom-out')?.addEventListener('click', () => {
-                this.localZoom = Math.max(0.2, this.localZoom / 1.5);
-                this.renderLocalMap();
+                this.localZoom = Math.max(0.1, this.localZoom / 1.5);
             });
             document.getElementById('local-center')?.addEventListener('click', () => {
                 this.centerOnPlayer();
-                this.renderLocalMap();
             });
         }
     }
 
-    /**
-     * Show the sector map
-     */
     show() {
         if (!this.modal) return;
-
         this.modal.classList.remove('hidden');
         this.visible = true;
 
-        // Initialize canvases on first show
         if (!this.localCtx || !this.universeCtx) {
-            // Small delay to allow modal to render
             setTimeout(() => {
                 this.initCanvases();
                 this.centerOnPlayer();
@@ -162,75 +152,42 @@ export class SectorMapManager {
             this.render();
             this.startAnimation();
         }
-
         this.game.audio?.play('click');
     }
 
-    /**
-     * Hide the sector map
-     */
     hide() {
         if (!this.modal) return;
-
         this.modal.classList.add('hidden');
         this.visible = false;
         this.stopAnimation();
+        this.hideTooltip();
     }
 
-    /**
-     * Toggle map visibility
-     */
     toggle() {
-        if (this.visible) {
-            this.hide();
-        } else {
-            this.show();
-        }
+        if (this.visible) this.hide();
+        else this.show();
     }
 
-    /**
-     * Start animation loop
-     */
     startAnimation() {
         if (this.animationId) return;
-
         const animate = () => {
-            if (!this.visible) {
-                this.animationId = null;
-                return;
-            }
-
+            if (!this.visible) { this.animationId = null; return; }
+            this.animTime += 0.016;
             this.render();
             this.animationId = requestAnimationFrame(animate);
         };
-
         this.animationId = requestAnimationFrame(animate);
     }
 
-    /**
-     * Stop animation loop
-     */
     stopAnimation() {
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
-            this.animationId = null;
-        }
+        if (this.animationId) { cancelAnimationFrame(this.animationId); this.animationId = null; }
     }
 
-    /**
-     * Render the active tab
-     */
     render() {
-        if (this.activeTab === 'local') {
-            this.renderLocalMap();
-        } else {
-            this.renderUniverseMap();
-        }
+        if (this.activeTab === 'local') this.renderLocalMap();
+        else this.renderUniverseMap();
     }
 
-    /**
-     * Center the local map on player
-     */
     centerOnPlayer() {
         const player = this.game.player;
         if (player) {
@@ -243,184 +200,869 @@ export class SectorMapManager {
     // LOCAL MAP RENDERING
     // ==========================================
 
-    /**
-     * Render the local sector map
-     */
     renderLocalMap() {
         if (!this.localCtx || !this.localCanvas) return;
 
         const ctx = this.localCtx;
-        const width = this.localCanvas.width;
-        const height = this.localCanvas.height;
+        const w = this.localCanvas.width;
+        const h = this.localCanvas.height;
         const player = this.game.player;
         const sector = this.game.currentSector;
 
-        // Clear canvas
-        ctx.fillStyle = '#000a14';
-        ctx.fillRect(0, 0, width, height);
+        // Deep space background
+        ctx.fillStyle = '#000810';
+        ctx.fillRect(0, 0, w, h);
 
         if (!sector) return;
 
-        // Calculate transform
-        const scale = (this.localZoom * width) / CONFIG.SECTOR_SIZE;
-        const offsetX = width / 2 - this.localPan.x * scale;
-        const offsetY = height / 2 - this.localPan.y * scale;
+        const scale = (this.localZoom * w) / CONFIG.SECTOR_SIZE;
+        const ox = w / 2 - this.localPan.x * scale;
+        const oy = h / 2 - this.localPan.y * scale;
 
-        // Draw grid
-        this.drawLocalGrid(ctx, width, height, scale, offsetX, offsetY);
+        // Subtle background stars
+        this.drawBackgroundStars(ctx, w, h, ox, oy, scale);
 
-        // Draw sector boundary
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(offsetX, offsetY, CONFIG.SECTOR_SIZE * scale, CONFIG.SECTOR_SIZE * scale);
+        // Grid
+        this.drawLocalGrid(ctx, w, h, scale, ox, oy);
 
-        // Draw entities
-        const entities = sector.entities || [];
+        // Sector boundary
+        ctx.strokeStyle = 'rgba(0, 200, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([8, 4]);
+        ctx.strokeRect(ox, oy, CONFIG.SECTOR_SIZE * scale, CONFIG.SECTOR_SIZE * scale);
+        ctx.setLineDash([]);
+
+        // Asteroid field overlay (density clouds)
+        if (this.showAsteroidFields) {
+            this.drawAsteroidFieldOverlay(ctx, sector, scale, ox, oy);
+        }
+
+        // Survey data overlay
+        if (this.showSurveyData) {
+            this.drawSurveyOverlay(ctx, scale, ox, oy);
+        }
+
+        // Player range rings
+        if (this.showRangeRings && player && player.alive) {
+            this.drawRangeRings(ctx, player, scale, ox, oy);
+        }
+
+        // D-Scan cone
+        if (this.showDscan && player && player.alive) {
+            this.drawDscanCone(ctx, player, scale, ox, oy);
+        }
+
+        // Draw entities (sorted: asteroids first, then structures, then ships)
+        const entities = (sector.entities || []).filter(e => e.alive && e.visible !== false);
+        const sortOrder = { asteroid: 0, planet: 1, station: 2, warpgate: 3, npc: 4, fleet: 5, guild: 6, enemy: 7 };
+        entities.sort((a, b) => (sortOrder[a.type] || 4) - (sortOrder[b.type] || 4));
+
         for (const entity of entities) {
-            if (!entity.alive || !entity.visible) continue;
+            this.drawEntity(ctx, entity, scale, ox, oy, w, h);
+        }
 
-            const screenX = entity.x * scale + offsetX;
-            const screenY = entity.y * scale + offsetY;
-            const radius = Math.max(4, (entity.radius || 10) * scale * 0.5);
-
-            // Determine color based on type
-            let color = '#888888';
-            if (entity.type === 'station') color = '#00ff00';
-            else if (entity.type === 'warpgate') color = '#00aaff';
-            else if (entity.type === 'asteroid') color = this.getAsteroidColor(entity);
-            else if (entity.type === 'enemy') color = '#ff4444';
-            else if (entity.type === 'planet') color = '#6644aa';
-
-            // Draw entity
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Highlight if selected
-            if (entity === this.game.selectedTarget) {
-                ctx.strokeStyle = '#00ffff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
-
-            // Draw label for large entities
-            if (entity.type === 'station' || entity.type === 'warpgate' || entity === this.hoveredEntity) {
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '10px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText(entity.name, screenX, screenY - radius - 5);
+        // Fleet ships
+        const fleetShips = this.game.fleet?.ships || [];
+        for (const fs of fleetShips) {
+            if (fs.alive && fs.currentSector === sector.id) {
+                this.drawEntity(ctx, fs, scale, ox, oy, w, h);
             }
         }
 
-        // Draw player
+        // Player (drawn last, always on top)
         if (player && player.alive) {
-            const screenX = player.x * scale + offsetX;
-            const screenY = player.y * scale + offsetY;
-            const radius = 8;
+            this.drawPlayer(ctx, player, scale, ox, oy);
+        }
 
-            // Player triangle
-            ctx.fillStyle = '#00ffff';
+        // Hover tooltip
+        if (this.hoveredEntity && !this.isDragging) {
+            this.drawEntityTooltip(ctx, this.hoveredEntity, scale, ox, oy, w, h);
+        }
+
+        // Info overlay
+        this.drawLocalInfo(ctx, w, h);
+
+        // Legend
+        this.drawLocalLegend(ctx, w, h);
+    }
+
+    drawBackgroundStars(ctx, w, h, ox, oy, scale) {
+        // Deterministic star positions based on pan
+        const seed = Math.floor(ox * 0.01) + Math.floor(oy * 0.01) * 1000;
+        const rng = (i) => {
+            const x = Math.sin(seed + i * 127.1) * 43758.5453;
+            return x - Math.floor(x);
+        };
+        ctx.fillStyle = 'rgba(100, 140, 180, 0.3)';
+        for (let i = 0; i < 60; i++) {
+            const sx = rng(i) * w;
+            const sy = rng(i + 100) * h;
+            const size = rng(i + 200) * 1.5 + 0.5;
             ctx.beginPath();
-            const angle = player.rotation;
-            ctx.moveTo(
-                screenX + Math.cos(angle) * radius * 1.5,
-                screenY + Math.sin(angle) * radius * 1.5
-            );
-            ctx.lineTo(
-                screenX + Math.cos(angle + 2.5) * radius,
-                screenY + Math.sin(angle + 2.5) * radius
-            );
-            ctx.lineTo(
-                screenX + Math.cos(angle - 2.5) * radius,
-                screenY + Math.sin(angle - 2.5) * radius
-            );
-            ctx.closePath();
+            ctx.arc(sx, sy, size, 0, Math.PI * 2);
             ctx.fill();
+        }
+    }
 
-            // Player glow
-            ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
-            ctx.lineWidth = 2;
+    drawLocalGrid(ctx, w, h, scale, ox, oy) {
+        // Adaptive grid spacing based on zoom
+        let gridSize = 1000;
+        if (this.localZoom > 3) gridSize = 500;
+        if (this.localZoom > 6) gridSize = 200;
+        if (this.localZoom < 0.5) gridSize = 2000;
+        if (this.localZoom < 0.2) gridSize = 5000;
+
+        ctx.strokeStyle = 'rgba(0, 180, 255, 0.06)';
+        ctx.lineWidth = 1;
+
+        const startX = Math.floor(-ox / (gridSize * scale)) * gridSize;
+        const startY = Math.floor(-oy / (gridSize * scale)) * gridSize;
+        const endX = Math.ceil((w - ox) / (gridSize * scale)) * gridSize;
+        const endY = Math.ceil((h - oy) / (gridSize * scale)) * gridSize;
+
+        for (let x = startX; x <= endX; x += gridSize) {
+            if (x < 0 || x > CONFIG.SECTOR_SIZE) continue;
+            const sx = x * scale + ox;
             ctx.beginPath();
-            ctx.arc(screenX, screenY, radius + 3, 0, Math.PI * 2);
+            ctx.moveTo(sx, Math.max(0, oy));
+            ctx.lineTo(sx, Math.min(h, oy + CONFIG.SECTOR_SIZE * scale));
             ctx.stroke();
         }
 
-        // Draw info overlay
-        this.drawLocalInfo(ctx, width, height);
+        for (let y = startY; y <= endY; y += gridSize) {
+            if (y < 0 || y > CONFIG.SECTOR_SIZE) continue;
+            const sy = y * scale + oy;
+            ctx.beginPath();
+            ctx.moveTo(Math.max(0, ox), sy);
+            ctx.lineTo(Math.min(w, ox + CONFIG.SECTOR_SIZE * scale), sy);
+            ctx.stroke();
+        }
+
+        // Grid coordinate labels
+        if (this.localZoom > 0.3) {
+            ctx.fillStyle = 'rgba(0, 180, 255, 0.15)';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'left';
+            for (let x = startX; x <= endX; x += gridSize) {
+                if (x < 0 || x > CONFIG.SECTOR_SIZE) continue;
+                const sx = x * scale + ox;
+                if (sx > 0 && sx < w) {
+                    ctx.fillText(`${(x / 1000).toFixed(0)}km`, sx + 2, Math.max(12, oy + 12));
+                }
+            }
+        }
     }
 
-    /**
-     * Draw grid on local map
-     */
-    drawLocalGrid(ctx, width, height, scale, offsetX, offsetY) {
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+    drawAsteroidFieldOverlay(ctx, sector, scale, ox, oy) {
+        // Cluster asteroids into field groups and draw density clouds
+        const asteroids = (sector.entities || []).filter(e => e.alive && e.type === 'asteroid');
+        if (asteroids.length < 3) return;
+
+        // Group nearby asteroids into fields (simple spatial clustering)
+        const fieldRadius = 2000;
+        const fields = [];
+        const assigned = new Set();
+
+        for (let i = 0; i < asteroids.length; i++) {
+            if (assigned.has(i)) continue;
+            const field = { asteroids: [asteroids[i]], cx: asteroids[i].x, cy: asteroids[i].y };
+            assigned.add(i);
+
+            for (let j = i + 1; j < asteroids.length; j++) {
+                if (assigned.has(j)) continue;
+                const dx = asteroids[j].x - field.cx;
+                const dy = asteroids[j].y - field.cy;
+                if (Math.sqrt(dx * dx + dy * dy) < fieldRadius) {
+                    field.asteroids.push(asteroids[j]);
+                    assigned.add(j);
+                    // Update centroid
+                    field.cx = field.asteroids.reduce((s, a) => s + a.x, 0) / field.asteroids.length;
+                    field.cy = field.asteroids.reduce((s, a) => s + a.y, 0) / field.asteroids.length;
+                }
+            }
+            if (field.asteroids.length >= 2) fields.push(field);
+        }
+
+        // Draw field boundary clouds
+        for (const field of fields) {
+            const sx = field.cx * scale + ox;
+            const sy = field.cy * scale + oy;
+
+            // Calculate field radius
+            let maxDist = 0;
+            for (const a of field.asteroids) {
+                const d = Math.sqrt((a.x - field.cx) ** 2 + (a.y - field.cy) ** 2);
+                if (d > maxDist) maxDist = d;
+            }
+            const r = Math.max(30, (maxDist + 500) * scale);
+
+            // Dominant ore type color
+            const oreCounts = {};
+            for (const a of field.asteroids) {
+                const t = a.oreType || 'veldspar';
+                oreCounts[t] = (oreCounts[t] || 0) + 1;
+            }
+            const dominant = Object.entries(oreCounts).sort((a, b) => b[1] - a[1])[0][0];
+            const oreColor = CONFIG.ASTEROID_TYPES[dominant]?.color || 0x888888;
+            const colorStr = `#${(typeof oreColor === 'number' ? oreColor : parseInt(oreColor)).toString(16).padStart(6, '0')}`;
+
+            // Soft gradient cloud
+            const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+            grad.addColorStop(0, this.hexToRgba(colorStr, 0.08));
+            grad.addColorStop(0.6, this.hexToRgba(colorStr, 0.04));
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Dashed boundary
+            ctx.strokeStyle = this.hexToRgba(colorStr, 0.15);
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 6]);
+            ctx.beginPath();
+            ctx.arc(sx, sy, r * 0.85, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Field label
+            if (r > 20) {
+                ctx.fillStyle = this.hexToRgba(colorStr, 0.5);
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'center';
+                const oreName = CONFIG.ASTEROID_TYPES[dominant]?.name || dominant;
+                ctx.fillText(`${oreName} Field (${field.asteroids.length})`, sx, sy - r - 4);
+            }
+        }
+    }
+
+    drawSurveyOverlay(ctx, scale, ox, oy) {
+        const surveySystem = this.game.surveySystem;
+        if (!surveySystem) return;
+
+        const sectorId = this.game.currentSector?.id;
+        if (!sectorId) return;
+
+        const scans = surveySystem.surveyData[sectorId];
+        if (!scans) return;
+
+        // Draw scan circles
+        for (const scan of Object.values(scans)) {
+            const sx = scan.scannerPos.x * scale + ox;
+            const sy = scan.scannerPos.y * scale + oy;
+            const r = scan.scanRadius * scale;
+
+            // Scan area circle
+            ctx.strokeStyle = 'rgba(0, 255, 136, 0.15)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 5]);
+            ctx.beginPath();
+            ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Scanned asteroid dots with value-based size
+            for (const a of scan.asteroids) {
+                const ax = a.x * scale + ox;
+                const ay = a.y * scale + oy;
+                const dotR = Math.max(2, Math.min(6, a.oreRemaining * 0.02));
+
+                const oreColor = CONFIG.ASTEROID_TYPES[a.oreType]?.color || 0x888888;
+                const colorStr = `#${(typeof oreColor === 'number' ? oreColor : parseInt(oreColor)).toString(16).padStart(6, '0')}`;
+
+                ctx.fillStyle = this.hexToRgba(colorStr, 0.7);
+                ctx.beginPath();
+                ctx.arc(ax, ay, dotR, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Value ring for high-value ores
+                if (a.value >= 50) {
+                    ctx.strokeStyle = this.hexToRgba(colorStr, 0.4);
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(ax, ay, dotR + 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+
+    drawRangeRings(ctx, player, scale, ox, oy) {
+        const sx = player.x * scale + ox;
+        const sy = player.y * scale + oy;
+
+        const rings = [
+            { range: 200, label: 'Mining', color: 'rgba(68, 136, 255, 0.2)', dash: [2, 4] },
+            { range: 500, label: 'Short', color: 'rgba(255, 170, 68, 0.15)', dash: [4, 4] },
+            { range: 1000, label: 'Med', color: 'rgba(255, 255, 68, 0.1)', dash: [6, 4] },
+            { range: 2000, label: 'Long', color: 'rgba(255, 68, 68, 0.08)', dash: [8, 4] },
+        ];
+
+        for (const ring of rings) {
+            const r = ring.range * scale;
+            if (r < 5 || r > 2000) continue; // Skip if too small/large on screen
+
+            ctx.strokeStyle = ring.color;
+            ctx.lineWidth = 1;
+            ctx.setLineDash(ring.dash);
+            ctx.beginPath();
+            ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Label
+            ctx.fillStyle = ring.color.replace(/[\d.]+\)$/, '0.5)');
+            ctx.font = '8px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`${ring.range}m ${ring.label}`, sx + r + 3, sy - 2);
+        }
+        ctx.setLineDash([]);
+    }
+
+    drawDscanCone(ctx, player, scale, ox, oy) {
+        const sx = player.x * scale + ox;
+        const sy = player.y * scale + oy;
+        const angle = player.rotation;
+        const coneAngle = Math.PI / 4; // 45 degree cone
+        const coneRange = 5000 * scale;
+
+        ctx.fillStyle = 'rgba(0, 255, 200, 0.04)';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.arc(sx, sy, coneRange, angle - coneAngle, angle + coneAngle);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(0, 255, 200, 0.15)';
         ctx.lineWidth = 1;
+        ctx.stroke();
+    }
 
-        const gridSize = 1000; // 1km grid
-        const gridScale = gridSize * scale;
+    drawEntity(ctx, entity, scale, ox, oy, w, h) {
+        const sx = entity.x * scale + ox;
+        const sy = entity.y * scale + oy;
 
-        // Vertical lines
-        for (let x = 0; x < CONFIG.SECTOR_SIZE; x += gridSize) {
-            const screenX = x * scale + offsetX;
-            if (screenX >= 0 && screenX <= width) {
-                ctx.beginPath();
-                ctx.moveTo(screenX, Math.max(0, offsetY));
-                ctx.lineTo(screenX, Math.min(height, offsetY + CONFIG.SECTOR_SIZE * scale));
-                ctx.stroke();
-            }
+        // Cull off-screen entities (with margin)
+        if (sx < -50 || sx > w + 50 || sy < -50 || sy > h + 50) return;
+
+        const isSelected = entity === this.game.selectedTarget;
+        const isHovered = entity === this.hoveredEntity;
+        const isLocked = entity === this.game.lockedTarget;
+        const pulse = Math.sin(this.animTime * 3) * 0.3 + 0.7;
+
+        switch (entity.type) {
+            case 'asteroid':
+                this.drawAsteroid(ctx, entity, sx, sy, scale, isSelected, isHovered);
+                break;
+            case 'planet':
+                this.drawPlanet(ctx, entity, sx, sy, scale, isSelected);
+                break;
+            case 'station':
+                this.drawStation(ctx, entity, sx, sy, scale, isSelected, isHovered, pulse);
+                break;
+            case 'warpgate':
+                this.drawWarpGate(ctx, entity, sx, sy, scale, isSelected, isHovered, pulse);
+                break;
+            case 'enemy':
+                this.drawShipIcon(ctx, entity, sx, sy, scale, '#ff4444', isSelected, isHovered, isLocked, pulse);
+                break;
+            case 'npc':
+                this.drawNPCIcon(ctx, entity, sx, sy, scale, isSelected, isHovered, isLocked);
+                break;
+            case 'guild':
+                this.drawGuildShipIcon(ctx, entity, sx, sy, scale, isSelected, isHovered, isLocked);
+                break;
+            case 'fleet':
+                this.drawShipIcon(ctx, entity, sx, sy, scale, '#44ffaa', isSelected, isHovered, isLocked, pulse);
+                break;
+            default:
+                this.drawGenericDot(ctx, sx, sy, '#888888', 4);
         }
 
-        // Horizontal lines
-        for (let y = 0; y < CONFIG.SECTOR_SIZE; y += gridSize) {
-            const screenY = y * scale + offsetY;
-            if (screenY >= 0 && screenY <= height) {
-                ctx.beginPath();
-                ctx.moveTo(Math.max(0, offsetX), screenY);
-                ctx.lineTo(Math.min(width, offsetX + CONFIG.SECTOR_SIZE * scale), screenY);
-                ctx.stroke();
-            }
+        // Selected indicator
+        if (isSelected) {
+            const r = Math.max(6, (entity.radius || 10) * scale * 0.3);
+            ctx.strokeStyle = `rgba(0, 255, 255, ${0.6 + pulse * 0.4})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(sx, sy, r + 4, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // Locked indicator
+        if (isLocked) {
+            const r = Math.max(8, (entity.radius || 10) * scale * 0.3);
+            ctx.strokeStyle = `rgba(255, 68, 68, ${0.5 + pulse * 0.5})`;
+            ctx.lineWidth = 2;
+            // Crosshair
+            const cr = r + 6;
+            ctx.beginPath();
+            ctx.moveTo(sx - cr, sy); ctx.lineTo(sx - cr + 4, sy);
+            ctx.moveTo(sx + cr, sy); ctx.lineTo(sx + cr - 4, sy);
+            ctx.moveTo(sx, sy - cr); ctx.lineTo(sx, sy - cr + 4);
+            ctx.moveTo(sx, sy + cr); ctx.lineTo(sx, sy + cr - 4);
+            ctx.stroke();
+        }
+
+        // Label for important entities
+        const showLabel = entity.type === 'station' || entity.type === 'warpgate' ||
+            isHovered || isSelected || isLocked ||
+            (entity.type === 'enemy' && this.localZoom > 0.8);
+
+        if (showLabel) {
+            const r = Math.max(6, (entity.radius || 10) * scale * 0.3);
+            ctx.fillStyle = isSelected ? '#00ffff' : isHovered ? '#ffffff' : 'rgba(200, 220, 255, 0.7)';
+            ctx.font = isSelected ? 'bold 10px monospace' : '9px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(entity.name || '', sx, sy - r - 6);
         }
     }
 
-    /**
-     * Draw info overlay on local map
-     */
-    drawLocalInfo(ctx, width, height) {
-        // Sector name
-        ctx.fillStyle = '#00ffff';
-        ctx.font = '14px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText(this.game.currentSector?.name || 'Unknown Sector', 15, 25);
-
-        // Zoom level
-        ctx.fillStyle = '#888888';
-        ctx.font = '11px monospace';
-        ctx.fillText(`Zoom: ${(this.localZoom * 100).toFixed(0)}%`, 15, 45);
-
-        // Entity count
-        const entities = this.game.currentSector?.entities || [];
-        ctx.fillText(`Entities: ${entities.filter(e => e.alive).length}`, 15, 60);
-
-        // Instructions
-        ctx.textAlign = 'right';
-        ctx.fillText('Click to select | Right-click for menu | Scroll to zoom | Drag to pan', width - 15, height - 15);
-    }
-
-    /**
-     * Get asteroid color
-     */
-    getAsteroidColor(asteroid) {
-        const oreType = asteroid.oreType || 'veldspar';
+    drawAsteroid(ctx, entity, sx, sy, scale, isSelected, isHovered) {
+        const oreType = entity.oreType || 'veldspar';
         const config = CONFIG.ASTEROID_TYPES[oreType];
-        if (!config) return '#888888';
+        const color = config ? `#${config.color.toString(16).padStart(6, '0')}` : '#888888';
+        const r = Math.max(2, Math.min(5, (entity.radius || 8) * scale * 0.3));
 
-        // Convert hex number to CSS color
-        const color = config.color;
-        if (typeof color === 'number') {
-            return `#${color.toString(16).padStart(6, '0')}`;
+        // Asteroid dot with ore-colored glow
+        ctx.fillStyle = color;
+        ctx.globalAlpha = isHovered ? 1.0 : 0.7;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+
+        // Depletion indicator (smaller = more depleted)
+        if (entity.oreRemaining !== undefined && entity.oreAmount) {
+            const pct = entity.oreRemaining / entity.oreAmount;
+            if (pct < 0.3) {
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.4)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(sx, sy, r + 2, 0, Math.PI * 2 * pct);
+                ctx.stroke();
+            }
         }
-        return color;
+    }
+
+    drawPlanet(ctx, entity, sx, sy, scale, isSelected) {
+        const r = Math.max(8, Math.min(40, entity.radius * scale * 0.3));
+
+        // Planet gradient
+        const grad = ctx.createRadialGradient(sx - r * 0.3, sy - r * 0.3, 0, sx, sy, r);
+        grad.addColorStop(0, '#8866cc');
+        grad.addColorStop(0.7, '#442266');
+        grad.addColorStop(1, '#221133');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Kill radius ring
+        if (entity.killRadius) {
+            const kr = entity.killRadius * scale;
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.arc(sx, sy, kr, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Label
+        ctx.fillStyle = '#8866cc';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(entity.name || 'Planet', sx, sy - r - 4);
+    }
+
+    drawStation(ctx, entity, sx, sy, scale, isSelected, isHovered, pulse) {
+        const r = Math.max(6, Math.min(14, entity.radius * scale * 0.2));
+
+        // Station diamond icon
+        ctx.fillStyle = isHovered ? '#44ff88' : '#00cc44';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - r);
+        ctx.lineTo(sx + r * 0.7, sy);
+        ctx.lineTo(sx, sy + r);
+        ctx.lineTo(sx - r * 0.7, sy);
+        ctx.closePath();
+        ctx.fill();
+
+        // Inner detail
+        ctx.fillStyle = '#003311';
+        ctx.beginPath();
+        ctx.arc(sx, sy, r * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Docking range ring
+        const dockRange = (entity.dockingRange || entity.radius + 200) * scale;
+        if (dockRange > 3) {
+            ctx.strokeStyle = `rgba(0, 204, 68, ${0.1 + pulse * 0.1})`;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 4]);
+            ctx.beginPath();
+            ctx.arc(sx, sy, dockRange, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Always show label
+        ctx.fillStyle = '#44ff88';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(entity.name || 'Station', sx, sy - r - 6);
+    }
+
+    drawWarpGate(ctx, entity, sx, sy, scale, isSelected, isHovered, pulse) {
+        const r = Math.max(6, Math.min(12, (entity.radius || 30) * scale * 0.2));
+
+        // Gate portal circle
+        ctx.strokeStyle = isHovered ? '#66ccff' : '#0088ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner rotating arcs
+        const t = this.animTime;
+        ctx.strokeStyle = `rgba(0, 170, 255, ${0.4 + pulse * 0.3})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r * 0.6, t % (Math.PI * 2), (t + Math.PI) % (Math.PI * 2));
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(sx, sy, r * 0.6, (t + Math.PI) % (Math.PI * 2), (t + Math.PI * 2) % (Math.PI * 2));
+        ctx.stroke();
+
+        // Destination label
+        const dest = entity.targetSector || entity.destination || '';
+        const destSector = UNIVERSE_LAYOUT.sectors.find(s => s.id === dest);
+        ctx.fillStyle = '#66aaff';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(entity.name || 'Gate', sx, sy - r - 8);
+        if (destSector) {
+            ctx.fillStyle = 'rgba(102, 170, 255, 0.5)';
+            ctx.fillText(`\u2192 ${destSector.name}`, sx, sy - r - 18);
+        }
+    }
+
+    drawShipIcon(ctx, entity, sx, sy, scale, color, isSelected, isHovered, isLocked, pulse) {
+        const r = Math.max(4, Math.min(8, (entity.radius || 10) * scale * 0.4));
+        const angle = entity.rotation || 0;
+
+        // Directional triangle
+        ctx.fillStyle = isHovered ? '#ffffff' : color;
+        ctx.beginPath();
+        ctx.moveTo(sx + Math.cos(angle) * r * 1.5, sy + Math.sin(angle) * r * 1.5);
+        ctx.lineTo(sx + Math.cos(angle + 2.4) * r, sy + Math.sin(angle + 2.4) * r);
+        ctx.lineTo(sx + Math.cos(angle - 2.4) * r, sy + Math.sin(angle - 2.4) * r);
+        ctx.closePath();
+        ctx.fill();
+
+        // Velocity vector line
+        if (entity.currentSpeed > 5) {
+            const vLen = Math.min(20, entity.currentSpeed * scale * 0.5);
+            ctx.strokeStyle = `${color}66`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + Math.cos(angle) * vLen, sy + Math.sin(angle) * vLen);
+            ctx.stroke();
+        }
+
+        // HP bar below
+        if (isHovered || isSelected || isLocked) {
+            const totalHp = (entity.shield || 0) + (entity.armor || 0) + (entity.hull || 0);
+            const maxHp = (entity.maxShield || 0) + (entity.maxArmor || 0) + (entity.maxHull || 0);
+            if (maxHp > 0) {
+                const pct = totalHp / maxHp;
+                const barW = 20;
+                const barH = 2;
+                const barX = sx - barW / 2;
+                const barY = sy + r + 4;
+                ctx.fillStyle = '#222';
+                ctx.fillRect(barX, barY, barW, barH);
+                ctx.fillStyle = pct > 0.6 ? '#44ff88' : pct > 0.3 ? '#ffaa44' : '#ff4444';
+                ctx.fillRect(barX, barY, barW * pct, barH);
+            }
+        }
+    }
+
+    drawNPCIcon(ctx, entity, sx, sy, scale, isSelected, isHovered, isLocked) {
+        const role = entity.role || 'miner';
+        let color = '#88aacc';
+        if (role === 'security') color = '#4488ff';
+        else if (role === 'miner') color = '#88cc88';
+        else if (role === 'logistics') color = '#88ff88';
+        else if (role === 'surveyor') color = '#88ffcc';
+
+        const r = Math.max(3, Math.min(6, (entity.radius || 8) * scale * 0.3));
+
+        // Role-specific icon shape
+        if (role === 'security') {
+            // Shield shape
+            ctx.fillStyle = isHovered ? '#ffffff' : color;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy - r);
+            ctx.lineTo(sx + r, sy - r * 0.3);
+            ctx.lineTo(sx + r * 0.7, sy + r);
+            ctx.lineTo(sx - r * 0.7, sy + r);
+            ctx.lineTo(sx - r, sy - r * 0.3);
+            ctx.closePath();
+            ctx.fill();
+        } else if (role === 'miner') {
+            // Pickaxe dot
+            ctx.fillStyle = isHovered ? '#ffffff' : color;
+            ctx.beginPath();
+            ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(sx - r * 0.5, sy - r * 0.5);
+            ctx.lineTo(sx + r * 0.5, sy + r * 0.5);
+            ctx.stroke();
+        } else {
+            // Generic NPC dot
+            ctx.fillStyle = isHovered ? '#ffffff' : color;
+            ctx.beginPath();
+            ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    drawGuildShipIcon(ctx, entity, sx, sy, scale, isSelected, isHovered, isLocked) {
+        const isPirate = entity.isPirate;
+        let color = '#aaaaff'; // default guild color
+
+        if (isPirate) {
+            color = '#ff4466';
+        } else if (entity.factionId) {
+            const faction = GUILD_FACTIONS?.[entity.factionId];
+            if (faction) color = faction.color;
+        }
+
+        const pulse = Math.sin(this.animTime * 3) * 0.3 + 0.7;
+        this.drawShipIcon(ctx, entity, sx, sy, scale, color, isSelected, isHovered, isLocked, pulse);
+    }
+
+    drawPlayer(ctx, player, scale, ox, oy) {
+        const sx = player.x * scale + ox;
+        const sy = player.y * scale + oy;
+        const r = 10;
+        const angle = player.rotation;
+        const pulse = Math.sin(this.animTime * 2) * 0.2 + 0.8;
+
+        // Outer glow
+        const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 2.5);
+        grad.addColorStop(0, `rgba(0, 255, 255, ${0.15 * pulse})`);
+        grad.addColorStop(1, 'rgba(0, 255, 255, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r * 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Player triangle (larger, filled)
+        ctx.fillStyle = '#00ffff';
+        ctx.beginPath();
+        ctx.moveTo(sx + Math.cos(angle) * r * 1.8, sy + Math.sin(angle) * r * 1.8);
+        ctx.lineTo(sx + Math.cos(angle + 2.4) * r, sy + Math.sin(angle + 2.4) * r);
+        ctx.lineTo(sx + Math.cos(angle - 2.4) * r, sy + Math.sin(angle - 2.4) * r);
+        ctx.closePath();
+        ctx.fill();
+
+        // Inner highlight
+        ctx.fillStyle = '#88ffff';
+        ctx.beginPath();
+        ctx.arc(sx, sy, r * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Velocity vector
+        if (player.currentSpeed > 5) {
+            const vLen = Math.min(30, player.currentSpeed * scale * 0.8);
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(sx + Math.cos(angle) * r * 1.8, sy + Math.sin(angle) * r * 1.8);
+            ctx.lineTo(sx + Math.cos(angle) * (r * 1.8 + vLen), sy + Math.sin(angle) * (r * 1.8 + vLen));
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // EWAR status indicators
+        if (player.isPointed) {
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath();
+            ctx.arc(sx, sy, r + 6, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        if (player.isWebbed) {
+            ctx.strokeStyle = '#ffaa00';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2;
+                ctx.moveTo(sx, sy);
+                ctx.lineTo(sx + Math.cos(a) * (r + 4), sy + Math.sin(a) * (r + 4));
+            }
+            ctx.stroke();
+        }
+
+        // Label
+        ctx.fillStyle = '#00ffff';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('YOU', sx, sy - r - 8);
+    }
+
+    drawGenericDot(ctx, sx, sy, color, r) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    drawEntityTooltip(ctx, entity, scale, ox, oy, w, h) {
+        const sx = entity.x * scale + ox;
+        const sy = entity.y * scale + oy;
+
+        // Build tooltip lines
+        const lines = [];
+        lines.push(entity.name || 'Unknown');
+
+        if (entity.type === 'asteroid') {
+            const oreName = CONFIG.ASTEROID_TYPES[entity.oreType]?.name || entity.oreType;
+            const value = CONFIG.ASTEROID_TYPES[entity.oreType]?.value || 0;
+            lines.push(`Type: ${oreName} (${value} ISK/unit)`);
+            if (entity.oreRemaining !== undefined) {
+                lines.push(`Remaining: ${entity.oreRemaining} units`);
+            }
+        } else if (entity.type === 'station') {
+            lines.push('Station');
+            if (entity.specialty) lines.push(`Specialty: ${entity.specialty}`);
+        } else if (entity.type === 'warpgate') {
+            const dest = entity.targetSector || entity.destination || 'unknown';
+            lines.push(`Gate \u2192 ${dest}`);
+        } else if (entity.type === 'enemy' || entity.type === 'npc' || entity.type === 'guild' || entity.type === 'fleet') {
+            if (entity.role) lines.push(`Role: ${entity.role}`);
+            if (entity.shipClass) lines.push(`Class: ${entity.shipClass}`);
+            const totalHp = (entity.shield || 0) + (entity.armor || 0) + (entity.hull || 0);
+            const maxHp = (entity.maxShield || 0) + (entity.maxArmor || 0) + (entity.maxHull || 0);
+            if (maxHp > 0) lines.push(`HP: ${Math.round(totalHp / maxHp * 100)}%`);
+            if (entity.aiState) lines.push(`State: ${entity.aiState}`);
+            if (entity.bounty) lines.push(`Bounty: ${entity.bounty} ISK`);
+        }
+
+        const player = this.game.player;
+        if (player) {
+            const dist = player.distanceTo(entity);
+            lines.push(`Dist: ${formatDistance(dist)}`);
+        }
+
+        // Draw tooltip box
+        const padding = 6;
+        const lineH = 14;
+        const tooltipW = Math.max(...lines.map(l => ctx.measureText(l).width)) + padding * 2 + 10;
+        const tooltipH = lines.length * lineH + padding * 2;
+
+        let tx = sx + 15;
+        let ty = sy - tooltipH / 2;
+        if (tx + tooltipW > w) tx = sx - tooltipW - 15;
+        if (ty < 5) ty = 5;
+        if (ty + tooltipH > h) ty = h - tooltipH - 5;
+
+        // Background
+        ctx.fillStyle = 'rgba(0, 10, 20, 0.9)';
+        ctx.strokeStyle = 'rgba(0, 200, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(tx, ty, tooltipW, tooltipH, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Text
+        ctx.fillStyle = '#ccddee';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'left';
+        for (let i = 0; i < lines.length; i++) {
+            ctx.fillStyle = i === 0 ? '#ffffff' : '#aabbcc';
+            ctx.fillText(lines[i], tx + padding, ty + padding + (i + 1) * lineH - 3);
+        }
+    }
+
+    drawLocalInfo(ctx, w, h) {
+        // Top-left panel
+        const sector = this.game.currentSector;
+        const difficulty = sector?.difficulty || 'unknown';
+        const diffColor = this.getDifficultyColor(difficulty);
+
+        // Background for info
+        ctx.fillStyle = 'rgba(0, 10, 20, 0.7)';
+        ctx.fillRect(5, 5, 190, 80);
+        ctx.strokeStyle = 'rgba(0, 200, 255, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(5, 5, 190, 80);
+
+        ctx.fillStyle = '#00ccff';
+        ctx.font = 'bold 13px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(sector?.name || 'Unknown Sector', 12, 22);
+
+        ctx.fillStyle = diffColor;
+        ctx.font = '10px monospace';
+        ctx.fillText(`Security: ${difficulty.toUpperCase()}`, 12, 38);
+
+        ctx.fillStyle = '#778899';
+        ctx.fillText(`Zoom: ${(this.localZoom * 100).toFixed(0)}%`, 12, 52);
+
+        const entities = (sector?.entities || []).filter(e => e.alive);
+        const ships = entities.filter(e => e.type === 'enemy' || e.type === 'npc' || e.type === 'guild');
+        const asteroids = entities.filter(e => e.type === 'asteroid');
+        ctx.fillText(`Ships: ${ships.length} | Rocks: ${asteroids.length}`, 12, 66);
+
+        // Player coordinates
+        const player = this.game.player;
+        if (player) {
+            ctx.fillStyle = '#556677';
+            ctx.font = '9px monospace';
+            ctx.fillText(`Pos: ${Math.round(player.x)}, ${Math.round(player.y)}`, 12, 80);
+        }
+    }
+
+    drawLocalLegend(ctx, w, h) {
+        const items = [
+            { color: '#00ffff', shape: 'tri', label: 'You' },
+            { color: '#ff4444', shape: 'tri', label: 'Hostile' },
+            { color: '#88cc88', shape: 'dot', label: 'NPC Miner' },
+            { color: '#4488ff', shape: 'shield', label: 'Security' },
+            { color: '#00cc44', shape: 'diamond', label: 'Station' },
+            { color: '#0088ff', shape: 'circle', label: 'Gate' },
+        ];
+
+        const startX = w - 110;
+        let y = h - items.length * 15 - 10;
+
+        ctx.fillStyle = 'rgba(0, 10, 20, 0.6)';
+        ctx.fillRect(startX - 5, y - 5, 115, items.length * 15 + 10);
+
+        ctx.font = '9px monospace';
+        for (const item of items) {
+            const ix = startX + 5;
+            ctx.fillStyle = item.color;
+            ctx.beginPath();
+            ctx.arc(ix, y + 5, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#889999';
+            ctx.textAlign = 'left';
+            ctx.fillText(item.label, ix + 8, y + 8);
+            y += 15;
+        }
     }
 
     // ==========================================
@@ -430,19 +1072,21 @@ export class SectorMapManager {
     handleLocalZoom(e) {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -1 : 1;
-        const factor = 1 + 0.2 * delta;
-        this.localZoom = Math.max(0.1, Math.min(10, this.localZoom * factor));
+        const factor = 1 + 0.15 * delta;
+        this.localZoom = Math.max(0.05, Math.min(12, this.localZoom * factor));
     }
 
     handleLocalMouseDown(e) {
         this.isDragging = true;
+        this.dragMoved = false;
         this.dragStart = { x: e.clientX, y: e.clientY };
         this.localCanvas.style.cursor = 'grabbing';
     }
 
     handleLocalMouseMove(e) {
+        this.mousePos = { x: e.offsetX, y: e.offsetY };
+
         if (!this.isDragging) {
-            // Handle hover
             const entity = this.findEntityAtScreenPos(e.offsetX, e.offsetY);
             this.hoveredEntity = entity;
             this.localCanvas.style.cursor = entity ? 'pointer' : 'grab';
@@ -451,6 +1095,8 @@ export class SectorMapManager {
 
         const dx = e.clientX - this.dragStart.x;
         const dy = e.clientY - this.dragStart.y;
+
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.dragMoved = true;
 
         const scale = (this.localZoom * this.localCanvas.width) / CONFIG.SECTOR_SIZE;
         this.localPan.x -= dx / scale;
@@ -465,7 +1111,7 @@ export class SectorMapManager {
     }
 
     handleLocalClick(e) {
-        if (this.isDragging) return;
+        if (this.dragMoved) return;
 
         const entity = this.findEntityAtScreenPos(e.offsetX, e.offsetY);
         if (entity) {
@@ -479,7 +1125,6 @@ export class SectorMapManager {
         const entity = this.findEntityAtScreenPos(e.offsetX, e.offsetY);
         if (entity) {
             this.game.selectTarget(entity);
-            // Position context menu
             this.game.ui?.showContextMenu(e.clientX, e.clientY, entity);
         }
     }
@@ -487,72 +1132,107 @@ export class SectorMapManager {
     findEntityAtScreenPos(screenX, screenY) {
         if (!this.localCanvas) return null;
 
-        const width = this.localCanvas.width;
-        const height = this.localCanvas.height;
-        const scale = (this.localZoom * width) / CONFIG.SECTOR_SIZE;
-        const offsetX = width / 2 - this.localPan.x * scale;
-        const offsetY = height / 2 - this.localPan.y * scale;
+        const w = this.localCanvas.width;
+        const h = this.localCanvas.height;
+        const scale = (this.localZoom * w) / CONFIG.SECTOR_SIZE;
+        const ox = w / 2 - this.localPan.x * scale;
+        const oy = h / 2 - this.localPan.y * scale;
 
-        // Convert screen to world
-        const worldX = (screenX - offsetX) / scale;
-        const worldY = (screenY - offsetY) / scale;
+        const worldX = (screenX - ox) / scale;
+        const worldY = (screenY - oy) / scale;
 
         const entities = this.game.currentSector?.entities || [];
-        const clickRadius = 20 / scale;
+        const clickRadius = 15 / scale;
 
         let closest = null;
         let closestDist = Infinity;
 
+        // Prioritize ships over asteroids
         for (const entity of entities) {
-            if (!entity.alive || !entity.visible) continue;
+            if (!entity.alive || entity.visible === false) continue;
 
             const dx = entity.x - worldX;
             const dy = entity.y - worldY;
             const dist = Math.sqrt(dx * dx + dy * dy);
             const entityRadius = (entity.radius || 20) + clickRadius;
 
-            if (dist < entityRadius && dist < closestDist) {
+            // Ships get priority in selection
+            const priority = (entity.type === 'asteroid') ? 0.5 : 1.0;
+
+            if (dist < entityRadius && dist * priority < closestDist) {
                 closest = entity;
-                closestDist = dist;
+                closestDist = dist * priority;
             }
         }
 
         return closest;
     }
 
+    hideTooltip() {
+        if (this.tooltip) this.tooltip.classList.add('hidden');
+        this.hoveredEntity = null;
+        this.hoveredSector = null;
+    }
+
     // ==========================================
     // UNIVERSE MAP RENDERING
     // ==========================================
 
-    /**
-     * Render the universe map
-     */
     renderUniverseMap() {
         if (!this.universeCtx || !this.universeCanvas) return;
 
         const ctx = this.universeCtx;
-        const width = this.universeCanvas.width;
-        const height = this.universeCanvas.height;
+        const w = this.universeCanvas.width;
+        const h = this.universeCanvas.height;
 
-        // Clear canvas
-        ctx.fillStyle = '#000a14';
-        ctx.fillRect(0, 0, width, height);
+        // Background with subtle nebula
+        ctx.fillStyle = '#000810';
+        ctx.fillRect(0, 0, w, h);
+        this.drawUniverseBackground(ctx, w, h);
 
         const layout = UNIVERSE_LAYOUT;
         const sectors = layout.sectors;
         const gates = layout.gates;
+        const positions = this.calculateSectorPositions(sectors, w, h);
+        const currentSectorId = this.game.currentSector?.id;
 
-        // Calculate layout bounds and scale
-        const positions = this.calculateSectorPositions(sectors, width, height);
-
-        // Draw gate connections first
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
-        ctx.lineWidth = 2;
-
+        // Draw gate connections with animated flow
         for (const gate of gates) {
             const fromPos = positions[gate.from];
             const toPos = positions[gate.to];
-            if (fromPos && toPos) {
+            if (!fromPos || !toPos) continue;
+
+            // Base line
+            ctx.strokeStyle = 'rgba(0, 180, 255, 0.15)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(fromPos.x, fromPos.y);
+            ctx.lineTo(toPos.x, toPos.y);
+            ctx.stroke();
+
+            // Animated flow dots
+            const dx = toPos.x - fromPos.x;
+            const dy = toPos.y - fromPos.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const dotCount = Math.floor(len / 30);
+
+            for (let i = 0; i < dotCount; i++) {
+                const t = ((i / dotCount) + this.animTime * 0.15) % 1;
+                const px = fromPos.x + dx * t;
+                const py = fromPos.y + dy * t;
+                const alpha = Math.sin(t * Math.PI) * 0.4;
+
+                ctx.fillStyle = `rgba(0, 200, 255, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Trade route indicators (if commerce system exists)
+            const fromIsAdj = gate.from === currentSectorId || gate.to === currentSectorId;
+            if (fromIsAdj) {
+                ctx.strokeStyle = 'rgba(0, 200, 255, 0.3)';
+                ctx.lineWidth = 3;
                 ctx.beginPath();
                 ctx.moveTo(fromPos.x, fromPos.y);
                 ctx.lineTo(toPos.x, toPos.y);
@@ -560,63 +1240,249 @@ export class SectorMapManager {
             }
         }
 
-        // Draw sectors
-        const currentSectorId = this.game.currentSector?.id;
+        // Draw autopilot route overlay
+        const routeInfo = this.game.autopilot?.getRouteInfo();
+        if (routeInfo) {
+            const routePath = routeInfo.path;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 200, 0, 0.6)';
+            ctx.lineWidth = 4;
+            ctx.shadowColor = '#ffcc00';
+            ctx.shadowBlur = 8;
+            ctx.setLineDash([8, 4]);
 
+            for (let i = 0; i < routePath.length - 1; i++) {
+                const fromPos = positions[routePath[i]];
+                const toPos = positions[routePath[i + 1]];
+                if (!fromPos || !toPos) continue;
+
+                // Dim completed segments, bright remaining
+                const completed = i < routeInfo.currentIndex;
+                ctx.strokeStyle = completed ? 'rgba(255, 200, 0, 0.15)' : 'rgba(255, 200, 0, 0.6)';
+                ctx.lineWidth = completed ? 2 : 4;
+
+                ctx.beginPath();
+                ctx.moveTo(fromPos.x, fromPos.y);
+                ctx.lineTo(toPos.x, toPos.y);
+                ctx.stroke();
+            }
+
+            // Route destination marker
+            const destPos = positions[routePath[routePath.length - 1]];
+            if (destPos) {
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.3)';
+                ctx.beginPath();
+                ctx.arc(destPos.x, destPos.y, 42, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        // Draw sectors
         for (const sector of sectors) {
             const pos = positions[sector.id];
             if (!pos) continue;
 
             const isCurrent = sector.id === currentSectorId;
             const isHovered = this.hoveredSector === sector.id;
-            const radius = isCurrent ? 35 : (isHovered ? 32 : 28);
 
-            // Sector circle
-            const difficultyColor = this.getDifficultyColor(sector.difficulty);
-            ctx.fillStyle = isCurrent ? '#00ffff' : difficultyColor;
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Outer ring
-            ctx.strokeStyle = isCurrent ? '#00ffff' : 'rgba(0, 255, 255, 0.5)';
-            ctx.lineWidth = isCurrent ? 3 : 2;
-            ctx.stroke();
-
-            // Station indicator
-            if (sector.hasStation) {
-                ctx.fillStyle = '#00ff00';
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y - radius - 8, 5, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            // Sector name
-            ctx.fillStyle = isCurrent ? '#000000' : '#ffffff';
-            ctx.font = isCurrent ? 'bold 11px monospace' : '10px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(sector.name.substring(0, 12), pos.x, pos.y + 4);
-
-            // Difficulty label below
-            ctx.fillStyle = '#888888';
-            ctx.font = '9px monospace';
-            ctx.fillText(sector.difficulty.toUpperCase(), pos.x, pos.y + radius + 15);
+            this.drawUniverseSector(ctx, sector, pos, isCurrent, isHovered);
         }
 
         // Draw legend
-        this.drawUniverseLegend(ctx, width, height);
+        this.drawUniverseLegend(ctx, w, h);
+
+        // Hovered sector tooltip
+        if (this.hoveredSector) {
+            this.drawUniverseTooltip(ctx, w, h, positions);
+        }
     }
 
-    /**
-     * Calculate screen positions for sectors
-     */
-    calculateSectorPositions(sectors, width, height) {
+    drawUniverseBackground(ctx, w, h) {
+        // Subtle nebula clouds
+        for (let i = 0; i < 3; i++) {
+            const cx = (i * 0.4 + 0.2) * w;
+            const cy = (Math.sin(i * 2.3) * 0.3 + 0.5) * h;
+            const r = 200;
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+            const colors = ['#110022', '#001122', '#002200'];
+            grad.addColorStop(0, colors[i] + '44');
+            grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+        }
+
+        // Background stars
+        const rng = (i) => {
+            const x = Math.sin(i * 127.1 + 47.3) * 43758.5453;
+            return x - Math.floor(x);
+        };
+        ctx.fillStyle = 'rgba(150, 180, 220, 0.4)';
+        for (let i = 0; i < 100; i++) {
+            ctx.beginPath();
+            ctx.arc(rng(i) * w, rng(i + 200) * h, rng(i + 400) * 1.2 + 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    drawUniverseSector(ctx, sector, pos, isCurrent, isHovered) {
+        const baseRadius = 30;
+        const radius = isCurrent ? baseRadius + 8 : (isHovered ? baseRadius + 4 : baseRadius);
+        const diffColor = this.getDifficultyColor(sector.difficulty);
+        const pulse = Math.sin(this.animTime * 2) * 0.15 + 0.85;
+
+        // Outer glow for current
+        if (isCurrent) {
+            const grad = ctx.createRadialGradient(pos.x, pos.y, radius, pos.x, pos.y, radius + 20);
+            grad.addColorStop(0, 'rgba(0, 255, 255, 0.15)');
+            grad.addColorStop(1, 'rgba(0, 255, 255, 0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, radius + 20, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Main circle - gradient fill
+        const grad = ctx.createRadialGradient(
+            pos.x - radius * 0.2, pos.y - radius * 0.2, 0,
+            pos.x, pos.y, radius
+        );
+        if (isCurrent) {
+            grad.addColorStop(0, '#44ffff');
+            grad.addColorStop(1, '#008888');
+        } else {
+            grad.addColorStop(0, diffColor);
+            grad.addColorStop(1, this.darkenColor(diffColor, 0.4));
+        }
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ring
+        ctx.strokeStyle = isCurrent ? `rgba(0, 255, 255, ${pulse})` : 'rgba(100, 180, 220, 0.4)';
+        ctx.lineWidth = isCurrent ? 3 : (isHovered ? 2 : 1);
+        ctx.stroke();
+
+        // Station icon
+        if (sector.hasStation) {
+            ctx.fillStyle = '#00ff66';
+            ctx.beginPath();
+            const sx = pos.x + radius * 0.6;
+            const sy = pos.y - radius * 0.6;
+            ctx.moveTo(sx, sy - 5);
+            ctx.lineTo(sx + 4, sy);
+            ctx.lineTo(sx, sy + 5);
+            ctx.lineTo(sx - 4, sy);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Ship count badge
+        const guildSys = this.game.guildEconomySystem;
+        if (guildSys) {
+            let shipCount = 0;
+            for (const faction of Object.values(guildSys.factions || {})) {
+                for (const ship of Object.values(faction.ships || {})) {
+                    if (ship.currentSector === sector.id) shipCount++;
+                }
+            }
+            if (shipCount > 0) {
+                ctx.fillStyle = 'rgba(0, 30, 60, 0.8)';
+                ctx.beginPath();
+                ctx.arc(pos.x + radius * 0.7, pos.y + radius * 0.5, 9, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#aaccff';
+                ctx.font = 'bold 8px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(shipCount, pos.x + radius * 0.7, pos.y + radius * 0.5 + 3);
+            }
+        }
+
+        // Sector name
+        ctx.fillStyle = isCurrent ? '#002222' : '#ffffff';
+        ctx.font = isCurrent ? 'bold 11px monospace' : '10px monospace';
+        ctx.textAlign = 'center';
+        const displayName = sector.name.length > 14 ? sector.name.substring(0, 12) + '..' : sector.name;
+        ctx.fillText(displayName, pos.x, pos.y + 4);
+
+        // Difficulty label
+        ctx.fillStyle = isCurrent ? '#005555' : 'rgba(150, 180, 200, 0.6)';
+        ctx.font = '8px monospace';
+        ctx.fillText(sector.difficulty.toUpperCase(), pos.x, pos.y + radius + 14);
+    }
+
+    drawUniverseTooltip(ctx, w, h, positions) {
+        const sectorId = this.hoveredSector;
+        const sector = UNIVERSE_LAYOUT.sectors.find(s => s.id === sectorId);
+        if (!sector) return;
+
+        const pos = positions[sectorId];
+        if (!pos) return;
+
+        const lines = [sector.name];
+        lines.push(`Security: ${sector.difficulty}`);
+
+        // Station specialty
+        const station = this.game.universe?.getSector(sectorId)?.getStation?.();
+        if (station?.specialty) {
+            lines.push(`Specialty: ${station.specialty}`);
+        }
+
+        // Enemy count from config
+        const diffConfig = CONFIG.SECTOR_DIFFICULTY[sector.difficulty];
+        if (diffConfig) {
+            lines.push(`Hostiles: ~${diffConfig.enemyCount}`);
+        }
+
+        // Guild ships in sector
+        const guildSys = this.game.guildEconomySystem;
+        if (guildSys) {
+            let ships = 0;
+            for (const faction of Object.values(guildSys.factions || {})) {
+                for (const ship of Object.values(faction.ships || {})) {
+                    if (ship.currentSector === sectorId) ships++;
+                }
+            }
+            if (ships > 0) lines.push(`Guild ships: ${ships}`);
+        }
+
+        // Draw tooltip
+        ctx.font = '10px monospace';
+        const padding = 8;
+        const lineH = 15;
+        const tooltipW = Math.max(...lines.map(l => ctx.measureText(l).width)) + padding * 2 + 10;
+        const tooltipH = lines.length * lineH + padding * 2;
+
+        let tx = pos.x + 45;
+        let ty = pos.y - tooltipH / 2;
+        if (tx + tooltipW > w) tx = pos.x - tooltipW - 45;
+        if (ty < 5) ty = 5;
+        if (ty + tooltipH > h) ty = h - tooltipH - 5;
+
+        ctx.fillStyle = 'rgba(0, 10, 25, 0.92)';
+        ctx.strokeStyle = 'rgba(0, 180, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(tx, ty, tooltipW, tooltipH, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.textAlign = 'left';
+        for (let i = 0; i < lines.length; i++) {
+            ctx.fillStyle = i === 0 ? '#ffffff' : '#99aabb';
+            ctx.fillText(lines[i], tx + padding, ty + padding + (i + 1) * lineH - 3);
+        }
+    }
+
+    calculateSectorPositions(sectors, w, h) {
         const positions = {};
-        const padding = 80;
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const spreadX = (width - padding * 2) / 3;
-        const spreadY = (height - padding * 2) / 3;
+        const padding = 90;
+        const centerX = w / 2;
+        const centerY = h / 2;
+        const spreadX = (w - padding * 2) / 3;
+        const spreadY = (h - padding * 2) / 3;
 
         for (const sector of sectors) {
             positions[sector.id] = {
@@ -624,66 +1490,51 @@ export class SectorMapManager {
                 y: centerY + sector.y * spreadY,
             };
         }
-
         return positions;
     }
 
-    /**
-     * Get color based on difficulty
-     */
     getDifficultyColor(difficulty) {
         switch (difficulty) {
-            case 'hub': return '#00ff00';
-            case 'safe': return '#44ff44';
-            case 'normal': return '#ffff00';
-            case 'dangerous': return '#ff8800';
-            case 'deadly': return '#ff0000';
+            case 'hub': return '#22dd44';
+            case 'safe': return '#44ee55';
+            case 'normal': return '#ddcc22';
+            case 'dangerous': return '#ee8822';
+            case 'deadly': return '#ee2222';
             default: return '#888888';
         }
     }
 
-    /**
-     * Draw universe map legend
-     */
-    drawUniverseLegend(ctx, width, height) {
-        const legendY = height - 80;
-        const startX = 20;
-
-        ctx.font = '10px monospace';
-
+    drawUniverseLegend(ctx, w, h) {
         const items = [
-            { color: '#00ff00', label: 'Hub' },
-            { color: '#44ff44', label: 'Safe' },
-            { color: '#ffff00', label: 'Normal' },
-            { color: '#ff8800', label: 'Dangerous' },
-            { color: '#ff0000', label: 'Deadly' },
+            { color: '#22dd44', label: 'Hub' },
+            { color: '#44ee55', label: 'Safe' },
+            { color: '#ddcc22', label: 'Normal' },
+            { color: '#ee8822', label: 'Danger' },
+            { color: '#ee2222', label: 'Deadly' },
         ];
 
-        let x = startX;
+        const legendX = 15;
+        const legendY = h - 55;
+
+        ctx.fillStyle = 'rgba(0, 10, 20, 0.6)';
+        ctx.fillRect(legendX - 5, legendY - 5, 280, 45);
+
+        ctx.font = '9px monospace';
+        let x = legendX;
         for (const item of items) {
             ctx.fillStyle = item.color;
             ctx.beginPath();
-            ctx.arc(x, legendY, 6, 0, Math.PI * 2);
+            ctx.arc(x + 5, legendY + 10, 5, 0, Math.PI * 2);
             ctx.fill();
-
-            ctx.fillStyle = '#888888';
+            ctx.fillStyle = '#889999';
             ctx.textAlign = 'left';
-            ctx.fillText(item.label, x + 12, legendY + 4);
-
-            x += 80;
+            ctx.fillText(item.label, x + 14, legendY + 14);
+            x += 55;
         }
 
-        // Station indicator
-        ctx.fillStyle = '#00ff00';
-        ctx.beginPath();
-        ctx.arc(x, legendY, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#888888';
-        ctx.fillText('= Station', x + 12, legendY + 4);
-
-        // Instructions
-        ctx.textAlign = 'right';
-        ctx.fillText('Click a sector to warp to its gate', width - 15, height - 15);
+        ctx.fillStyle = '#556677';
+        ctx.textAlign = 'left';
+        ctx.fillText('Click a sector to select its gate | Hover for details', legendX, legendY + 32);
     }
 
     // ==========================================
@@ -694,20 +1545,21 @@ export class SectorMapManager {
         const sectorId = this.findSectorAtPos(e.offsetX, e.offsetY);
         if (!sectorId) return;
 
-        // Don't warp to current sector
         if (sectorId === this.game.currentSector?.id) {
             this.game.ui?.log('Already in this sector', 'system');
             return;
         }
 
-        // Find the gate that leads to this sector (or a connected sector leading there)
+        // Direct gate for adjacent sectors
         const gate = this.findGateToSector(sectorId);
         if (gate) {
             this.game.selectTarget(gate);
             this.game.ui?.log(`Selected gate to ${sectorId}. Press S to warp.`, 'system');
             this.hide();
         } else {
-            this.game.ui?.log('No direct gate connection to that sector', 'system');
+            // Multi-sector route for non-adjacent sectors
+            this.game.autopilot?.planRoute(sectorId);
+            this.hide();
         }
     }
 
@@ -718,20 +1570,15 @@ export class SectorMapManager {
     }
 
     findSectorAtPos(screenX, screenY) {
-        const width = this.universeCanvas.width;
-        const height = this.universeCanvas.height;
-        const positions = this.calculateSectorPositions(UNIVERSE_LAYOUT.sectors, width, height);
+        const w = this.universeCanvas.width;
+        const h = this.universeCanvas.height;
+        const positions = this.calculateSectorPositions(UNIVERSE_LAYOUT.sectors, w, h);
 
         for (const [sectorId, pos] of Object.entries(positions)) {
             const dx = screenX - pos.x;
             const dy = screenY - pos.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist < 35) {
-                return sectorId;
-            }
+            if (Math.sqrt(dx * dx + dy * dy) < 38) return sectorId;
         }
-
         return null;
     }
 
@@ -739,19 +1586,43 @@ export class SectorMapManager {
         const currentSectorId = this.game.currentSector?.id;
         const gates = UNIVERSE_LAYOUT.gates;
 
-        // Check if there's a direct gate connection
         const hasConnection = gates.some(g =>
             (g.from === currentSectorId && g.to === targetSectorId) ||
             (g.to === currentSectorId && g.from === targetSectorId)
         );
-
         if (!hasConnection) return null;
 
-        // Find the gate entity in current sector
         const entities = this.game.currentSector?.entities || [];
         return entities.find(e =>
-            e.type === 'warpgate' &&
-            (e.destination === targetSectorId || e.targetSector === targetSectorId)
+            e.type === 'gate' &&
+            e.destinationSectorId === targetSectorId
         );
+    }
+
+    // ==========================================
+    // UTILITIES
+    // ==========================================
+
+    hexToRgba(hex, alpha) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    darkenColor(hex, factor) {
+        const r = Math.round(parseInt(hex.slice(1, 3), 16) * factor);
+        const g = Math.round(parseInt(hex.slice(3, 5), 16) * factor);
+        const b = Math.round(parseInt(hex.slice(5, 7), 16) * factor);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    getAsteroidColor(asteroid) {
+        const oreType = asteroid.oreType || 'veldspar';
+        const config = CONFIG.ASTEROID_TYPES[oreType];
+        if (!config) return '#888888';
+        const color = config.color;
+        if (typeof color === 'number') return `#${color.toString(16).padStart(6, '0')}`;
+        return color;
     }
 }

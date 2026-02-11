@@ -24,15 +24,25 @@ export class StarField {
     generate() {
         const random = new SeededRandom(42);
 
+        // Parallax factors: deep background moves slowest, near stars move with camera
+        const parallaxFactors = [0.05, 0.15, 0.35];
+        // Star color palettes per layer (distant=cool blue, near=warm white)
+        const layerTints = [
+            { r: 0.7, g: 0.8, b: 1.0 },   // Distant: cool blue
+            { r: 0.9, g: 0.9, b: 1.0 },   // Mid: neutral
+            { r: 1.0, g: 0.95, b: 0.9 },  // Near: warm white
+        ];
+
         for (let layer = 0; layer < this.layerCount; layer++) {
             const layerGroup = new THREE.Group();
             const starCount = Math.floor(CONFIG.STAR_COUNT / (layer + 1));
-            const depth = layer * 0.3; // Parallax factor
+            const depth = parallaxFactors[layer];
 
             // Create star geometry
             const positions = [];
             const colors = [];
             const sizes = [];
+            const tint = layerTints[layer];
 
             for (let i = 0; i < starCount; i++) {
                 // Position - spread across larger area for seamless scrolling
@@ -40,10 +50,17 @@ export class StarField {
                 const y = random.float(-CONFIG.SECTOR_SIZE * 2, CONFIG.SECTOR_SIZE * 3);
                 positions.push(x, y, -50 - layer * 10);
 
-                // Color - white with slight variation
-                const brightness = random.float(0.5, 1.0);
-                const tint = random.float(0.9, 1.1);
-                colors.push(brightness * tint, brightness, brightness);
+                // Color - tinted per layer with brightness variation
+                const brightness = random.float(0.4, 1.0);
+                // Occasional colored stars (blue, red, yellow giants)
+                let r = brightness * tint.r;
+                let g = brightness * tint.g;
+                let b = brightness * tint.b;
+                const starType = random.float(0, 1);
+                if (starType > 0.95) { r *= 1.3; g *= 0.7; b *= 0.7; } // Red giant
+                else if (starType > 0.9) { r *= 0.7; g *= 0.8; b *= 1.3; } // Blue star
+                else if (starType > 0.85) { r *= 1.2; g *= 1.1; b *= 0.6; } // Yellow star
+                colors.push(r, g, b);
 
                 // Size - back layers have smaller stars
                 sizes.push(random.float(1, 3) / (layer + 1));
@@ -102,15 +119,19 @@ export class StarField {
     update(camera) {
         if (!camera) return;
 
-        for (const layer of this.layers) {
+        const time = Date.now() * 0.001;
+
+        for (let i = 0; i < this.layers.length; i++) {
+            const layer = this.layers[i];
             // Apply parallax offset
             layer.group.position.x = -camera.x * layer.parallax;
             layer.group.position.y = -camera.y * layer.parallax;
 
-            // Twinkle effect for front layer
-            if (layer.parallax === 0 && layer.stars) {
-                const time = Date.now() * 0.001;
-                layer.stars.material.opacity = 0.7 + Math.sin(time) * 0.1;
+            // Twinkle effect - each layer twinkles at different rates
+            if (layer.stars) {
+                const rate = 0.5 + i * 0.3;
+                const baseOpacity = 0.8 - i * 0.15;
+                layer.stars.material.opacity = baseOpacity + Math.sin(time * rate) * 0.06;
             }
         }
     }

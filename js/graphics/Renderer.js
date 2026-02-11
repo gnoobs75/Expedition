@@ -7,8 +7,11 @@
 import { CONFIG } from '../config.js';
 import { StarField } from './StarField.js';
 import { Nebula } from './Nebula.js';
+import { SpaceDust } from './SpaceDust.js';
 import { Effects } from './Effects.js';
 import { LightPool } from './LightPool.js';
+import { EngineTrails } from './EngineTrails.js';
+import { StatusEffects } from './StatusEffects.js';
 
 export class Renderer {
     constructor(game) {
@@ -28,8 +31,16 @@ export class Renderer {
         // Special effects
         this.starField = null;
         this.nebula = null;
+        this.spaceDust = null;
         this.effects = null;
         this.lightPool = null;
+        this.engineTrails = null;
+        this.statusEffects = null;
+        this.beltDustMeshes = [];
+
+        // Speed lines (streaks when moving fast)
+        this.speedLines = null;
+        this.speedLineCount = 40;
 
         // Entity mesh tracking
         this.entityMeshes = new Map();
@@ -40,6 +51,39 @@ export class Renderer {
         // Selection indicator
         this.selectionMesh = null;
         this.lockMesh = null;
+
+        // Orbit ring visualization
+        this.orbitRingMesh = null;
+
+        // Weapon range ring
+        this.weaponRangeMesh = null;
+        this.weaponRangeTimer = 0;
+        this.weaponRangePersist = false; // toggle with key
+
+        // Mining progress ring
+        this.miningRingMesh = null;
+
+        // Target lead indicator
+        this.leadIndicatorMesh = null;
+
+        // Sensor sweep
+        this.sensorSweepEnabled = false;
+        this.sensorSweepAngle = 0;
+        this.sensorSweepMesh = null;
+        this.sensorSweepPings = [];
+
+        // Velocity vector line
+        this.velocityVectorMesh = null;
+        this.velocityVectorTip = null;
+
+        // Fleet formation lines
+        this.fleetLines = [];
+
+        // Docking tractor beam
+        this.tractorBeamMesh = null;
+
+        // Distance marker rings
+        this.distanceRings = null;
 
         // Lighting
         this.hemisphereLight = null;
@@ -105,11 +149,24 @@ export class Renderer {
         this.nebula = new Nebula(this.game);
         this.backgroundGroup.add(this.nebula.mesh);
 
+        // Create ambient space dust
+        this.spaceDust = new SpaceDust(this.game);
+        this.backgroundGroup.add(this.spaceDust.mesh);
+
         // Create dynamic light pool
         this.lightPool = new LightPool(this.scene);
 
         // Create effects manager (pass lightPool for dynamic illumination)
         this.effects = new Effects(this.game, this.effectsGroup, this.lightPool);
+
+        // Create engine trails
+        this.engineTrails = new EngineTrails(this.game, this.entityGroup);
+
+        // Create status effects (EWAR beams, shield flashes, prop flares)
+        this.statusEffects = new StatusEffects(this.game, this.effectsGroup);
+
+        // Create speed lines
+        this.createSpeedLines();
 
         // Create selection indicators
         this.createSelectionIndicators();
@@ -175,6 +232,119 @@ export class Renderer {
         this.lockMesh = new THREE.Mesh(lockGeometry, lockMaterial);
         this.lockMesh.visible = false;
         this.uiGroup.add(this.lockMesh);
+
+        // Orbit ring visualization (dashed circle)
+        const orbitRingGeometry = new THREE.RingGeometry(0.95, 1.0, 64);
+        const orbitRingMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.15,
+            side: THREE.DoubleSide,
+        });
+        this.orbitRingMesh = new THREE.Mesh(orbitRingGeometry, orbitRingMaterial);
+        this.orbitRingMesh.visible = false;
+        this.uiGroup.add(this.orbitRingMesh);
+
+        // Orbit position marker (small dot on orbit ring)
+        const markerGeometry = new THREE.CircleGeometry(4, 8);
+        const markerMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.6,
+        });
+        this.orbitMarkerMesh = new THREE.Mesh(markerGeometry, markerMaterial);
+        this.orbitMarkerMesh.visible = false;
+        this.uiGroup.add(this.orbitMarkerMesh);
+
+        // Weapon range ring (dashed circle around player)
+        const rangeRingGeo = new THREE.RingGeometry(0.97, 1.0, 64);
+        const rangeRingMat = new THREE.MeshBasicMaterial({
+            color: 0xff4444,
+            transparent: true,
+            opacity: 0.0,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+        });
+        this.weaponRangeMesh = new THREE.Mesh(rangeRingGeo, rangeRingMat);
+        this.weaponRangeMesh.visible = false;
+        this.uiGroup.add(this.weaponRangeMesh);
+
+        // Mining progress ring (arc that fills as mining cycle progresses)
+        const miningArcGeo = new THREE.RingGeometry(1.0, 1.15, 32, 1, 0, Math.PI * 2);
+        const miningArcMat = new THREE.MeshBasicMaterial({
+            color: 0x4488ff,
+            transparent: true,
+            opacity: 0.4,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+        });
+        this.miningRingMesh = new THREE.Mesh(miningArcGeo, miningArcMat);
+        this.miningRingMesh.visible = false;
+        this.uiGroup.add(this.miningRingMesh);
+
+        // Target lead indicator (crosshair at predicted position)
+        const leadGroup = new THREE.Group();
+        const leadMat = new THREE.LineBasicMaterial({
+            color: 0xff6644,
+            transparent: true,
+            opacity: 0.4,
+            depthWrite: false,
+        });
+        // Cross shape
+        const cross = [
+            [[-6, 0, 0], [6, 0, 0]],
+            [[0, -6, 0], [0, 6, 0]],
+        ];
+        for (const [a, b] of cross) {
+            const pts = [new THREE.Vector3(...a), new THREE.Vector3(...b)];
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            leadGroup.add(new THREE.Line(geo, leadMat));
+        }
+        // Small diamond outline
+        const diamondPts = [
+            new THREE.Vector3(0, 8, 0),
+            new THREE.Vector3(8, 0, 0),
+            new THREE.Vector3(0, -8, 0),
+            new THREE.Vector3(-8, 0, 0),
+            new THREE.Vector3(0, 8, 0),
+        ];
+        const diamondGeo = new THREE.BufferGeometry().setFromPoints(diamondPts);
+        leadGroup.add(new THREE.Line(diamondGeo, leadMat.clone()));
+        this.leadIndicatorMesh = leadGroup;
+        this.leadIndicatorMesh.visible = false;
+        this.uiGroup.add(this.leadIndicatorMesh);
+
+        // Velocity vector line (shows movement direction + speed)
+        const velLinePositions = new Float32Array(6); // 2 points * 3 components
+        const velGeo = new THREE.BufferGeometry();
+        velGeo.setAttribute('position', new THREE.BufferAttribute(velLinePositions, 3));
+        const velMat = new THREE.LineBasicMaterial({
+            color: 0x00ffcc,
+            transparent: true,
+            opacity: 0.35,
+            depthWrite: false,
+        });
+        this.velocityVectorMesh = new THREE.Line(velGeo, velMat);
+        this.velocityVectorMesh.visible = false;
+        this.velocityVectorMesh.frustumCulled = false;
+        this.uiGroup.add(this.velocityVectorMesh);
+
+        // Small chevron at tip
+        const tipPts = [
+            new THREE.Vector3(-4, -3, 0),
+            new THREE.Vector3(0, 4, 0),
+            new THREE.Vector3(4, -3, 0),
+        ];
+        const tipGeo = new THREE.BufferGeometry().setFromPoints(tipPts);
+        const tipMat = new THREE.LineBasicMaterial({
+            color: 0x00ffcc,
+            transparent: true,
+            opacity: 0.4,
+            depthWrite: false,
+        });
+        this.velocityVectorTip = new THREE.Line(tipGeo, tipMat);
+        this.velocityVectorTip.visible = false;
+        this.uiGroup.add(this.velocityVectorTip);
     }
 
     /**
@@ -227,11 +397,339 @@ export class Renderer {
     }
 
     /**
+     * Create speed line streaks for high-velocity visual feedback
+     */
+    createSpeedLines() {
+        this.speedLines = [];
+        for (let i = 0; i < this.speedLineCount; i++) {
+            const geo = new THREE.BufferGeometry();
+            const positions = new Float32Array(6); // 2 points * xyz
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const mat = new THREE.LineBasicMaterial({
+                color: 0x88ccff,
+                transparent: true,
+                opacity: 0,
+                depthWrite: false,
+            });
+            const line = new THREE.Line(geo, mat);
+            line.frustumCulled = false;
+            this.effectsGroup.add(line);
+            this.speedLines.push({
+                mesh: line,
+                offsetX: 0,
+                offsetY: 0,
+                length: 30 + Math.random() * 60,
+                drift: (Math.random() - 0.5) * 0.2,
+            });
+        }
+    }
+
+    /**
+     * Update speed lines based on player velocity
+     */
+    updateSpeedLines(dt) {
+        const player = this.game.player;
+        if (!player?.alive || !this.speedLines) return;
+
+        const speed = player.currentSpeed || 0;
+        const maxSpeed = player.maxSpeed || 200;
+        const isWarping = this.game.autopilot?.warping || false;
+        const speedRatio = isWarping ? 3.0 : speed / maxSpeed;
+
+        // Only show at > 70% speed (or always during warp)
+        const threshold = isWarping ? 0 : 0.7;
+        const intensity = isWarping ? 1.0 : Math.max(0, (speedRatio - threshold) / (1 - threshold));
+
+        if (intensity <= 0) {
+            for (const sl of this.speedLines) {
+                sl.mesh.material.opacity = 0;
+            }
+            return;
+        }
+
+        const vx = isWarping ? Math.cos(player.rotation || 0) * 2000 : player.velocity.x;
+        const vy = isWarping ? Math.sin(player.rotation || 0) * 2000 : player.velocity.y;
+        const heading = Math.atan2(vy, vx);
+        const viewHeight = 1000000 / (this.game.camera?.zoom || 100);
+        const spread = viewHeight * (isWarping ? 0.6 : 0.4);
+
+        for (let i = 0; i < this.speedLines.length; i++) {
+            const sl = this.speedLines[i];
+
+            // Respawn line if off-screen
+            const respawnRate = isWarping ? 0.08 : 0.02;
+            if (sl.mesh.material.opacity <= 0.01 || Math.random() < respawnRate) {
+                // Place ahead and to sides of player
+                const perp = heading + Math.PI / 2;
+                const sideOffset = (Math.random() - 0.5) * spread * 2;
+                const forwardOffset = (Math.random() - 0.3) * spread;
+                sl.offsetX = Math.cos(heading) * forwardOffset + Math.cos(perp) * sideOffset;
+                sl.offsetY = Math.sin(heading) * forwardOffset + Math.sin(perp) * sideOffset;
+                sl.mesh.material.opacity = isWarping ? (0.3 + Math.random() * 0.4) : (0.15 + Math.random() * 0.25);
+                sl.mesh.material.color.setHex(
+                    isWarping ? (Math.random() > 0.5 ? 0xccddff : 0xffffff) :
+                    (Math.random() > 0.3 ? 0x88ccff : 0xaaddff)
+                );
+            }
+
+            // Move lines opposite to travel direction (streaking effect)
+            const moveScale = isWarping ? 5.0 : 1.5;
+            sl.offsetX -= vx * dt * moveScale;
+            sl.offsetY -= vy * dt * moveScale;
+
+            const x = player.x + sl.offsetX;
+            const y = player.y + sl.offsetY;
+            const lineLen = sl.length * intensity * (isWarping ? 4.0 : (0.5 + speedRatio));
+            const ex = x - Math.cos(heading) * lineLen;
+            const ey = y - Math.sin(heading) * lineLen;
+
+            const positions = sl.mesh.geometry.attributes.position.array;
+            positions[0] = x; positions[1] = y; positions[2] = 2;
+            positions[3] = ex; positions[4] = ey; positions[5] = 2;
+            sl.mesh.geometry.attributes.position.needsUpdate = true;
+
+            // Fade based on distance from player
+            const distSq = sl.offsetX * sl.offsetX + sl.offsetY * sl.offsetY;
+            const maxDistSq = spread * spread;
+            const distFade = Math.max(0, 1 - distSq / maxDistSq);
+            const baseOpacity = isWarping ? (0.25 + Math.random() * 0.15) : (0.15 + Math.random() * 0.05);
+            sl.mesh.material.opacity = intensity * distFade * baseOpacity;
+        }
+    }
+
+    /**
+     * Update spinning debris pieces from explosions
+     */
+    updateDebris(dt) {
+        if (!this._debrisList || this._debrisList.length === 0) return;
+
+        for (let i = this._debrisList.length - 1; i >= 0; i--) {
+            const mesh = this._debrisList[i];
+            const d = mesh.userData;
+            d.life += dt;
+
+            if (d.life >= d.maxLife) {
+                this.effectsGroup.remove(mesh);
+                mesh.geometry.dispose();
+                mesh.material.dispose();
+                this._debrisList.splice(i, 1);
+                continue;
+            }
+
+            // Move
+            mesh.position.x += d.vx * dt;
+            mesh.position.y += d.vy * dt;
+            // Slow down
+            d.vx *= 0.99;
+            d.vy *= 0.99;
+            // Spin
+            mesh.rotation.z += d.spin * dt;
+            // Fade
+            const progress = d.life / d.maxLife;
+            mesh.material.opacity = 0.9 * (1 - progress * progress);
+        }
+    }
+
+    toggleWeaponRange() {
+        this.weaponRangePersist = !this.weaponRangePersist;
+        return this.weaponRangePersist;
+    }
+
+    toggleSensorSweep() {
+        this.sensorSweepEnabled = !this.sensorSweepEnabled;
+        if (!this.sensorSweepEnabled) {
+            // Clean up
+            if (this.sensorSweepMesh) {
+                this.uiGroup.remove(this.sensorSweepMesh);
+                this.sensorSweepMesh.geometry.dispose();
+                this.sensorSweepMesh.material.dispose();
+                this.sensorSweepMesh = null;
+            }
+            for (const ping of this.sensorSweepPings) {
+                this.effectsGroup.remove(ping);
+                ping.geometry.dispose();
+                ping.material.dispose();
+            }
+            this.sensorSweepPings = [];
+        }
+        return this.sensorSweepEnabled;
+    }
+
+    updateSensorSweep(dt) {
+        if (!this.sensorSweepEnabled) return;
+        const player = this.game.player;
+        if (!player) return;
+
+        const sweepRadius = 2000;
+        const sweepArc = Math.PI / 4; // 45-degree cone
+        const rotSpeed = 1.2; // radians per second
+
+        this.sensorSweepAngle += rotSpeed * dt;
+        if (this.sensorSweepAngle > Math.PI * 2) this.sensorSweepAngle -= Math.PI * 2;
+
+        // Create sweep mesh if needed
+        if (!this.sensorSweepMesh) {
+            const shape = new THREE.Shape();
+            shape.moveTo(0, 0);
+            const segments = 20;
+            for (let i = 0; i <= segments; i++) {
+                const a = -sweepArc / 2 + (sweepArc * i / segments);
+                shape.lineTo(Math.cos(a) * sweepRadius, Math.sin(a) * sweepRadius);
+            }
+            shape.lineTo(0, 0);
+            const geo = new THREE.ShapeGeometry(shape);
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0x00ff88,
+                transparent: true,
+                opacity: 0.06,
+                side: THREE.DoubleSide,
+            });
+            this.sensorSweepMesh = new THREE.Mesh(geo, mat);
+            this.sensorSweepMesh.position.z = 5;
+            this.uiGroup.add(this.sensorSweepMesh);
+        }
+
+        // Position sweep on player
+        this.sensorSweepMesh.position.x = player.x;
+        this.sensorSweepMesh.position.y = player.y;
+        this.sensorSweepMesh.rotation.z = this.sensorSweepAngle;
+
+        // Check entities in sweep cone and spawn pings
+        const sector = this.game.currentSector;
+        if (sector) {
+            for (const entity of sector.entities) {
+                if (entity === player || !entity.alive) continue;
+                const dx = entity.x - player.x;
+                const dy = entity.y - player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > sweepRadius || dist < 30) continue;
+
+                // Check if entity is within sweep cone
+                const entityAngle = Math.atan2(dy, dx);
+                let angleDiff = entityAngle - this.sensorSweepAngle;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+                if (Math.abs(angleDiff) < sweepArc / 2 && Math.abs(angleDiff) > sweepArc / 4) {
+                    // Spawn a brief ping circle
+                    const pingGeo = new THREE.RingGeometry(8, 12, 12);
+                    const pingColor = entity.hostility === 'hostile' ? 0xff4444 :
+                        (entity.type === 'asteroid' ? 0xffaa00 : 0x00ffaa);
+                    const pingMat = new THREE.MeshBasicMaterial({
+                        color: pingColor,
+                        transparent: true,
+                        opacity: 0.7,
+                    });
+                    const pingMesh = new THREE.Mesh(pingGeo, pingMat);
+                    pingMesh.position.set(entity.x, entity.y, 12);
+                    pingMesh.userData = { life: 0, maxLife: 1.5 };
+                    this.effectsGroup.add(pingMesh);
+                    this.sensorSweepPings.push(pingMesh);
+                }
+            }
+        }
+
+        // Update pings
+        for (let i = this.sensorSweepPings.length - 1; i >= 0; i--) {
+            const ping = this.sensorSweepPings[i];
+            ping.userData.life += dt;
+            if (ping.userData.life >= ping.userData.maxLife) {
+                this.effectsGroup.remove(ping);
+                ping.geometry.dispose();
+                ping.material.dispose();
+                this.sensorSweepPings.splice(i, 1);
+                continue;
+            }
+            const t = ping.userData.life / ping.userData.maxLife;
+            ping.material.opacity = 0.7 * (1 - t);
+            const s = 1 + t * 0.5;
+            ping.scale.setScalar(s);
+        }
+    }
+
+    /**
+     * Update fleet formation lines connecting fleet ships in same control group
+     */
+    updateFleetFormation() {
+        // Clear old lines
+        for (const line of this.fleetLines) {
+            this.uiGroup.remove(line);
+            line.geometry.dispose();
+            line.material.dispose();
+        }
+        this.fleetLines = [];
+
+        const fleet = this.game.fleetSystem;
+        if (!fleet?.controlGroups) return;
+        const player = this.game.player;
+        if (!player?.alive) return;
+
+        // Group colors
+        const groupColors = [0, 0x44ffaa, 0x44aaff, 0xffaa44, 0xff44aa, 0xaaff44];
+
+        for (const [groupId, memberIds] of fleet.controlGroups) {
+            if (memberIds.size < 1) continue;
+
+            const ships = [];
+            const allFleetShips = this.game.fleet?.ships || [];
+            for (const id of memberIds) {
+                const ship = allFleetShips.find(s => s.fleetId === id);
+                if (ship?.alive) {
+                    ships.push(ship);
+                }
+            }
+            if (ships.length < 1) continue;
+
+            const color = groupColors[groupId] || 0x88ff88;
+
+            // Draw lines from player to each fleet ship in this group
+            for (const ship of ships) {
+                const points = [
+                    new THREE.Vector3(player.x, player.y, 2),
+                    new THREE.Vector3(ship.x, ship.y, 2),
+                ];
+                const geo = new THREE.BufferGeometry().setFromPoints(points);
+                const mat = new THREE.LineBasicMaterial({
+                    color,
+                    transparent: true,
+                    opacity: 0.08,
+                    depthWrite: false,
+                });
+                const line = new THREE.Line(geo, mat);
+                line.frustumCulled = false;
+                this.uiGroup.add(line);
+                this.fleetLines.push(line);
+            }
+
+            // Small group number badge (as a text sprite would be complex, use a dot instead)
+            for (const ship of ships) {
+                const dotGeo = new THREE.CircleGeometry(3, 6);
+                const dotMat = new THREE.MeshBasicMaterial({
+                    color,
+                    transparent: true,
+                    opacity: 0.5,
+                    depthWrite: false,
+                });
+                const dot = new THREE.Mesh(dotGeo, dotMat);
+                dot.position.set(ship.x, ship.y + (ship.radius || 20) + 8, 5);
+                this.uiGroup.add(dot);
+                this.fleetLines.push(dot); // reuse array for cleanup
+            }
+        }
+    }
+
+    /**
      * Load a sector's entities into the scene
      */
     loadSector(sector) {
         // Update nebula for this sector
         this.nebula.setSeed(sector.seed);
+
+        // Update space dust for sector theme
+        this.spaceDust.regenerate(sector.id);
+
+        // Create asteroid belt dust clouds
+        this.createBeltDustClouds(sector);
 
         // Create meshes for all entities
         for (const entity of sector.entities) {
@@ -263,9 +761,14 @@ export class Renderer {
         }
         this.entityShadows.clear();
 
-        // Clear effects and lights
+        // Clear asteroid belt dust clouds
+        this.clearBeltDustClouds();
+
+        // Clear effects, lights, trails, and status effects
         this.effects.clear();
         this.lightPool.clear();
+        this.engineTrails.clear();
+        this.statusEffects.clear();
     }
 
     /**
@@ -345,6 +848,78 @@ export class Renderer {
     }
 
     /**
+     * Create dust cloud visuals for asteroid belt fields
+     */
+    createBeltDustClouds(sector) {
+        this.beltDustMeshes = [];
+
+        if (!sector.asteroidFields) return;
+
+        for (const field of sector.asteroidFields) {
+            const group = new THREE.Group();
+            group.position.set(field.x, field.y, -1);
+
+            // Main dust cloud - large, soft circle
+            const mainGeo = new THREE.CircleGeometry(field.radius * 0.9, 32);
+            const mainMat = new THREE.MeshBasicMaterial({
+                color: 0x8899aa,
+                transparent: true,
+                opacity: 0.04,
+                depthWrite: false,
+            });
+            group.add(new THREE.Mesh(mainGeo, mainMat));
+
+            // Inner glow - slightly brighter core
+            const innerGeo = new THREE.CircleGeometry(field.radius * 0.5, 24);
+            const innerMat = new THREE.MeshBasicMaterial({
+                color: 0x99aabb,
+                transparent: true,
+                opacity: 0.06,
+                depthWrite: false,
+            });
+            group.add(new THREE.Mesh(innerGeo, innerMat));
+
+            // Scatter a few micro-dust particles for texture
+            const dustCount = 8 + field.seed * 3;
+            for (let i = 0; i < dustCount; i++) {
+                const angle = (i / dustCount) * Math.PI * 2 + field.seed * 0.5;
+                const dist = field.radius * (0.2 + Math.abs(Math.sin(i * 2.7 + field.seed)) * 0.7);
+                const dotSize = 20 + Math.abs(Math.sin(i * 1.3 + field.seed * 2)) * 80;
+
+                const dotGeo = new THREE.CircleGeometry(dotSize, 8);
+                const dotMat = new THREE.MeshBasicMaterial({
+                    color: 0x667788,
+                    transparent: true,
+                    opacity: 0.03 + Math.abs(Math.sin(i * 3.1)) * 0.04,
+                    depthWrite: false,
+                });
+                const dot = new THREE.Mesh(dotGeo, dotMat);
+                dot.position.set(
+                    Math.cos(angle) * dist,
+                    Math.sin(angle) * dist,
+                    0
+                );
+                group.add(dot);
+            }
+
+            this.backgroundGroup.add(group);
+            this.beltDustMeshes.push(group);
+        }
+    }
+
+    /**
+     * Clear asteroid belt dust clouds
+     */
+    clearBeltDustClouds() {
+        if (!this.beltDustMeshes) return;
+        for (const mesh of this.beltDustMeshes) {
+            this.backgroundGroup.remove(mesh);
+            this.disposeMesh(mesh);
+        }
+        this.beltDustMeshes = [];
+    }
+
+    /**
      * Main render function
      */
     render() {
@@ -365,6 +940,51 @@ export class Renderer {
 
         // Update nebula animation
         this.nebula.update(1 / 60);
+
+        // Update ambient space dust
+        this.spaceDust.update(1 / 60, this.game.camera);
+
+        // Update engine trails
+        this.engineTrails.update(1 / 60);
+
+        // Update status effects (EWAR beams, shield flashes, etc.)
+        this.statusEffects.update(1 / 60);
+
+        // Update speed lines
+        this.updateSpeedLines(1 / 60);
+
+        // Update debris pieces
+        this.updateDebris(1 / 60);
+
+        // Update sensor sweep
+        this.updateSensorSweep(1 / 60);
+
+        // Update fleet formation lines
+        this.updateFleetFormation();
+
+        // Station ambient particles — occasional dock sparks and energy wisps
+        this._stationParticleTimer = (this._stationParticleTimer || 0) + 1/60;
+        if (this._stationParticleTimer > 0.3) {
+            this._stationParticleTimer = 0;
+            const entities = this.game.currentSector?.entities || [];
+            for (const e of entities) {
+                if (e.type === 'station' && e.alive && e.visible) {
+                    if (Math.random() < 0.4) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = e.radius * (0.5 + Math.random() * 0.5);
+                        const px = e.x + Math.cos(angle) * dist;
+                        const py = e.y + Math.sin(angle) * dist;
+                        this.effects.spawn('hit', px, py, {
+                            count: 1,
+                            color: Math.random() < 0.5 ? 0x44ffaa : 0x4488ff,
+                            speed: 8,
+                            size: 1.5,
+                            life: 1.5,
+                        });
+                    }
+                }
+            }
+        }
 
         // Update effects
         this.effects.update(1 / 60);
@@ -487,6 +1107,312 @@ export class Renderer {
             this.lockMesh.rotation.z -= 0.03;
         } else {
             this.lockMesh.visible = false;
+        }
+
+        // Orbit ring visualization
+        const autopilot = this.game.autopilot;
+        if (autopilot?.command === 'orbit' && autopilot.target?.alive && this.orbitRingMesh) {
+            const orbitTarget = autopilot.target;
+            const orbitRadius = autopilot.distance || 300;
+            const tiltFactor = this.game.player?.orbitTilt || 0.7;
+
+            this.orbitRingMesh.visible = true;
+            this.orbitRingMesh.position.set(orbitTarget.x, orbitTarget.y, 2);
+            this.orbitRingMesh.scale.set(orbitRadius, orbitRadius * tiltFactor, 1);
+
+            // Pulsing opacity
+            this.orbitRingMesh.material.opacity = 0.1 + Math.sin(this._animTime * 2) * 0.05;
+
+            // Player position marker on orbit ring
+            if (this.game.player && this.orbitMarkerMesh) {
+                this.orbitMarkerMesh.visible = true;
+                const phase = this.game.player.orbitPhase || 0;
+                const mx = orbitTarget.x + Math.cos(phase) * orbitRadius;
+                const my = orbitTarget.y + Math.sin(phase) * orbitRadius * tiltFactor;
+                this.orbitMarkerMesh.position.set(mx, my, 3);
+                this.orbitMarkerMesh.material.opacity = 0.4 + Math.sin(this._animTime * 5) * 0.3;
+            }
+        } else {
+            if (this.orbitRingMesh) this.orbitRingMesh.visible = false;
+            if (this.orbitMarkerMesh) this.orbitMarkerMesh.visible = false;
+        }
+
+        // Weapon range ring (shows when player is firing)
+        if (this.weaponRangeMesh) {
+            const player = this.game.player;
+            let showRange = false;
+            let maxRange = 0;
+
+            if (player?.alive && player.activeModules?.size > 0) {
+                for (const slotId of player.activeModules) {
+                    const [slotType, idx] = player.parseSlotId?.(slotId) || [];
+                    if (slotType === undefined) continue;
+                    const moduleId = player.modules[slotType]?.[idx];
+                    if (!moduleId) continue;
+                    const config = player.getModuleConfig?.(moduleId);
+                    if (config?.damage || config?.type === 'weapon') {
+                        showRange = true;
+                        maxRange = Math.max(maxRange, config.range || config.attackRange || 400);
+                    }
+                }
+            }
+
+            // Persistent weapon range display
+            if (this.weaponRangePersist && player?.alive) {
+                let wpnRange = 0;
+                for (const [slotType, slots] of Object.entries(player.modules || {})) {
+                    if (slotType !== 'high') continue;
+                    for (const moduleId of slots) {
+                        if (!moduleId) continue;
+                        const cfg = player.getModuleConfig?.(moduleId);
+                        if (cfg?.damage || cfg?.type === 'weapon') {
+                            wpnRange = Math.max(wpnRange, cfg.range || cfg.attackRange || 400);
+                        }
+                    }
+                }
+                if (wpnRange > 0) maxRange = Math.max(maxRange, wpnRange);
+                showRange = true;
+            }
+
+            if (showRange && maxRange > 0) {
+                this.weaponRangeTimer = 2.0;
+                this.weaponRangeMesh.visible = true;
+                this.weaponRangeMesh.position.set(player.x, player.y, 1);
+                this.weaponRangeMesh.scale.set(maxRange, maxRange, 1);
+                const baseOpacity = this.weaponRangePersist ? 0.06 : 0.08;
+                this.weaponRangeMesh.material.opacity = baseOpacity + Math.sin(this._animTime * 3) * 0.03;
+            } else if (this.weaponRangeTimer > 0) {
+                this.weaponRangeTimer -= 0.016;
+                const player2 = this.game.player;
+                if (player2?.alive) {
+                    this.weaponRangeMesh.position.set(player2.x, player2.y, 1);
+                }
+                this.weaponRangeMesh.material.opacity = Math.max(0, this.weaponRangeTimer * 0.05);
+            } else {
+                this.weaponRangeMesh.visible = false;
+            }
+        }
+
+        // Mining progress ring
+        if (this.miningRingMesh) {
+            const miningData = this.game.mining?.activeMining?.get(this.game.player);
+            if (miningData?.asteroid?.alive) {
+                const asteroid = miningData.asteroid;
+                const r = (asteroid.radius || 20) + 8;
+
+                // Find mining module cycle progress
+                let progress = 0;
+                const player3 = this.game.player;
+                if (player3) {
+                    for (const slotId of player3.activeModules) {
+                        const [slotType, idx] = player3.parseSlotId?.(slotId) || [];
+                        if (slotType === undefined) continue;
+                        const moduleId = player3.modules[slotType]?.[idx];
+                        if (!moduleId || !moduleId.includes('mining')) continue;
+                        const cooldown = player3.moduleCooldowns?.get(slotId) || 0;
+                        const config = player3.getModuleConfig?.(moduleId);
+                        if (config?.cycleTime) {
+                            progress = Math.max(progress, 1 - cooldown / config.cycleTime);
+                        }
+                    }
+                }
+
+                // Recreate geometry for arc progress
+                this.miningRingMesh.geometry.dispose();
+                const arc = Math.max(0.01, progress) * Math.PI * 2;
+                this.miningRingMesh.geometry = new THREE.RingGeometry(r, r + 3, 32, 1, 0, arc);
+                this.miningRingMesh.visible = true;
+                this.miningRingMesh.position.set(asteroid.x, asteroid.y, 3);
+                this.miningRingMesh.rotation.z = -Math.PI / 2; // Start from top
+                this.miningRingMesh.material.opacity = 0.3 + progress * 0.3;
+            } else {
+                this.miningRingMesh.visible = false;
+            }
+        }
+
+        // Target lead indicator
+        if (this.leadIndicatorMesh) {
+            const locked2 = this.game.lockedTarget;
+            if (locked2?.alive && locked2.velocity && this.game.player?.alive) {
+                const vx = locked2.velocity.x || 0;
+                const vy = locked2.velocity.y || 0;
+                const speed2 = Math.sqrt(vx * vx + vy * vy);
+
+                if (speed2 > 5) {
+                    // Predict position 1.5 seconds ahead
+                    const leadTime = 1.5;
+                    const px = locked2.x + vx * leadTime;
+                    const py = locked2.y + vy * leadTime;
+
+                    this.leadIndicatorMesh.visible = true;
+                    this.leadIndicatorMesh.position.set(px, py, 6);
+                    this.leadIndicatorMesh.rotation.z += 0.02;
+                    // Pulse opacity
+                    const opc = 0.25 + Math.sin(this._animTime * 4) * 0.15;
+                    this.leadIndicatorMesh.children.forEach(c => {
+                        if (c.material) c.material.opacity = opc;
+                    });
+                } else {
+                    this.leadIndicatorMesh.visible = false;
+                }
+            } else {
+                this.leadIndicatorMesh.visible = false;
+            }
+        }
+
+        // Lock progress ring (while locking target)
+        if (!this.lockProgressMesh) {
+            const lpGeo = new THREE.RingGeometry(0.95, 1.0, 32, 1, 0, Math.PI * 2);
+            const lpMat = new THREE.MeshBasicMaterial({
+                color: 0xffaa00,
+                transparent: true,
+                opacity: 0.5,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+            });
+            this.lockProgressMesh = new THREE.Mesh(lpGeo, lpMat);
+            this.lockProgressMesh.visible = false;
+            this.uiGroup.add(this.lockProgressMesh);
+        }
+
+        const lockTarget = this.game.lockingTarget;
+        if (lockTarget?.alive && this.game.lockingStartTime) {
+            const elapsed = performance.now() - this.game.lockingStartTime;
+            const progress = Math.min(elapsed / this.game.lockingDuration, 1);
+            const r = (lockTarget.radius || 30) + 12;
+
+            // Recreate geometry for arc
+            this.lockProgressMesh.geometry.dispose();
+            const arc = Math.max(0.01, progress) * Math.PI * 2;
+            this.lockProgressMesh.geometry = new THREE.RingGeometry(r - 2, r, 32, 1, 0, arc);
+            this.lockProgressMesh.visible = true;
+            this.lockProgressMesh.position.set(lockTarget.x, lockTarget.y, 6);
+            this.lockProgressMesh.rotation.z = -Math.PI / 2; // Start from top
+            this.lockProgressMesh.material.opacity = 0.3 + progress * 0.4;
+        } else {
+            this.lockProgressMesh.visible = false;
+        }
+
+        // Velocity vector line (movement direction from player ship)
+        if (this.velocityVectorMesh) {
+            const p = this.game.player;
+            if (p?.alive && (p.currentSpeed || 0) > 10) {
+                const vx = p.velocity?.x || 0;
+                const vy = p.velocity?.y || 0;
+                const speed = Math.sqrt(vx * vx + vy * vy);
+                if (speed > 10) {
+                    // Line length scales with speed (30-150 units)
+                    const lineLen = Math.min(30 + speed * 0.5, 150);
+                    const nx = vx / speed;
+                    const ny = vy / speed;
+
+                    // Start slightly ahead of ship
+                    const startOff = (p.radius || 20) + 5;
+                    const sx = p.x + nx * startOff;
+                    const sy = p.y + ny * startOff;
+                    const ex = p.x + nx * (startOff + lineLen);
+                    const ey = p.y + ny * (startOff + lineLen);
+
+                    const positions = this.velocityVectorMesh.geometry.attributes.position;
+                    positions.setXYZ(0, sx, sy, 4);
+                    positions.setXYZ(1, ex, ey, 4);
+                    positions.needsUpdate = true;
+                    this.velocityVectorMesh.visible = true;
+
+                    // Speed-based opacity (faster = more visible)
+                    const speedFactor = Math.min(speed / 200, 1);
+                    this.velocityVectorMesh.material.opacity = 0.15 + speedFactor * 0.25;
+
+                    // Position chevron tip at end, rotated to face direction
+                    this.velocityVectorTip.position.set(ex, ey, 4);
+                    this.velocityVectorTip.rotation.z = Math.atan2(ny, nx) - Math.PI / 2;
+                    this.velocityVectorTip.visible = true;
+                    this.velocityVectorTip.material.opacity = 0.2 + speedFactor * 0.3;
+                } else {
+                    this.velocityVectorMesh.visible = false;
+                    this.velocityVectorTip.visible = false;
+                }
+            } else {
+                this.velocityVectorMesh.visible = false;
+                this.velocityVectorTip.visible = false;
+            }
+        }
+
+        // Distance marker rings centered on player when target is selected
+        {
+            const p = this.game.player;
+            const tgt = this.game.selectedTarget || this.game.lockedTarget;
+            if (p?.alive && tgt?.alive) {
+                if (!this.distanceRings) {
+                    this.distanceRings = [];
+                    const distances = [250, 500, 1000];
+                    for (const d of distances) {
+                        const geo = new THREE.RingGeometry(d - 1, d + 1, 64);
+                        const mat = new THREE.MeshBasicMaterial({
+                            color: 0x446688,
+                            transparent: true,
+                            opacity: 0.06,
+                            side: THREE.DoubleSide,
+                        });
+                        const ring = new THREE.Mesh(geo, mat);
+                        ring.frustumCulled = false;
+                        ring.position.z = 0.5;
+                        this.uiGroup.add(ring);
+                        this.distanceRings.push({ mesh: ring, dist: d });
+                    }
+                }
+                for (const r of this.distanceRings) {
+                    r.mesh.position.set(p.x, p.y, 0.5);
+                    r.mesh.visible = true;
+                    r.mesh.material.opacity = 0.04 + Math.sin(this._animTime * 1.5 + r.dist * 0.01) * 0.02;
+                }
+            } else if (this.distanceRings) {
+                for (const r of this.distanceRings) r.mesh.visible = false;
+            }
+        }
+
+        // Docking tractor beam — green beam from station to player when in dock range
+        const player = this.game.player;
+        if (player?.alive) {
+            const entities = this.game.currentSector?.entities || [];
+            let nearStation = null;
+            for (const e of entities) {
+                if (e.type === 'station' && e.alive) {
+                    const dx = player.x - e.x;
+                    const dy = player.y - e.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < e.dockingRange) {
+                        nearStation = e;
+                        break;
+                    }
+                }
+            }
+
+            if (nearStation) {
+                if (!this.tractorBeamMesh) {
+                    const beamGeo = new THREE.BufferGeometry();
+                    beamGeo.setAttribute('position', new THREE.Float32BufferAttribute([0,0,0, 0,0,0], 3));
+                    const beamMat = new THREE.LineBasicMaterial({
+                        color: 0x44ff88,
+                        transparent: true,
+                        opacity: 0.3,
+                    });
+                    this.tractorBeamMesh = new THREE.Line(beamGeo, beamMat);
+                    this.tractorBeamMesh.frustumCulled = false;
+                    this.uiGroup.add(this.tractorBeamMesh);
+                }
+                const positions = this.tractorBeamMesh.geometry.attributes.position;
+                positions.setXYZ(0, nearStation.x, nearStation.y, 3);
+                positions.setXYZ(1, player.x, player.y, 3);
+                positions.needsUpdate = true;
+                const pulse = 0.15 + Math.sin(this._animTime * 5) * 0.1;
+                this.tractorBeamMesh.material.opacity = pulse;
+                this.tractorBeamMesh.visible = true;
+            } else if (this.tractorBeamMesh) {
+                this.tractorBeamMesh.visible = false;
+            }
+        } else if (this.tractorBeamMesh) {
+            this.tractorBeamMesh.visible = false;
         }
     }
 

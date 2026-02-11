@@ -28,6 +28,8 @@ export class WarpGate extends Entity {
         // Animation
         this.pulsePhase = Math.random() * Math.PI * 2;
         this.rotationSpeed = 0.3;
+        this.activationLevel = 0; // 0 = idle, 1 = fully activated
+        this.wasActivated = false;
     }
 
     /**
@@ -35,8 +37,31 @@ export class WarpGate extends Entity {
      */
     update(dt) {
         super.update(dt);
-        this.rotation += this.rotationSpeed * dt;
-        this.pulsePhase += dt * 2;
+
+        // Check player proximity for activation ramp
+        const player = this.game.player;
+        if (player?.alive) {
+            const dist = this.distanceTo(player);
+            const activationOuter = this.activationRange * 3; // Start activating at 3x range
+            if (dist < activationOuter) {
+                const targetLevel = Math.min(1, Math.max(0, 1 - (dist - this.activationRange) / (activationOuter - this.activationRange)));
+                this.activationLevel += (targetLevel - this.activationLevel) * dt * 3;
+
+                // Play activation sound on threshold
+                if (this.activationLevel > 0.8 && !this.wasActivated) {
+                    this.wasActivated = true;
+                    if (player.isPlayer) this.game.audio?.play('scan-complete');
+                }
+            } else {
+                this.activationLevel *= (1 - dt * 2);
+                this.wasActivated = false;
+            }
+        }
+
+        // Scale rotation speed with activation
+        const speedMult = 1 + this.activationLevel * 4;
+        this.rotation += this.rotationSpeed * speedMult * dt;
+        this.pulsePhase += dt * (2 + this.activationLevel * 6);
     }
 
     /**
@@ -190,23 +215,26 @@ export class WarpGate extends Entity {
             this.mesh.rotation.z = this.rotation;
             this.mesh.visible = this.visible && this.alive;
 
-            // Pulse the inner ring
+            const act = this.activationLevel;
+
+            // Pulse the inner ring - brighter when activated
             if (this.innerRing) {
-                const pulse = 0.5 + Math.sin(this.pulsePhase) * 0.3;
-                this.innerRing.material.opacity = pulse;
+                const basePulse = 0.5 + Math.sin(this.pulsePhase) * 0.3;
+                this.innerRing.material.opacity = basePulse + act * 0.4;
+                this.innerRing.material.color.setHex(act > 0.5 ? 0x66bbff : 0x4488ff);
             }
 
-            // Pulse the glow
+            // Pulse the glow - bigger and brighter when activated
             if (this.glow) {
                 const pulse = 0.6 + Math.sin(this.pulsePhase * 1.5) * 0.3;
-                this.glow.material.opacity = pulse;
-                this.glow.scale.setScalar(0.9 + Math.sin(this.pulsePhase) * 0.1);
+                this.glow.material.opacity = pulse + act * 0.3;
+                this.glow.scale.setScalar(0.9 + Math.sin(this.pulsePhase) * 0.1 + act * 0.4);
             }
 
-            // Rotate the swirl overlay
+            // Rotate the swirl overlay - faster when activated
             if (this.swirl) {
-                this.swirl.rotation.z += 0.02;
-                this.swirl.material.opacity = 0.2 + Math.sin(this.pulsePhase * 0.8) * 0.15;
+                this.swirl.rotation.z += 0.02 + act * 0.06;
+                this.swirl.material.opacity = 0.2 + Math.sin(this.pulsePhase * 0.8) * 0.15 + act * 0.3;
             }
         }
     }

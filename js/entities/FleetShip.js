@@ -265,8 +265,13 @@ export class FleetShip extends Ship {
             return;
         }
 
-        const targetX = player.x + this.followOffset.x;
-        const targetY = player.y + this.followOffset.y;
+        // Rotate follow offset by player heading for formation alignment
+        const cos = Math.cos(player.rotation);
+        const sin = Math.sin(player.rotation);
+        const rotX = this.followOffset.x * cos - this.followOffset.y * sin;
+        const rotY = this.followOffset.x * sin + this.followOffset.y * cos;
+        const targetX = player.x + rotX;
+        const targetY = player.y + rotY;
         const dist = wrappedDistance(this.x, this.y, targetX, targetY, CONFIG.SECTOR_SIZE);
 
         if (dist > this.followRange) {
@@ -532,6 +537,9 @@ export class FleetShip extends Ship {
         if (this.mesh) {
             this.mesh.position.set(this.x, this.y, 0);
             this.mesh.rotation.z = this.rotation;
+
+            // Add weapon turrets
+            this.addTurretHardpoints();
         }
         return this.mesh;
     }

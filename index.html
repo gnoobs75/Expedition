@@ -13,21 +13,74 @@
     <!-- Toast Notifications -->
     <div id="toast-container"></div>
 
+    <!-- Tactical Overlay Container -->
+    <div id="tactical-overlay" class="hidden"></div>
+
     <!-- Damage Flash Overlay -->
     <div id="damage-flash"></div>
 
+    <!-- Hull Emergency Vignette -->
+    <div id="hull-vignette" class="hull-vignette"></div>
+
+    <!-- Damage Direction Indicators -->
+    <div id="damage-direction-container"></div>
+
+    <!-- Salvage Beam Container -->
+    <div id="salvage-beam-container"></div>
+
+    <!-- Autopilot Route Indicator -->
+    <div id="route-indicator" class="hidden">
+        <div class="route-arrow">&#9654;</div>
+        <div class="route-info">
+            <span class="route-dest" id="route-dest-name">--</span>
+            <span class="route-jumps" id="route-jump-count">0 jumps</span>
+        </div>
+    </div>
+
+    <!-- Docking Animation Overlay -->
+    <div id="dock-animation" class="dock-anim hidden">
+        <div class="dock-anim-bar dock-anim-top"></div>
+        <div class="dock-anim-bar dock-anim-bottom"></div>
+        <div class="dock-anim-content">
+            <div class="dock-anim-icon">&#9632;</div>
+            <div id="dock-anim-text" class="dock-anim-text">DOCKING</div>
+            <div id="dock-anim-station" class="dock-anim-station"></div>
+            <div class="dock-anim-dots"><span>.</span><span>.</span><span>.</span></div>
+        </div>
+    </div>
+
     <!-- Credit Popup Container -->
     <div id="credit-popups"></div>
+
+    <!-- Damage Popup Container -->
+    <div id="damage-popups"></div>
+
+    <!-- Gate Label Container -->
+    <div id="gate-labels"></div>
 
     <!-- UI Overlay -->
     <div id="ui-overlay">
         <!-- Bottom Bar: Ship Status HUD -->
         <div id="bottom-bar">
-            <!-- Left: Speed -->
+            <!-- Left: Speed & Heading -->
             <div class="left-section">
                 <div id="speed-display">
                     <span id="speed-value">0</span>
                     <span class="unit">m/s</span>
+                </div>
+                <div id="heading-display">
+                    <div class="heading-compass">
+                        <svg id="compass-ring" width="44" height="44" viewBox="0 0 44 44">
+                            <circle cx="22" cy="22" r="19" fill="none" stroke="rgba(0,255,255,0.15)" stroke-width="1"/>
+                            <line id="compass-needle" x1="22" y1="22" x2="22" y2="6" stroke="var(--primary-cyan)" stroke-width="1.5" stroke-linecap="round"/>
+                            <line id="compass-target-bearing" x1="22" y1="22" x2="22" y2="8" stroke="var(--hostile-color)" stroke-width="1" stroke-linecap="round" stroke-dasharray="2,2" opacity="0"/>
+                            <text x="22" y="7" text-anchor="middle" fill="rgba(0,255,255,0.3)" font-size="5">N</text>
+                        </svg>
+                    </div>
+                    <div class="heading-text">
+                        <span id="heading-degrees">000</span><span class="heading-unit">&deg;</span>
+                        <span id="heading-cardinal" class="heading-cardinal">N</span>
+                    </div>
                 </div>
             </div>
 
@@ -55,11 +108,22 @@
                             <span id="hull-text">100%</span>
                         </div>
                     </div>
-                    <div class="status-group">
+                    <div class="status-group cap-ring-group">
                         <label>CAPACITOR</label>
                         <div class="bar-container">
                             <div id="capacitor-bar" class="status-bar capacitor"></div>
                             <span id="capacitor-text">100%</span>
+                        </div>
+                        <svg id="cap-ring" class="cap-ring" viewBox="0 0 44 44">
+                            <circle class="cap-ring-bg" cx="22" cy="22" r="19"></circle>
+                            <circle id="cap-ring-fill" class="cap-ring-fill" cx="22" cy="22" r="19"></circle>
+                        </svg>
+                    </div>
+                    <div class="status-group">
+                        <label>CARGO</label>
+                        <div class="bar-container">
+                            <div id="cargo-bar" class="status-bar cargo"></div>
+                            <span id="cargo-text">0%</span>
                         </div>
                     </div>
                 </div>
@@ -77,6 +141,10 @@
                         <div id="cargo-bar" class="cargo-bar"></div>
                         <span id="cargo-text">0 / 200 m³</span>
                     </div>
+                </div>
+                <div id="danger-indicator" title="Sector Security Level">
+                    <span class="danger-label">SEC</span>
+                    <span id="danger-level" class="danger-safe">1.0</span>
                 </div>
                 <button id="settings-btn" title="Settings (Esc)">&#9881;</button>
             </div>
@@ -103,6 +171,68 @@
                         <div id="target-hull-bar" class="mini-bar hull"></div>
                     </div>
                 </div>
+                <div id="target-combat-info" class="target-combat-info">
+                    <div class="combat-info-row">
+                        <span class="combat-info-label">DPS OUT</span>
+                        <span class="combat-info-value" id="target-dps-out">0</span>
+                    </div>
+                    <div class="combat-info-row">
+                        <span class="combat-info-label">SPEED</span>
+                        <span class="combat-info-value" id="target-speed-val">0 m/s</span>
+                    </div>
+                    <div class="combat-info-row">
+                        <span class="combat-info-label">ANGULAR</span>
+                        <span class="combat-info-value" id="target-angular-val">0</span>
+                    </div>
+                </div>
+                <!-- Scanner Readout (expanded ship data) -->
+                <div id="target-scanner" class="target-scanner">
+                    <div class="scanner-divider"></div>
+                    <div class="scanner-grid">
+                        <div class="scanner-row">
+                            <span class="scanner-label">SPEED</span>
+                            <span class="scanner-value" id="scan-speed">--</span>
+                        </div>
+                        <div class="scanner-row">
+                            <span class="scanner-label">HEADING</span>
+                            <span class="scanner-value" id="scan-heading">--</span>
+                        </div>
+                        <div class="scanner-row">
+                            <span class="scanner-label">TRANSVERSAL</span>
+                            <span class="scanner-value" id="scan-transversal">--</span>
+                        </div>
+                        <div class="scanner-row">
+                            <span class="scanner-label">ANG VELOCITY</span>
+                            <span class="scanner-value" id="scan-angular">--</span>
+                        </div>
+                        <div class="scanner-row">
+                            <span class="scanner-label">SIGNATURE</span>
+                            <span class="scanner-value" id="scan-signature">--</span>
+                        </div>
+                        <div class="scanner-row">
+                            <span class="scanner-label">CARGO</span>
+                            <span class="scanner-value" id="scan-cargo">--</span>
+                        </div>
+                    </div>
+                    <div class="scanner-ewar" id="scan-ewar"></div>
+                    <div class="scanner-modules" id="scan-modules"></div>
+                    <div class="scanner-divider"></div>
+                    <div class="scanner-dps">
+                        <div class="scanner-row">
+                            <span class="scanner-label">INCOMING DPS</span>
+                            <span class="scanner-value dps-incoming" id="scan-dps-incoming">0</span>
+                        </div>
+                        <div class="scanner-row">
+                            <span class="scanner-label">OUTGOING DPS</span>
+                            <span class="scanner-value dps-outgoing" id="scan-dps-outgoing">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="threat-list" class="threat-list hidden">
+                    <div class="scanner-divider"></div>
+                    <div class="threat-header">THREATS TARGETING YOU</div>
+                    <div id="threat-list-body"></div>
+                </div>
             </div>
         </div>
 
@@ -126,24 +256,50 @@
                     <button class="filter-btn" data-filter="stations" title="Stations">&#9632;</button>
                     <button class="filter-btn" data-filter="asteroids" title="Asteroids">&#9671;</button>
                     <button class="filter-btn" data-filter="gates" title="Gates">&#10070;</button>
+                    <button class="filter-btn" data-filter="anomalies" title="Anomalies">&#10059;</button>
                 </div>
             </div>
             <div class="panel-content">
                 <table id="overview-table">
                     <thead>
                         <tr>
-                            <th class="col-icon">Icon</th>
-                            <th class="col-name">Name</th>
-                            <th class="col-type">Type</th>
-                            <th class="col-dist">Distance</th>
-                            <th class="col-vel">Velocity</th>
-                            <th class="col-ang">Angular</th>
+                            <th class="col-icon" data-sort="icon"></th>
+                            <th class="col-name sortable" data-sort="name">Name</th>
+                            <th class="col-type sortable" data-sort="type">Type</th>
+                            <th class="col-dist sortable active-sort sort-asc" data-sort="dist">Dist</th>
+                            <th class="col-vel sortable" data-sort="vel">Vel</th>
+                            <th class="col-ang sortable" data-sort="ang">Ang</th>
                         </tr>
                     </thead>
                     <tbody id="overview-body">
                         <!-- Dynamically populated -->
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Power Routing Panel -->
+        <div id="power-routing">
+            <div class="power-channel" data-channel="weapons">
+                <div class="power-label">WPN</div>
+                <div class="power-slider-track">
+                    <div class="power-slider-fill" id="power-weapons-fill"></div>
+                </div>
+                <div class="power-value" id="power-weapons-val">33</div>
+            </div>
+            <div class="power-channel" data-channel="shields">
+                <div class="power-label">SHD</div>
+                <div class="power-slider-track">
+                    <div class="power-slider-fill" id="power-shields-fill"></div>
+                </div>
+                <div class="power-value" id="power-shields-val">33</div>
+            </div>
+            <div class="power-channel" data-channel="engines">
+                <div class="power-label">ENG</div>
+                <div class="power-slider-track">
+                    <div class="power-slider-fill" id="power-engines-fill"></div>
+                </div>
+                <div class="power-value" id="power-engines-val">34</div>
             </div>
         </div>
 
@@ -192,6 +348,10 @@
                     </div>
                 </div>
             </div>
+            <div id="cargo-hud-bar">
+                <div id="cargo-hud-fill"></div>
+                <span id="cargo-hud-text">0/0 m³</span>
+            </div>
         </div>
 
         <!-- Bottom Left: Event Log -->
@@ -200,10 +360,10 @@
                 <span class="panel-title">EVENT LOG</span>
                 <div id="log-filters">
                     <button class="log-filter-btn active" data-log-filter="all">ALL</button>
-                    <button class="log-filter-btn" data-log-filter="combat">&#9876;</button>
-                    <button class="log-filter-btn" data-log-filter="mining">&#9874;</button>
-                    <button class="log-filter-btn" data-log-filter="system">&#9881;</button>
-                    <button class="log-filter-btn" data-log-filter="warp">&#10070;</button>
+                    <button class="log-filter-btn" data-log-filter="combat" title="Combat">&#9876;</button>
+                    <button class="log-filter-btn" data-log-filter="mining" title="Mining">&#9874;</button>
+                    <button class="log-filter-btn" data-log-filter="trade" title="Trade">&#9878;</button>
+                    <button class="log-filter-btn" data-log-filter="system" title="System">&#9881;</button>
                 </div>
             </div>
             <div class="panel-content">
@@ -227,14 +387,31 @@
                 <div id="ship-indicator-health">
                     <div class="mini-bar-group">
                         <div id="ship-shield-bar" class="mini-bar shield"></div>
+                        <span class="bar-pct" id="ship-shield-pct"></span>
                     </div>
                     <div class="mini-bar-group">
                         <div id="ship-armor-bar" class="mini-bar armor"></div>
+                        <span class="bar-pct" id="ship-armor-pct"></span>
                     </div>
                     <div class="mini-bar-group">
                         <div id="ship-hull-bar" class="mini-bar hull"></div>
+                        <span class="bar-pct" id="ship-hull-pct"></span>
+                    </div>
+                    <div class="mini-bar-group">
+                        <div id="ship-cap-bar" class="mini-bar capacitor"></div>
+                        <span class="bar-pct" id="ship-cap-pct"></span>
                     </div>
                 </div>
+                <div id="ship-cargo-bar-container" class="mini-bar-group cargo-bar-group">
+                    <div id="ship-cargo-bar" class="mini-bar cargo"></div>
+                    <span class="cargo-label" id="ship-cargo-label"></span>
+                </div>
+                <div id="velocity-compass" class="velocity-compass">
+                    <canvas id="velocity-compass-canvas" width="50" height="50"></canvas>
+                    <span id="velocity-speed-label" class="velocity-speed-label">0 m/s</span>
+                </div>
+                <div id="hull-warning-text" class="hull-warning-text hidden">HULL CRITICAL</div>
+                <div id="ewar-status" class="ewar-status-bar"></div>
             </div>
         </div>
 
@@ -270,6 +447,30 @@
                 <div class="drone-status">Idle</div>
             </div>
         </div>
+
+        <!-- Radar Minimap -->
+        <div id="minimap" class="panel">
+            <div class="panel-header minimap-header">
+                <span class="panel-title">RADAR</span>
+                <div class="minimap-range-btns">
+                    <button class="minimap-range-btn" data-range="2000">2K</button>
+                    <button class="minimap-range-btn active" data-range="5000">5K</button>
+                    <button class="minimap-range-btn" data-range="10000">10K</button>
+                    <button class="minimap-range-btn" data-range="25000">25K</button>
+                    <button id="minimap-expand-btn" class="minimap-range-btn" title="Expand/Collapse">▴</button>
+                </div>
+            </div>
+            <canvas id="minimap-canvas" width="200" height="200"></canvas>
+        </div>
+
+        <!-- Hazard Warning HUD -->
+        <div id="hazard-warning" class="hidden">
+            <span class="hazard-icon">&#9888;</span>
+            <span class="hazard-name">HAZARD</span>
+        </div>
+
+        <!-- Dock Prompt -->
+        <div id="dock-prompt" class="hidden">DOCK &#9166;</div>
 
         <!-- Autopilot Status Indicator -->
         <div id="autopilot-indicator" class="panel hidden">
@@ -314,18 +515,58 @@
             <div class="menu-item" data-action="bookmark">Save Location</div>
         </div>
 
-        <!-- Warp Tunnel Overlay -->
+        <!-- Hyperspace Jump Overlay -->
         <div id="warp-tunnel" class="hidden">
+            <canvas id="warp-streaks-canvas"></canvas>
+            <div class="warp-vortex"></div>
+            <div class="warp-ring warp-ring-1"></div>
+            <div class="warp-ring warp-ring-2"></div>
+            <div class="warp-ring warp-ring-3"></div>
+            <div class="warp-ring warp-ring-4"></div>
+            <div class="warp-ring warp-ring-5"></div>
+            <div class="warp-stars"></div>
             <div class="warp-lines"></div>
-            <div class="warp-text">WARPING...</div>
+            <div class="warp-flash-overlay"></div>
+            <div class="warp-text">
+                <span class="warp-text-main">JUMPING</span>
+                <span class="warp-text-sector" id="warp-destination"></span>
+            </div>
+            <div id="warp-destination-text" class="warp-destination-text"></div>
+        </div>
+
+        <!-- Sector Arrival Banner -->
+        <div id="sector-banner" class="hidden">
+            <div class="sector-banner-name" id="sector-banner-name"></div>
+            <div class="sector-banner-subtitle" id="sector-banner-subtitle"></div>
+        </div>
+
+        <!-- Keyboard Shortcuts Overlay -->
+        <div id="keybind-overlay" class="hidden">
+            <div class="keybind-container">
+                <div class="keybind-header">
+                    <span class="keybind-title">&#9881; KEYBOARD REFERENCE</span>
+                    <span class="keybind-hint">Press F1 or Esc to close</span>
+                </div>
+                <div class="keybind-grid" id="keybind-grid"></div>
+                <div class="keybind-footer">
+                    EXPEDITION v1.0 &bull; Press ? on any UI panel for contextual help
+                </div>
+            </div>
         </div>
 
         <!-- Station Panel (Modal) -->
         <div id="station-panel" class="modal hidden">
+            <canvas id="station-ambient-canvas"></canvas>
             <div class="modal-content">
                 <div class="modal-header">
                     <span id="station-name">Station Name</span>
                     <button class="modal-close" id="undock-btn">UNDOCK</button>
+                </div>
+                <div id="station-traffic" class="station-traffic">
+                    <div class="traffic-log" id="station-traffic-log"></div>
+                </div>
+                <div id="price-ticker" class="price-ticker">
+                    <div class="price-ticker-track" id="price-ticker-track"></div>
                 </div>
                 <div class="modal-tabs">
                     <button class="tab-btn active" data-tab="hangar">HANGAR</button>
@@ -337,6 +578,9 @@
                     <button class="tab-btn" data-tab="cantina">CANTINA</button>
                     <button class="tab-btn" data-tab="guild">GUILDS</button>
                     <button class="tab-btn" data-tab="commerce">COMMERCE</button>
+                    <button class="tab-btn" data-tab="insurance">INSURANCE</button>
+                    <button class="tab-btn" data-tab="bounty">BOUNTY</button>
+                    <button class="tab-btn" data-tab="skills">SKILLS</button>
                 </div>
                 <div class="modal-body">
                     <div id="tab-hangar" class="tab-content active">
@@ -372,7 +616,74 @@
                     <div id="tab-commerce" class="tab-content">
                         <div id="commerce-content"></div>
                     </div>
+                    <div id="tab-insurance" class="tab-content">
+                        <div id="insurance-content"></div>
+                    </div>
+                    <div id="tab-bounty" class="tab-content">
+                        <div id="bounty-content"></div>
+                    </div>
+                    <div id="tab-skills" class="tab-content">
+                        <div id="skills-content"></div>
+                    </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Statistics Panel -->
+        <div id="stats-panel" class="panel hidden">
+            <div class="panel-header">
+                <span class="panel-title">PILOT STATISTICS</span>
+                <button class="panel-close">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="stats-content"></div>
+            </div>
+        </div>
+
+        <!-- Ship Log Panel -->
+        <div id="ship-log-panel" class="panel hidden">
+            <div class="panel-header">
+                <span class="panel-title">SHIP LOG</span>
+                <button class="panel-close">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="ship-log-filters">
+                    <button class="log-filter-btn active" data-ship-log="all">ALL</button>
+                    <button class="log-filter-btn" data-ship-log="combat">COMBAT</button>
+                    <button class="log-filter-btn" data-ship-log="trade">TRADE</button>
+                    <button class="log-filter-btn" data-ship-log="nav">NAV</button>
+                    <button class="log-filter-btn" data-ship-log="quest">QUEST</button>
+                </div>
+                <div id="ship-log-entries"></div>
+            </div>
+        </div>
+
+        <!-- Combat Log Panel -->
+        <div id="combat-log-panel" class="panel hidden">
+            <div class="panel-header">
+                <span class="panel-title">COMBAT LOG</span>
+                <button class="panel-close">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="combat-log-summary"></div>
+                <div id="combat-log-filters">
+                    <button class="clog-filter-btn active" data-clog="all">ALL</button>
+                    <button class="clog-filter-btn" data-clog="outgoing">DEALT</button>
+                    <button class="clog-filter-btn" data-clog="incoming">TAKEN</button>
+                    <button class="clog-filter-btn" data-clog="kills">KILLS</button>
+                </div>
+                <div id="combat-log-entries"></div>
+            </div>
+        </div>
+
+        <!-- Achievements Panel -->
+        <div id="achievements-panel" class="panel hidden">
+            <div class="panel-header">
+                <span class="panel-title">ACHIEVEMENTS</span>
+                <button class="panel-close">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="achievements-content"></div>
             </div>
         </div>
 
@@ -384,11 +695,38 @@
             </div>
             <div class="panel-content">
                 <div id="dscan-controls">
-                    <label>Range: <input type="range" id="dscan-range" min="1000" max="15000" value="10000"></label>
-                    <label>Angle: <input type="range" id="dscan-angle" min="5" max="360" value="60"></label>
-                    <button id="dscan-scan">SCAN</button>
+                    <div class="dscan-slider-row">
+                        <span class="dscan-label">RANGE</span>
+                        <input type="range" id="dscan-range" min="1000" max="20000" value="10000" step="500">
+                        <span class="dscan-value" id="dscan-range-val">10,000m</span>
+                    </div>
+                    <div class="dscan-slider-row">
+                        <span class="dscan-label">ANGLE</span>
+                        <input type="range" id="dscan-angle" min="5" max="360" value="60" step="5">
+                        <span class="dscan-value" id="dscan-angle-val">60&#176;</span>
+                    </div>
+                    <div class="dscan-button-row">
+                        <button id="dscan-scan" class="dscan-scan-btn">&#9673; SCAN (V)</button>
+                        <button id="dscan-360" class="dscan-preset-btn" title="360&#176; scan">360&#176;</button>
+                        <button id="dscan-180" class="dscan-preset-btn" title="180&#176; scan">180&#176;</button>
+                        <button id="dscan-60" class="dscan-preset-btn" title="60&#176; scan">60&#176;</button>
+                        <button id="dscan-15" class="dscan-preset-btn" title="15&#176; scan">15&#176;</button>
+                    </div>
                 </div>
-                <div id="dscan-results"></div>
+                <div class="dscan-summary" id="dscan-summary"></div>
+                <div class="dscan-results-wrap">
+                    <table class="dscan-table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Distance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dscan-results"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -454,6 +792,15 @@
                         <div class="settings-row">
                             <label>Sound Effects</label>
                             <input type="checkbox" id="sfx-enabled" checked>
+                        </div>
+                        <div class="settings-row">
+                            <label>Music Volume</label>
+                            <input type="range" id="music-volume" min="0" max="100" value="12">
+                            <span id="music-volume-value">12%</span>
+                        </div>
+                        <div class="settings-row">
+                            <label>Music Enabled</label>
+                            <input type="checkbox" id="music-enabled" checked>
                         </div>
                     </div>
 

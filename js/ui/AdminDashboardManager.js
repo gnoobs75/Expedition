@@ -215,7 +215,7 @@ export class AdminDashboardManager {
         const tbody = document.getElementById('admin-table-body');
         if (!tbody) return;
 
-        const roleIcons = { miner: '\u2692', hauler: '\u2696', ratter: '\u2694', raider: '\u2620', bomber: '\uD83D\uDCA3' };
+        const roleIcons = { miner: '\u2692', hauler: '\u2696', ratter: '\u2694', raider: '\u2620', bomber: '\uD83D\uDCA3', surveyor: '\uD83D\uDD2D', logistics: '\u2695' };
         const stateColors = {
             idle: '#888', traveling: '#44aaff', mining: '#ffaa44',
             'trading-buy': '#44ff88', 'trading-sell': '#44ff88',
@@ -225,6 +225,7 @@ export class AdminDashboardManager {
             pursuing: '#ff6622', intercepting: '#ff44ff',
             tackling: '#ff2200', disengaging: '#aa8844',
             patrol: '#5588cc', responding: '#ff8844',
+            surveying: '#00ff88', repairing: '#44ddff',
         };
 
         tbody.innerHTML = ships.map(ship => {

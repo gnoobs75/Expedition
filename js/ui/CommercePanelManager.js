@@ -374,6 +374,9 @@ export class CommercePanelManager {
         this.game.audio?.play('click');
         this.game.ui?.showCreditPopup(result.cost, window.innerWidth / 2, window.innerHeight / 2, 'loss');
 
+        // Encyclopedia discovery
+        this.game.encyclopedia?.discoverItem('tradegoods', goodId);
+
         this.render(container, station);
     }
 
@@ -394,10 +397,16 @@ export class CommercePanelManager {
         // Notify commerce system for quest tracking
         this.game.commerceSystem?.onTradeGoodSold(goodId, quantity, station.sectorId);
 
+        // Award trade XP
+        this.game.skillSystem?.onTrade(result.value);
+
         this.game.ui?.log(`Sold ${quantity} ${good.name} for ${formatCredits(result.value)} ISK`, 'system');
         this.game.ui?.toast(`Sold ${good.name} for ${formatCredits(result.value)} ISK`, 'success');
         this.game.audio?.play('sell');
         this.game.ui?.showCreditPopup(result.value, window.innerWidth / 2, window.innerHeight / 2, 'gain');
+
+        // Encyclopedia discovery
+        this.game.encyclopedia?.discoverItem('tradegoods', goodId);
 
         this.render(container, station);
     }

@@ -13,6 +13,8 @@ export const SHIP_ROLES = {
     POLICE: 'police',
     MILITARY: 'military',
     PIRATE: 'pirate',
+    SURVEYOR: 'surveyor',
+    LOGISTICS: 'logistics',
 };
 
 // Ship size classes
@@ -65,7 +67,7 @@ export const SHIP_DATABASE = {
         description: 'Entry-level mining frigate with built-in ore hold bonus.',
         size: 'frigate',
         role: 'mining',
-        modelPath: 'assets/ships/Miner/Miner.glb',
+        modelPath: 'assets/ships/mining/mining_frigate.glb',
         // Frigate base: HP ~200, speed ~150, sig ~28, slots 7
         // Mining: +30% HP=260, -33% speed=100, -75% DPS (1 weapon), +300% cargo
         maxSpeed: 100,
@@ -91,6 +93,7 @@ export const SHIP_DATABASE = {
         description: 'Agile mining frigate with enhanced ore hold and covert capability.',
         size: 'frigate',
         role: 'mining',
+        modelPath: 'assets/ships/mining/mining_frigate.glb',
         // Mining frigate variant 2: slightly better
         maxSpeed: 108,
         acceleration: 22,
@@ -115,6 +118,7 @@ export const SHIP_DATABASE = {
         description: 'Dedicated mining destroyer with massive ore hold.',
         size: 'destroyer',
         role: 'mining',
+        modelPath: 'assets/ships/mining/mining_frigate.glb',
         // Destroyer base: HP ~440, speed ~110, sig ~50, slots 9
         // Mining: +30% HP=572, -33% speed=74, +300% cargo
         maxSpeed: 74,
@@ -140,6 +144,7 @@ export const SHIP_DATABASE = {
         description: 'Tanky mining destroyer built for dangerous space.',
         size: 'destroyer',
         role: 'mining',
+        modelPath: 'assets/ships/mining/mining_frigate.glb',
         // Mining destroyer variant: tankier, fewer weapons
         maxSpeed: 70,
         acceleration: 14,
@@ -164,6 +169,7 @@ export const SHIP_DATABASE = {
         description: 'High-yield mining cruiser, requires fleet support for defense.',
         size: 'cruiser',
         role: 'mining',
+        modelPath: 'assets/ships/mining/mining_cruiser.glb',
         // Cruiser base: HP ~1000, speed ~75, sig ~80, slots 13
         // Mining: +30% HP=1300, -33% speed=50, +400% cargo
         maxSpeed: 50,
@@ -189,6 +195,7 @@ export const SHIP_DATABASE = {
         description: 'Elite mining cruiser, maximum extraction efficiency.',
         size: 'cruiser',
         role: 'mining',
+        modelPath: 'assets/ships/mining/mining_cruiser.glb',
         // Mining cruiser variant 2: premium
         maxSpeed: 46,
         acceleration: 9,
@@ -213,6 +220,7 @@ export const SHIP_DATABASE = {
         description: 'Industrial command ship with fleet mining bonuses.',
         size: 'battlecruiser',
         role: 'mining',
+        modelPath: 'assets/ships/mining/mining_cruiser.glb',
         // BC base: HP ~2000, speed ~50, sig ~140, slots 16
         // Mining: +30% HP=2600, -33% speed=33, +400% cargo
         maxSpeed: 33,
@@ -238,6 +246,7 @@ export const SHIP_DATABASE = {
         description: 'Massive capital industrial vessel. The ultimate mining platform.',
         size: 'capital',
         role: 'mining',
+        modelPath: 'assets/ships/mining/mining_cruiser.glb',
         // Capital base: HP ~8000, speed ~20, sig ~420, slots 22
         // Mining: +40% HP=11200, -35% speed=13, +500% cargo
         maxSpeed: 13,
@@ -270,6 +279,7 @@ export const SHIP_DATABASE = {
         description: 'Small cargo frigate for quick deliveries.',
         size: 'frigate',
         role: 'hauler',
+        modelPath: 'assets/ships/hauler/hauler_frigate.glb',
         // Frigate base: HP ~200, speed ~150, sig ~28, slots 7
         // Hauler: +20% HP=240, -35% speed=98, +400% cargo
         maxSpeed: 98,
@@ -295,6 +305,7 @@ export const SHIP_DATABASE = {
         description: 'Fast hauling destroyer with decent defensive options.',
         size: 'destroyer',
         role: 'hauler',
+        modelPath: 'assets/ships/hauler/hauler_frigate.glb',
         // Destroyer base: HP ~440, speed ~110, sig ~50, slots 9
         // Hauler: +20% HP=528, -35% speed=72, +400% cargo
         maxSpeed: 72,
@@ -320,6 +331,7 @@ export const SHIP_DATABASE = {
         description: 'Standard industrial cruiser for bulk cargo transport.',
         size: 'cruiser',
         role: 'hauler',
+        modelPath: 'assets/ships/hauler/hauler_cruiser.glb',
         // Cruiser base: HP ~1000, speed ~75, sig ~80, slots 13
         // Hauler: +20% HP=1200, -35% speed=49, +400% cargo
         maxSpeed: 49,
@@ -345,6 +357,7 @@ export const SHIP_DATABASE = {
         description: 'Armored deep-space transport with enhanced defenses.',
         size: 'cruiser',
         role: 'hauler',
+        modelPath: 'assets/ships/hauler/hauler_cruiser.glb',
         // Hauler cruiser variant: tankier
         maxSpeed: 44,
         acceleration: 8,
@@ -369,6 +382,7 @@ export const SHIP_DATABASE = {
         description: 'Massive freighter battlecruiser. Slow but enormous cargo capacity.',
         size: 'battlecruiser',
         role: 'hauler',
+        modelPath: 'assets/ships/hauler/hauler_cruiser.glb',
         // BC base: HP ~2000, speed ~50, sig ~140, slots 16
         // Hauler: +20% HP=2400, -35% speed=33, +500% cargo
         maxSpeed: 33,
@@ -394,6 +408,7 @@ export const SHIP_DATABASE = {
         description: 'Capital-class freighter. The backbone of interstellar commerce.',
         size: 'capital',
         role: 'hauler',
+        modelPath: 'assets/ships/hauler/hauler_cruiser.glb',
         // Capital base: HP ~8000, speed ~20, sig ~420, slots 22
         // Hauler: +20% HP=9600, -35% speed=13, +500% cargo
         maxSpeed: 13,
@@ -426,6 +441,7 @@ export const SHIP_DATABASE = {
         description: 'Light salvaging frigate for battlefield cleanup.',
         size: 'frigate',
         role: 'salvager',
+        modelPath: 'assets/ships/salvager/salvager_frigate.glb',
         // Frigate base: HP ~200, speed ~150, sig ~28, slots 7
         // Salvager: +25% HP=250, -30% speed=105, +250% cargo
         maxSpeed: 105,
@@ -451,6 +467,7 @@ export const SHIP_DATABASE = {
         description: 'Salvage-optimized destroyer with tractor beam capability.',
         size: 'destroyer',
         role: 'salvager',
+        modelPath: 'assets/ships/salvager/salvager_frigate.glb',
         // Destroyer base: HP ~440, speed ~110, sig ~50, slots 9
         // Salvager: +25% HP=550, -30% speed=77, +250% cargo
         maxSpeed: 77,
@@ -476,6 +493,7 @@ export const SHIP_DATABASE = {
         description: 'Dedicated salvage cruiser with massive tractor range.',
         size: 'cruiser',
         role: 'salvager',
+        modelPath: 'assets/ships/salvager/salvager_cruiser.glb',
         // Cruiser base: HP ~1000, speed ~75, sig ~80, slots 13
         // Salvager: +25% HP=1250, -30% speed=53, +300% cargo
         maxSpeed: 53,
@@ -501,6 +519,7 @@ export const SHIP_DATABASE = {
         description: 'Advanced salvage cruiser with automated salvage drones.',
         size: 'cruiser',
         role: 'salvager',
+        modelPath: 'assets/ships/salvager/salvager_cruiser.glb',
         // Salvager cruiser variant 2: premium
         maxSpeed: 48,
         acceleration: 9,
@@ -532,6 +551,7 @@ export const SHIP_DATABASE = {
         description: 'Light harvesting frigate for gas cloud and resource collection.',
         size: 'frigate',
         role: 'harvester',
+        modelPath: 'assets/ships/harvester/harvester_frigate.glb',
         // Frigate base: HP ~200, speed ~150, sig ~28, slots 7
         // Harvester: +25% HP=250, -30% speed=105, +250% cargo
         maxSpeed: 105,
@@ -557,6 +577,7 @@ export const SHIP_DATABASE = {
         description: 'Purpose-built harvesting destroyer for planetary resources.',
         size: 'destroyer',
         role: 'harvester',
+        modelPath: 'assets/ships/harvester/harvester_frigate.glb',
         // Destroyer base: HP ~440, speed ~110, sig ~50, slots 9
         // Harvester: +25% HP=550, -30% speed=77, +250% cargo
         maxSpeed: 77,
@@ -582,6 +603,7 @@ export const SHIP_DATABASE = {
         description: 'Specialized harvesting cruiser with enhanced resource processing.',
         size: 'cruiser',
         role: 'harvester',
+        modelPath: 'assets/ships/harvester/harvester_cruiser.glb',
         // Cruiser base: HP ~1000, speed ~75, sig ~80, slots 13
         // Harvester: +25% HP=1250, -30% speed=53, +300% cargo
         maxSpeed: 53,
@@ -607,6 +629,7 @@ export const SHIP_DATABASE = {
         description: 'Advanced harvester with drone-assisted extraction.',
         size: 'cruiser',
         role: 'harvester',
+        modelPath: 'assets/ships/harvester/harvester_cruiser.glb',
         // Harvester cruiser variant 2: premium
         maxSpeed: 48,
         acceleration: 9,
@@ -638,6 +661,7 @@ export const SHIP_DATABASE = {
         description: 'Fast attack frigate for hit-and-run tactics.',
         size: 'frigate',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_frigate.glb',
         // Frigate base: HP ~200, speed ~150, sig ~28, slots 7
         // Merc: -10% HP=180, +18% speed=177, low cargo
         maxSpeed: 177,
@@ -663,6 +687,7 @@ export const SHIP_DATABASE = {
         description: 'Iconic combat frigate, balanced offense and defense.',
         size: 'frigate',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_frigate.glb',
         // Merc frigate variant 2: balanced
         maxSpeed: 168,
         acceleration: 36,
@@ -687,6 +712,7 @@ export const SHIP_DATABASE = {
         description: 'Glass cannon destroyer with devastating alpha strike.',
         size: 'destroyer',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_frigate.glb',
         // Destroyer base: HP ~440, speed ~110, sig ~50, slots 9
         // Merc: -10% HP=396, +18% speed=130, more weapons
         maxSpeed: 130,
@@ -712,6 +738,7 @@ export const SHIP_DATABASE = {
         description: 'Missile-focused destroyer for standoff engagement.',
         size: 'destroyer',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_frigate.glb',
         // Merc destroyer variant 2
         maxSpeed: 125,
         acceleration: 26,
@@ -736,6 +763,7 @@ export const SHIP_DATABASE = {
         description: 'Versatile combat cruiser with drone support.',
         size: 'cruiser',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_cruiser.glb',
         // Cruiser base: HP ~1000, speed ~75, sig ~80, slots 13
         // Merc: -10% HP=900, +18% speed=89, more weapons
         maxSpeed: 89,
@@ -761,6 +789,7 @@ export const SHIP_DATABASE = {
         description: 'Long-range missile cruiser for kiting combat.',
         size: 'cruiser',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_cruiser.glb',
         // Merc cruiser variant 2
         maxSpeed: 93,
         acceleration: 19,
@@ -785,6 +814,7 @@ export const SHIP_DATABASE = {
         description: 'Heavy assault battlecruiser, devastating close-range damage.',
         size: 'battlecruiser',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_cruiser.glb',
         // BC base: HP ~2000, speed ~50, sig ~140, slots 16
         // Merc: -10% HP=1800, +18% speed=59, more weapons
         maxSpeed: 59,
@@ -810,6 +840,7 @@ export const SHIP_DATABASE = {
         description: 'Shield-tanked missile battlecruiser. Endurance fighter.',
         size: 'battlecruiser',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_cruiser.glb',
         // Merc BC variant 2: tankier merc
         maxSpeed: 55,
         acceleration: 11,
@@ -834,6 +865,7 @@ export const SHIP_DATABASE = {
         description: 'Versatile battleship with balanced offensive capability.',
         size: 'battleship',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_cruiser.glb',
         // BS base: HP ~4000, speed ~30, sig ~220, slots 19
         // Merc: -10% HP=3600, +18% speed=35, more weapons
         maxSpeed: 35,
@@ -859,6 +891,7 @@ export const SHIP_DATABASE = {
         description: 'Cruise missile battleship. Devastating long-range firepower.',
         size: 'battleship',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_cruiser.glb',
         // Merc BS variant 2
         maxSpeed: 33,
         acceleration: 6,
@@ -883,6 +916,7 @@ export const SHIP_DATABASE = {
         description: 'Elite faction battleship, fastest battleship hull available.',
         size: 'battleship',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_cruiser.glb',
         // Merc BS variant 3: fast elite
         maxSpeed: 42,
         acceleration: 8,
@@ -907,6 +941,7 @@ export const SHIP_DATABASE = {
         description: 'Capital dreadnought. Siege-level firepower for fleet combat.',
         size: 'capital',
         role: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_cruiser.glb',
         // Capital base: HP ~8000, speed ~20, sig ~420, slots 22
         // Merc: -10% HP=7200, +18% speed=24, more weapons
         maxSpeed: 24,
@@ -939,6 +974,7 @@ export const SHIP_DATABASE = {
         description: 'Fast patrol frigate for law enforcement.',
         size: 'frigate',
         role: 'police',
+        modelPath: 'assets/ships/police/police_frigate.glb',
         // Frigate base: HP ~200, speed ~150, sig ~28, slots 7
         // Police: balanced
         maxSpeed: 155,
@@ -964,6 +1000,7 @@ export const SHIP_DATABASE = {
         description: 'Police interceptor destroyer with warp disruption specialty.',
         size: 'destroyer',
         role: 'police',
+        modelPath: 'assets/ships/police/police_frigate.glb',
         // Destroyer base: HP ~440, speed ~110, sig ~50, slots 9
         // Police: balanced
         maxSpeed: 112,
@@ -989,6 +1026,7 @@ export const SHIP_DATABASE = {
         description: 'Support cruiser with shield logistics capability.',
         size: 'cruiser',
         role: 'police',
+        modelPath: 'assets/ships/police/police_cruiser.glb',
         // Cruiser base: HP ~1000, speed ~75, sig ~80, slots 13
         // Police: balanced
         maxSpeed: 75,
@@ -1014,6 +1052,7 @@ export const SHIP_DATABASE = {
         description: 'Command cruiser providing fleet-wide bonuses.',
         size: 'cruiser',
         role: 'police',
+        modelPath: 'assets/ships/police/police_cruiser.glb',
         // Police cruiser variant 2: command
         maxSpeed: 70,
         acceleration: 14,
@@ -1038,6 +1077,7 @@ export const SHIP_DATABASE = {
         description: 'Heavy command battlecruiser for extended operations.',
         size: 'battlecruiser',
         role: 'police',
+        modelPath: 'assets/ships/police/police_cruiser.glb',
         // BC base: HP ~2000, speed ~50, sig ~140, slots 16
         // Police: balanced
         maxSpeed: 50,
@@ -1063,6 +1103,7 @@ export const SHIP_DATABASE = {
         description: 'Fleet battleship for sector defense operations.',
         size: 'battleship',
         role: 'police',
+        modelPath: 'assets/ships/police/police_cruiser.glb',
         // BS base: HP ~4000, speed ~30, sig ~220, slots 19
         // Police: balanced
         maxSpeed: 30,
@@ -1095,6 +1136,7 @@ export const SHIP_DATABASE = {
         description: 'Light military interceptor. Fast target acquisition.',
         size: 'frigate',
         role: 'military',
+        modelPath: 'assets/ships/military/military_frigate.glb',
         // Frigate base: HP ~200, speed ~150, sig ~28, slots 7
         // Military: +30% HP=260, -15% speed=128
         maxSpeed: 138,
@@ -1120,6 +1162,7 @@ export const SHIP_DATABASE = {
         description: 'Shielded assault frigate. Tough for its size.',
         size: 'frigate',
         role: 'military',
+        modelPath: 'assets/ships/military/military_frigate.glb',
         // Military frigate variant 2: tanky
         maxSpeed: 130,
         acceleration: 28,
@@ -1144,6 +1187,7 @@ export const SHIP_DATABASE = {
         description: 'Sniper destroyer with extreme weapon range.',
         size: 'destroyer',
         role: 'military',
+        modelPath: 'assets/ships/military/military_frigate.glb',
         // Destroyer base: HP ~440, speed ~110, sig ~50, slots 9
         // Military: +30% HP=572, -15% speed=94
         maxSpeed: 94,
@@ -1169,6 +1213,7 @@ export const SHIP_DATABASE = {
         description: 'Missile barrage destroyer. Area denial specialist.',
         size: 'destroyer',
         role: 'military',
+        modelPath: 'assets/ships/military/military_frigate.glb',
         // Military destroyer variant 2
         maxSpeed: 98,
         acceleration: 21,
@@ -1193,6 +1238,7 @@ export const SHIP_DATABASE = {
         description: 'Shield-tanked combat cruiser for sustained engagements.',
         size: 'cruiser',
         role: 'military',
+        modelPath: 'assets/ships/military/military_cruiser.glb',
         // Cruiser base: HP ~1000, speed ~75, sig ~80, slots 13
         // Military: +30% HP=1300, -15% speed=64
         maxSpeed: 64,
@@ -1218,6 +1264,7 @@ export const SHIP_DATABASE = {
         description: 'Upgraded military cruiser with enhanced firepower.',
         size: 'cruiser',
         role: 'military',
+        modelPath: 'assets/ships/military/military_cruiser.glb',
         // Military cruiser variant 2
         maxSpeed: 68,
         acceleration: 14,
@@ -1242,6 +1289,7 @@ export const SHIP_DATABASE = {
         description: 'Long-range sniper battlecruiser with shield defense.',
         size: 'battlecruiser',
         role: 'military',
+        modelPath: 'assets/ships/military/military_cruiser.glb',
         // BC base: HP ~2000, speed ~50, sig ~140, slots 16
         // Military: +30% HP=2600, -15% speed=43
         maxSpeed: 43,
@@ -1267,6 +1315,7 @@ export const SHIP_DATABASE = {
         description: 'Attack battlecruiser with battleship-class weapons.',
         size: 'battlecruiser',
         role: 'military',
+        modelPath: 'assets/ships/military/military_cruiser.glb',
         // Military BC variant 2: glass cannon
         maxSpeed: 46,
         acceleration: 9,
@@ -1291,6 +1340,7 @@ export const SHIP_DATABASE = {
         description: 'Fortress battleship with extreme shield capacity.',
         size: 'battleship',
         role: 'military',
+        modelPath: 'assets/ships/military/military_cruiser.glb',
         // BS base: HP ~4000, speed ~30, sig ~220, slots 19
         // Military: +30% HP=5200, -15% speed=26
         maxSpeed: 26,
@@ -1316,6 +1366,7 @@ export const SHIP_DATABASE = {
         description: 'EWAR battleship specializing in electronic warfare.',
         size: 'battleship',
         role: 'military',
+        modelPath: 'assets/ships/military/military_cruiser.glb',
         // Military BS variant 2: EWAR focus
         maxSpeed: 24,
         acceleration: 4,
@@ -1340,6 +1391,7 @@ export const SHIP_DATABASE = {
         description: 'Capital titan. The ultimate military vessel.',
         size: 'capital',
         role: 'military',
+        modelPath: 'assets/ships/military/military_cruiser.glb',
         // Capital base: HP ~8000, speed ~20, sig ~420, slots 22
         // Military: +30% HP=10400, -15% speed=17
         maxSpeed: 17,
@@ -1372,6 +1424,7 @@ export const SHIP_DATABASE = {
         description: 'Aggressive pirate frigate with explosive payload.',
         size: 'frigate',
         role: 'pirate',
+        modelPath: 'assets/ships/pirate/pirate_frigate.glb',
         // Frigate base: HP ~200, speed ~150, sig ~28, slots 7
         // Pirate: -15% HP=170, +20% speed=180, more weapons
         maxSpeed: 182,
@@ -1397,6 +1450,7 @@ export const SHIP_DATABASE = {
         description: 'Angel Cartel frigate. Fastest combat hull in space.',
         size: 'frigate',
         role: 'pirate',
+        modelPath: 'assets/ships/pirate/pirate_frigate.glb',
         // Pirate frigate variant 2: elite fast
         maxSpeed: 195,
         acceleration: 44,
@@ -1421,6 +1475,7 @@ export const SHIP_DATABASE = {
         description: 'Pirate tactical destroyer with mode switching capability.',
         size: 'destroyer',
         role: 'pirate',
+        modelPath: 'assets/ships/pirate/pirate_frigate.glb',
         // Destroyer base: HP ~440, speed ~110, sig ~50, slots 9
         // Pirate: -15% HP=374, +20% speed=132, more weapons
         maxSpeed: 132,
@@ -1446,6 +1501,7 @@ export const SHIP_DATABASE = {
         description: 'Angel Cartel cruiser. Speed and firepower combined.',
         size: 'cruiser',
         role: 'pirate',
+        modelPath: 'assets/ships/pirate/pirate_cruiser.glb',
         // Cruiser base: HP ~1000, speed ~75, sig ~80, slots 13
         // Pirate: -15% HP=850, +20% speed=90, more weapons
         maxSpeed: 94,
@@ -1471,6 +1527,7 @@ export const SHIP_DATABASE = {
         description: 'Covert ops cruiser with drone specialization.',
         size: 'cruiser',
         role: 'pirate',
+        modelPath: 'assets/ships/pirate/pirate_cruiser.glb',
         // Pirate cruiser variant 2: drone focus
         maxSpeed: 84,
         acceleration: 17,
@@ -1495,6 +1552,7 @@ export const SHIP_DATABASE = {
         description: 'Pirate battlecruiser favoring close-range brawling.',
         size: 'battlecruiser',
         role: 'pirate',
+        modelPath: 'assets/ships/pirate/pirate_cruiser.glb',
         // BC base: HP ~2000, speed ~50, sig ~140, slots 16
         // Pirate: -15% HP=1700, +20% speed=60, more weapons
         maxSpeed: 60,
@@ -1520,6 +1578,7 @@ export const SHIP_DATABASE = {
         description: 'Serpentis faction battlecruiser. Raw damage output.',
         size: 'battlecruiser',
         role: 'pirate',
+        modelPath: 'assets/ships/pirate/pirate_cruiser.glb',
         // Pirate BC variant 2: damage focused
         maxSpeed: 56,
         acceleration: 11,
@@ -1544,6 +1603,7 @@ export const SHIP_DATABASE = {
         description: 'Guristas faction battleship. Drones and missiles combined.',
         size: 'battleship',
         role: 'pirate',
+        modelPath: 'assets/ships/pirate/pirate_cruiser.glb',
         // BS base: HP ~4000, speed ~30, sig ~220, slots 19
         // Pirate: -15% HP=3400, +20% speed=36, more weapons
         maxSpeed: 36,
@@ -1569,6 +1629,7 @@ export const SHIP_DATABASE = {
         description: 'Sansha faction battleship. Laser damage specialization.',
         size: 'battleship',
         role: 'pirate',
+        modelPath: 'assets/ships/pirate/pirate_cruiser.glb',
         // Pirate BS variant 2: laser focus
         maxSpeed: 38,
         acceleration: 7,
@@ -1593,6 +1654,7 @@ export const SHIP_DATABASE = {
         description: 'Blood Raider flagship. Capacitor warfare specialist.',
         size: 'battleship',
         role: 'pirate',
+        modelPath: 'assets/ships/pirate/pirate_cruiser.glb',
         // Pirate BS variant 3: cap warfare
         maxSpeed: 34,
         acceleration: 6,
@@ -1617,6 +1679,7 @@ export const SHIP_DATABASE = {
         description: 'Pirate supercarrier capital. Supreme drone warfare platform.',
         size: 'capital',
         role: 'pirate',
+        modelPath: 'assets/ships/pirate/pirate_cruiser.glb',
         // Capital base: HP ~8000, speed ~20, sig ~420, slots 22
         // Pirate: -15% HP=6800, +20% speed=24, more weapons
         maxSpeed: 24,
@@ -1636,6 +1699,284 @@ export const SHIP_DATABASE = {
         droneBandwidth: 200,
         price: 1500000,
         bonuses: { droneBonus: 1.55, damageBonus: 1.45, maxSpeed: 1.25 },
+    },
+
+    // =============================================
+    // SURVEYOR SHIPS
+    // =============================================
+    // Surveyor role: +15% HP, -60% DPS (fewer weapons), +10% speed, +200% cargo
+    // Bonuses: 25-60% scan range, scan speed, probe strength
+
+    'probe': {
+        name: 'Probe',
+        description: 'Fast survey frigate with built-in directional scanner.',
+        size: 'frigate',
+        role: 'surveyor',
+        modelPath: 'assets/ships/military/military_frigate.glb',
+        maxSpeed: 165,
+        acceleration: 36,
+        turnSpeed: 2.6,
+        shield: 90,
+        armor: 55,
+        hull: 70,
+        capacitor: 95,
+        capacitorRegen: 4,
+        signatureRadius: 26,
+        weaponSlots: 2,
+        moduleSlots: 3,
+        subsystemSlots: 2,
+        cargoCapacity: 400,
+        droneCapacity: 3,
+        droneBandwidth: 25,
+        price: 6000,
+        bonuses: { scanRange: 1.30, scanSpeed: 1.25 },
+    },
+    'buzzard': {
+        name: 'Buzzard',
+        description: 'Covert survey frigate. Extended scan radius and probe strength.',
+        size: 'frigate',
+        role: 'surveyor',
+        modelPath: 'assets/ships/military/military_frigate.glb',
+        maxSpeed: 172,
+        acceleration: 38,
+        turnSpeed: 2.8,
+        shield: 85,
+        armor: 50,
+        hull: 65,
+        capacitor: 100,
+        capacitorRegen: 4,
+        signatureRadius: 24,
+        weaponSlots: 2,
+        moduleSlots: 3,
+        subsystemSlots: 2,
+        cargoCapacity: 350,
+        droneCapacity: 2,
+        droneBandwidth: 20,
+        price: 14000,
+        bonuses: { scanRange: 1.40, scanSpeed: 1.30, signatureRadius: 0.80 },
+    },
+    'helios': {
+        name: 'Helios',
+        description: 'Advanced survey destroyer with deep-space scanner array.',
+        size: 'destroyer',
+        role: 'surveyor',
+        modelPath: 'assets/ships/military/military_frigate.glb',
+        maxSpeed: 118,
+        acceleration: 25,
+        turnSpeed: 2.0,
+        shield: 195,
+        armor: 120,
+        hull: 155,
+        capacitor: 160,
+        capacitorRegen: 5,
+        signatureRadius: 44,
+        weaponSlots: 2,
+        moduleSlots: 4,
+        subsystemSlots: 3,
+        cargoCapacity: 600,
+        droneCapacity: 4,
+        droneBandwidth: 35,
+        price: 28000,
+        bonuses: { scanRange: 1.45, scanSpeed: 1.35, scanStrength: 1.25 },
+    },
+    'astero': {
+        name: 'Astero',
+        description: 'Exploration cruiser with massive scan arrays and drone bay.',
+        size: 'cruiser',
+        role: 'surveyor',
+        modelPath: 'assets/ships/military/military_cruiser.glb',
+        maxSpeed: 82,
+        acceleration: 16,
+        turnSpeed: 1.3,
+        shield: 420,
+        armor: 280,
+        hull: 350,
+        capacitor: 280,
+        capacitorRegen: 7,
+        signatureRadius: 72,
+        weaponSlots: 3,
+        moduleSlots: 5,
+        subsystemSlots: 5,
+        cargoCapacity: 1200,
+        droneCapacity: 8,
+        droneBandwidth: 75,
+        price: 85000,
+        bonuses: { scanRange: 1.55, scanSpeed: 1.40, scanStrength: 1.35 },
+    },
+    'stratios-survey': {
+        name: 'Stratios Survey',
+        description: 'Heavy exploration cruiser. Full-sector scan capability.',
+        size: 'cruiser',
+        role: 'surveyor',
+        modelPath: 'assets/ships/military/military_cruiser.glb',
+        maxSpeed: 76,
+        acceleration: 15,
+        turnSpeed: 1.2,
+        shield: 460,
+        armor: 310,
+        hull: 380,
+        capacitor: 320,
+        capacitorRegen: 8,
+        signatureRadius: 76,
+        weaponSlots: 3,
+        moduleSlots: 5,
+        subsystemSlots: 5,
+        cargoCapacity: 1500,
+        droneCapacity: 10,
+        droneBandwidth: 100,
+        price: 130000,
+        bonuses: { scanRange: 1.60, scanSpeed: 1.45, scanStrength: 1.40, cargoCapacity: 1.20 },
+    },
+
+    // =============================================
+    // LOGISTICS SHIPS
+    // =============================================
+    // Logistics role: +40% HP, -70% DPS (few weapons), -20% speed
+    // Bonuses: 30-60% remote repair amount/range/cap use
+
+    'bantam': {
+        name: 'Bantam',
+        description: 'Entry-level logistics frigate. Shield repair specialist.',
+        size: 'frigate',
+        role: 'logistics',
+        modelPath: 'assets/ships/police/police_frigate.glb',
+        maxSpeed: 120,
+        acceleration: 26,
+        turnSpeed: 2.2,
+        shield: 130,
+        armor: 70,
+        hull: 85,
+        capacitor: 110,
+        capacitorRegen: 4,
+        signatureRadius: 30,
+        weaponSlots: 1,
+        moduleSlots: 4,
+        subsystemSlots: 2,
+        cargoCapacity: 200,
+        droneCapacity: 2,
+        droneBandwidth: 15,
+        price: 7000,
+        bonuses: { remoteRepair: 1.30, remoteRepairRange: 1.25, capacitorUse: 0.85 },
+    },
+    'inquisitor': {
+        name: 'Inquisitor',
+        description: 'Armor logistics frigate with capacitor transfer capability.',
+        size: 'frigate',
+        role: 'logistics',
+        modelPath: 'assets/ships/police/police_frigate.glb',
+        maxSpeed: 115,
+        acceleration: 24,
+        turnSpeed: 2.0,
+        shield: 95,
+        armor: 100,
+        hull: 90,
+        capacitor: 120,
+        capacitorRegen: 4,
+        signatureRadius: 31,
+        weaponSlots: 1,
+        moduleSlots: 4,
+        subsystemSlots: 2,
+        cargoCapacity: 210,
+        droneCapacity: 2,
+        droneBandwidth: 15,
+        price: 8000,
+        bonuses: { remoteRepair: 1.35, remoteRepairRange: 1.20, capacitorUse: 0.80 },
+    },
+    'osprey': {
+        name: 'Osprey',
+        description: 'Dedicated logistics destroyer. Dual shield repair arrays.',
+        size: 'destroyer',
+        role: 'logistics',
+        modelPath: 'assets/ships/police/police_frigate.glb',
+        maxSpeed: 88,
+        acceleration: 18,
+        turnSpeed: 1.6,
+        shield: 280,
+        armor: 170,
+        hull: 210,
+        capacitor: 200,
+        capacitorRegen: 6,
+        signatureRadius: 52,
+        weaponSlots: 1,
+        moduleSlots: 5,
+        subsystemSlots: 3,
+        cargoCapacity: 300,
+        droneCapacity: 3,
+        droneBandwidth: 25,
+        price: 30000,
+        bonuses: { remoteRepair: 1.40, remoteRepairRange: 1.30, capacitorUse: 0.75 },
+    },
+    'augoror': {
+        name: 'Augoror',
+        description: 'Armor logistics cruiser with massive capacitor pool.',
+        size: 'cruiser',
+        role: 'logistics',
+        modelPath: 'assets/ships/police/police_cruiser.glb',
+        maxSpeed: 60,
+        acceleration: 12,
+        turnSpeed: 1.0,
+        shield: 480,
+        armor: 420,
+        hull: 380,
+        capacitor: 380,
+        capacitorRegen: 9,
+        signatureRadius: 85,
+        weaponSlots: 2,
+        moduleSlots: 6,
+        subsystemSlots: 5,
+        cargoCapacity: 350,
+        droneCapacity: 4,
+        droneBandwidth: 40,
+        price: 90000,
+        bonuses: { remoteRepair: 1.50, remoteRepairRange: 1.40, capacitorUse: 0.70 },
+    },
+    'basilisk': {
+        name: 'Basilisk',
+        description: 'Heavy logistics cruiser. Fleet-class shield repair platform.',
+        size: 'cruiser',
+        role: 'logistics',
+        modelPath: 'assets/ships/police/police_cruiser.glb',
+        maxSpeed: 58,
+        acceleration: 11,
+        turnSpeed: 0.9,
+        shield: 560,
+        armor: 380,
+        hull: 420,
+        capacitor: 400,
+        capacitorRegen: 10,
+        signatureRadius: 88,
+        weaponSlots: 2,
+        moduleSlots: 7,
+        subsystemSlots: 4,
+        cargoCapacity: 320,
+        droneCapacity: 5,
+        droneBandwidth: 50,
+        price: 120000,
+        bonuses: { remoteRepair: 1.55, remoteRepairRange: 1.45, capacitorUse: 0.65 },
+    },
+    'guardian': {
+        name: 'Guardian',
+        description: 'Logistics battlecruiser. The gold standard for fleet repair.',
+        size: 'battlecruiser',
+        role: 'logistics',
+        modelPath: 'assets/ships/police/police_cruiser.glb',
+        maxSpeed: 40,
+        acceleration: 8,
+        turnSpeed: 0.7,
+        shield: 1050,
+        armor: 850,
+        hull: 780,
+        capacitor: 550,
+        capacitorRegen: 12,
+        signatureRadius: 148,
+        weaponSlots: 2,
+        moduleSlots: 8,
+        subsystemSlots: 6,
+        cargoCapacity: 400,
+        droneCapacity: 5,
+        droneBandwidth: 50,
+        price: 280000,
+        bonuses: { remoteRepair: 1.60, remoteRepairRange: 1.50, capacitorUse: 0.60 },
     },
 
     // =============================================
@@ -1666,6 +2007,7 @@ export const SHIP_DATABASE = {
         price: 120000,
         bonuses: { miningYield: 1.60, miningCycleTime: 0.65, cargoCapacity: 1.50, droneYield: 1.40 },
         guildExclusive: 'mining',
+        modelPath: 'assets/ships/mining/mining_cruiser.glb',
     },
     'motherlode': {
         name: 'Motherlode',
@@ -1690,6 +2032,7 @@ export const SHIP_DATABASE = {
         price: 800000,
         bonuses: { miningYield: 1.80, miningCycleTime: 0.50, cargoCapacity: 2.00, droneYield: 1.60 },
         guildExclusive: 'mining',
+        modelPath: 'assets/ships/mining/mining_cruiser.glb',
     },
 
     // Mercenary Guild exclusive
@@ -1716,6 +2059,7 @@ export const SHIP_DATABASE = {
         price: 35000,
         bonuses: { damageBonus: 1.50, trackingSpeed: 1.35, maxSpeed: 1.20, cycleTimeBonus: 0.85 },
         guildExclusive: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_frigate.glb',
     },
     'executioner': {
         name: 'Executioner',
@@ -1740,6 +2084,7 @@ export const SHIP_DATABASE = {
         price: 350000,
         bonuses: { damageBonus: 1.55, trackingSpeed: 1.25, optimalRange: 1.30, capacitorUse: 0.80 },
         guildExclusive: 'mercenary',
+        modelPath: 'assets/ships/mercenary/mercenary_cruiser.glb',
     },
 };
 

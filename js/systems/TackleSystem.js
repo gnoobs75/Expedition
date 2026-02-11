@@ -26,12 +26,14 @@ export class TackleSystem {
         if (player && player.alive) {
             player.isPointed = false;
             player.isWebbed = false;
+            player.isNosed = false;
             player.webSpeedFactor = 1.0;
         }
         for (const e of entities) {
             if (!e.alive || e.type === 'asteroid' || e.type === 'station' || e.type === 'planet' || e.type === 'gate') continue;
             e.isPointed = false;
             e.isWebbed = false;
+            e.isNosed = false;
             e.webSpeedFactor = 1.0;
         }
 
@@ -67,6 +69,18 @@ export class TackleSystem {
                     ship.target.isWebbed = true;
                     const factor = 1 - config.speedReduction;
                     ship.target.webSpeedFactor = Math.min(ship.target.webSpeedFactor, factor);
+                }
+
+                // Energy nosferatu (cap drain)
+                if (config.capacitorDrain && dist <= (config.range || 0)) {
+                    const drain = config.capacitorDrain * this.throttleInterval;
+                    ship.target.isNosed = true;
+                    if (ship.target.capacitor !== undefined) {
+                        ship.target.capacitor = Math.max(0, ship.target.capacitor - drain);
+                    }
+                    if (ship.capacitor !== undefined && ship.maxCapacitor) {
+                        ship.capacitor = Math.min(ship.maxCapacitor, ship.capacitor + drain * 0.8);
+                    }
                 }
             }
         }

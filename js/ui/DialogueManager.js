@@ -55,6 +55,11 @@ export class DialogueManager {
         name.textContent = npcConfig.name;
         title.textContent = npcConfig.title || '';
 
+        // Mood indicator based on context
+        const mood = npcConfig.mood || this.inferMood(npcConfig);
+        portrait.dataset.mood = mood;
+        portrait.style.borderColor = this.getMoodBorderColor(mood);
+
         this.showText(npcConfig.text, npcConfig.options || []);
 
         this.game.audio?.play('dialogue-open');
@@ -132,6 +137,42 @@ export class DialogueManager {
                 }
             });
         });
+    }
+
+    /**
+     * Infer mood from dialogue context
+     */
+    inferMood(config) {
+        const text = (config.text || '').toLowerCase();
+        const color = config.color || '';
+
+        // Hostile/threatening
+        if (color === '#ff4444' || /pirate|kill|destroy|die|scrap|no witness/i.test(text)) return 'hostile';
+        // Warning
+        if (/warning|danger|careful|beware|alert/i.test(text)) return 'worried';
+        // Friendly/welcoming
+        if (/welcome|greetings|hello|good to see|friend|well done|congratulations/i.test(text)) return 'friendly';
+        // Business
+        if (/trade|buy|sell|contract|cargo|deliver|transport/i.test(text)) return 'business';
+        // Quest/mission
+        if (/mission|task|quest|assignment|job/i.test(text)) return 'determined';
+
+        return 'neutral';
+    }
+
+    /**
+     * Get border color for mood
+     */
+    getMoodBorderColor(mood) {
+        const colors = {
+            hostile: 'rgba(255, 50, 50, 0.6)',
+            worried: 'rgba(255, 180, 40, 0.5)',
+            friendly: 'rgba(50, 255, 120, 0.5)',
+            business: 'rgba(100, 180, 255, 0.4)',
+            determined: 'rgba(200, 150, 255, 0.5)',
+            neutral: 'rgba(0, 170, 255, 0.25)',
+        };
+        return colors[mood] || colors.neutral;
     }
 
     /**

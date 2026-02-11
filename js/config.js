@@ -311,11 +311,38 @@ export const CONFIG = {
 
     // Graphics
     STAR_COUNT: 500,
-    PARTICLE_POOL_SIZE: 200,
+    PARTICLE_POOL_SIZE: 500,
     MAX_VISIBLE_OBJECTS: 100,
 
     // Death
     DEATH_CREDIT_PENALTY: 0.1,   // Lose 10% of credits on death
+
+    // Sector Environment Hazards
+    SECTOR_HAZARDS: {
+        'sector-4': {
+            type: 'radiation',
+            name: 'Radiation Belt',
+            damagePerSecond: 2,
+            interval: 3,
+            warning: 'RADIATION WARNING - Hull taking damage',
+            color: '#ff4444',
+        },
+        'sector-5': {
+            type: 'ion-storm',
+            name: 'Ion Storm',
+            capDrainPerSecond: 8,
+            interval: 2,
+            warning: 'ION STORM - Capacitor destabilizing',
+            color: '#8844ff',
+        },
+        'sector-6': {
+            type: 'nebula-interference',
+            name: 'Nebula Interference',
+            radarReduction: 0.5,
+            warning: 'NEBULA INTERFERENCE - Sensor range reduced',
+            color: '#44aa88',
+        },
+    },
 };
 
 // Sector layout for hub-and-spoke universe

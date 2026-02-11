@@ -150,7 +150,7 @@ export class InputManager {
      * Check if a click event is on an interactive UI element (not game world)
      */
     isClickOnUI(e) {
-        return !!e.target.closest('.panel:not(.hidden), #module-rack, #bottom-bar, .modal:not(.hidden), #context-menu:not(.hidden), #ship-indicator, #drone-bar:not(.hidden), #performance-monitor, #locked-targets-container, button, .menu-item');
+        return !!e.target.closest('.panel:not(.hidden), #module-rack, #bottom-bar, .modal:not(.hidden), #context-menu:not(.hidden), #ship-indicator, #drone-bar:not(.hidden), #performance-monitor, #locked-targets-container, button, .menu-item, #encyclopedia:not(.hidden)');
     }
 
     onClick(e) {
@@ -341,14 +341,27 @@ export class InputManager {
         const action = keyBindings.getAction(keyStr);
 
         if (!action) {
-            // Check for Escape to close context menu, settings, or deselect
+            // Enter to quick-dock when near station
+            if (e.code === 'Enter' && !this.game.dockedAt) {
+                const player = this.game.player;
+                const entities = this.game.currentSector?.entities || [];
+                for (const entity of entities) {
+                    if (entity.alive && entity.type === 'station' && player?.distanceTo(entity) < 300) {
+                        this.game.dockAtStation(entity);
+                        return;
+                    }
+                }
+            }
+            // Check for Escape to close context menu, settings, overlays, or deselect
             if (e.code === 'Escape') {
-                // Priority: context menu > settings > deselect
                 const contextMenu = document.getElementById('context-menu');
                 const contextMenuOpen = contextMenu && !contextMenu.classList.contains('hidden');
+                const helpOpen = !document.getElementById('keybind-overlay')?.classList?.contains('hidden');
 
                 if (contextMenuOpen) {
                     this.game.ui?.hideContextMenu();
+                } else if (helpOpen) {
+                    this.game.ui?.toggleKeybindOverlay();
                 } else if (settingsOpen) {
                     this.game.ui?.hideSettings();
                 } else {
@@ -422,6 +435,10 @@ export class InputManager {
                 this.cycleTargets();
                 break;
 
+            case 'targetNearestHostile':
+                this.targetNearestHostile();
+                break;
+
             case 'deselectTarget':
                 this.game.selectTarget(null);
                 this.game.ui?.hideContextMenu();
@@ -463,7 +480,12 @@ export class InputManager {
 
             // UI Panels
             case 'toggleDScan':
-                this.game.ui?.toggleDScan();
+                // If panel is visible, perform scan; otherwise toggle panel
+                if (!this.game.ui?.elements?.dscanPanel?.classList?.contains('hidden')) {
+                    this.game.ui?.performDScan();
+                } else {
+                    this.game.ui?.toggleDScan();
+                }
                 break;
 
             case 'toggleBookmarks':
@@ -523,6 +545,52 @@ export class InputManager {
             case 'toggleAdminDashboard':
                 this.game.adminDashboard?.toggle();
                 break;
+
+            case 'toggleEncyclopedia':
+                this.game.encyclopedia?.toggle();
+                break;
+
+            case 'toggleMinimap': {
+                const minimap = document.getElementById('minimap');
+                if (minimap) minimap.classList.toggle('hidden');
+                break;
+            }
+
+            case 'toggleHelp':
+                this.game.ui?.toggleKeybindOverlay();
+                break;
+
+            case 'toggleStats':
+                this.game.ui?.toggleStats();
+                break;
+
+            case 'toggleAchievements':
+                this.game.ui?.toggleAchievements();
+                break;
+
+            case 'toggleShipLog':
+                this.game.ui?.toggleShipLog();
+                break;
+
+            case 'toggleTactical':
+                this.game.ui?.toggleTacticalOverlay();
+                break;
+
+            case 'toggleCombatLog':
+                this.game.ui?.toggleCombatLog();
+                break;
+
+            case 'toggleSensorSweep': {
+                const enabled = this.game.renderer?.toggleSensorSweep();
+                this.game.ui?.showToast(enabled ? 'Sensor sweep active' : 'Sensor sweep disabled', 'system');
+                break;
+            }
+
+            case 'toggleWeaponRange': {
+                const on = this.game.renderer?.toggleWeaponRange();
+                this.game.ui?.showToast(on ? 'Weapon range overlay ON' : 'Weapon range overlay OFF', 'system');
+                break;
+            }
         }
     }
 
@@ -544,5 +612,30 @@ export class InputManager {
         const nextIndex = (currentIndex + 1) % entities.length;
 
         this.game.selectTarget(entities[nextIndex]);
+    }
+
+    /**
+     * Target the nearest hostile entity
+     */
+    targetNearestHostile() {
+        const player = this.game.player;
+        if (!player) return;
+
+        const hostiles = this.game.getVisibleEntities()
+            .filter(e => e !== player && e.alive &&
+                (e.hostility === 'hostile' || e.type === 'enemy' || e.isPirate))
+            .sort((a, b) => {
+                const distA = Math.hypot(a.x - player.x, a.y - player.y);
+                const distB = Math.hypot(b.x - player.x, b.y - player.y);
+                return distA - distB;
+            });
+
+        if (hostiles.length > 0) {
+            // If already targeting a hostile, cycle to next hostile
+            const currentIdx = hostiles.indexOf(this.game.selectedTarget);
+            const nextIdx = (currentIdx + 1) % hostiles.length;
+            this.game.selectTarget(hostiles[nextIdx]);
+            this.game.audio?.play('click');
+        }
     }
 }

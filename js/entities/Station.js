@@ -330,6 +330,14 @@ export class Station extends Entity {
             group.add(new THREE.Line(lineGeo, lineMat));
         }
 
+        // Store docking lights for approach animation
+        this.dockingLights = [];
+        group.children.forEach(child => {
+            if (child.material && (child.material.color.getHex() === 0x00ff44 || child.material.color.getHex() === 0x00aaff) && child.geometry?.parameters?.radius < r * 0.05) {
+                this.dockingLights.push(child);
+            }
+        });
+
         this.mesh = group;
         this.mesh.position.set(this.x, this.y, 0);
         this.innerRing = innerRing;
@@ -351,11 +359,39 @@ export class Station extends Entity {
                 this.innerRing.rotation.z = -this.rotation * 2;
             }
 
+            const t = Date.now() * 0.001;
+
             // Pulse core halo
             if (this.coreHalo) {
-                const t = Date.now() * 0.001;
                 this.coreHalo.material.opacity = 0.2 + Math.sin(t * 2) * 0.1;
                 this.coreHalo.scale.setScalar(1.0 + Math.sin(t * 1.5) * 0.08);
+            }
+
+            // Approach guide lights - blink faster as player gets closer
+            if (this.dockingLights.length > 0 && this.game.player?.alive) {
+                const dist = this.game.player.distanceTo(this);
+                const dockRange = this.radius * 3;
+
+                if (dist < dockRange) {
+                    // Proximity factor: 0 at max range, 1 at docking distance
+                    const proximity = 1 - Math.min(dist / dockRange, 1);
+                    // Blink speed: 1Hz far, 4Hz close
+                    const blinkSpeed = 1 + proximity * 3;
+                    for (let i = 0; i < this.dockingLights.length; i++) {
+                        // Sequential chase pattern
+                        const phase = (t * blinkSpeed + i * 0.3) % 1;
+                        const blink = phase < 0.5 ? 1 : 0.2;
+                        this.dockingLights[i].material.opacity = blink * (0.5 + proximity * 0.5);
+                        // Scale up slightly when active
+                        this.dockingLights[i].scale.setScalar(1 + proximity * 0.5);
+                    }
+                } else {
+                    // Default steady glow when far
+                    for (const light of this.dockingLights) {
+                        light.material.opacity = 0.5 + Math.sin(t * 0.5) * 0.1;
+                        light.scale.setScalar(1);
+                    }
+                }
             }
         }
     }

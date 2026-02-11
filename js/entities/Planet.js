@@ -166,9 +166,41 @@ export class Planet extends Entity {
             group.add(ring);
         }
 
+        // Gravitational lens ring — faint shimmer beyond atmosphere
+        const lensInner = this.atmosphere ? this.radius * 1.16 : this.radius * 1.02;
+        const lensOuter = lensInner + this.radius * 0.06;
+        const lensGeo = new THREE.RingGeometry(lensInner, lensOuter, 64);
+        const lensMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.06,
+            side: THREE.DoubleSide,
+        });
+        const lensRing = new THREE.Mesh(lensGeo, lensMat);
+        lensRing.position.z = -0.3;
+        group.add(lensRing);
+        this.lensRing = lensRing;
+
         this.mesh = group;
         this.mesh.position.set(this.x, this.y, -1); // Behind other objects
 
         return this.mesh;
+    }
+
+    /**
+     * Update mesh with animation
+     */
+    updateMesh() {
+        if (this.mesh) {
+            this.mesh.position.set(this.x, this.y, -1);
+            this.mesh.visible = this.visible && this.alive;
+
+            // Subtle gravitational lens shimmer
+            if (this.lensRing) {
+                const t = performance.now() * 0.001;
+                this.lensRing.material.opacity = 0.04 + Math.sin(t * 0.8 + this.x * 0.01) * 0.03;
+                this.lensRing.scale.setScalar(1.0 + Math.sin(t * 0.3) * 0.01);
+            }
+        }
     }
 }

@@ -134,6 +134,9 @@ export class PlayerShip extends Ship {
         this.shieldOverlay.position.z = 2;
         this.mesh.add(this.shieldOverlay);
 
+        // Add weapon turrets
+        this.addTurretHardpoints();
+
         // Try loading GLB model async - swap in when ready
         this.loadGLBMesh();
 

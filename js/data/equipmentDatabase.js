@@ -888,6 +888,73 @@ export const EQUIPMENT_DATABASE = {
     },
 
     // =============================================
+    // MODULES - Survey Scanners
+    // =============================================
+
+    'survey-scanner-1': {
+        name: 'Survey Scanner I',
+        slot: 'module',
+        size: 'small',
+        category: 'survey',
+        description: 'Scans nearby asteroid fields revealing ore composition and yield. 2000u range.',
+        scanRange: 2000,
+        cycleTime: 10,
+        capacitorUse: 15,
+        price: 8000,
+    },
+    'survey-scanner-2': {
+        name: 'Survey Scanner II',
+        slot: 'module',
+        size: 'medium',
+        category: 'survey',
+        description: 'Enhanced scanner with 3500u range and faster cycle. Reveals detailed field data.',
+        scanRange: 3500,
+        cycleTime: 7,
+        capacitorUse: 20,
+        price: 25000,
+    },
+    'deep-space-scanner': {
+        name: 'Deep Space Scanner',
+        slot: 'module',
+        size: 'large',
+        category: 'survey',
+        description: 'Capital-grade scanner. 6000u range reveals entire asteroid fields with precision data.',
+        scanRange: 6000,
+        cycleTime: 12,
+        capacitorUse: 30,
+        price: 60000,
+    },
+
+    // =============================================
+    // MODULES - Remote Repair (Enhanced)
+    // =============================================
+
+    'remote-shield-repairer-2': {
+        name: 'Remote Shield Repairer II',
+        slot: 'module',
+        size: 'large',
+        category: 'utility',
+        description: 'Heavy remote shield repair. Capital-grade logistics module.',
+        remoteShieldRepair: 80,
+        range: 800,
+        cycleTime: 3.5,
+        capacitorUse: 30,
+        price: 35000,
+    },
+    'remote-armor-repairer-2': {
+        name: 'Remote Armor Repairer II',
+        slot: 'module',
+        size: 'large',
+        category: 'utility',
+        description: 'Heavy remote armor repair. Capital-grade logistics module.',
+        remoteArmorRepair: 70,
+        range: 700,
+        cycleTime: 4,
+        capacitorUse: 38,
+        price: 38000,
+    },
+
+    // =============================================
     // GUILD REWARD EQUIPMENT
     // =============================================
 

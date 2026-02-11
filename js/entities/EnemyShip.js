@@ -6,6 +6,8 @@
 import { Ship } from './Ship.js';
 import { CONFIG } from '../config.js';
 import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
+import { LootContainer } from './LootContainer.js';
+import { Wreck } from './Wreck.js';
 
 export class EnemyShip extends Ship {
     constructor(game, options = {}) {
@@ -82,12 +84,41 @@ export class EnemyShip extends Ship {
             Math.random() * (this.lootValue.max - this.lootValue.min) + this.lootValue.min
         );
 
-        // Award bounty and loot to player if player killed this
+        // Award bounty directly
         if (this.game.player && this.game.player.alive) {
-            this.game.addCredits(this.bounty + lootValue);
-            this.game.ui?.log(`+${this.bounty} ISK bounty, +${lootValue} ISK loot`, 'combat');
+            this.game.addCredits(this.bounty);
+            this.game.ui?.log(`+${this.bounty} ISK bounty`, 'combat');
             this.game.audio?.play('loot-pickup');
+
+            // Show bounty popup
+            if (this.game.input) {
+                const screen = this.game.input.worldToScreen(this.x, this.y);
+                this.game.ui?.showCreditPopup(this.bounty, screen.x, screen.y, 'bounty');
+            }
         }
+
+        // Drop loot container with credits
+        if (lootValue > 0) {
+            const container = new LootContainer(this.game, {
+                x: this.x + (Math.random() - 0.5) * 50,
+                y: this.y + (Math.random() - 0.5) * 50,
+                name: `${this.name}'s Wreck`,
+                credits: lootValue,
+            });
+            this.game.currentSector?.addEntity(container);
+        }
+
+        // Drop salvageable wreck
+        const wreck = new Wreck(this.game, {
+            x: this.x + (Math.random() - 0.5) * 30,
+            y: this.y + (Math.random() - 0.5) * 30,
+            name: `Wreck of ${this.name}`,
+            credits: Math.floor(this.bounty * 0.3),
+            salvageMaterials: Math.floor(2 + Math.random() * 4),
+            sourceShipName: this.name,
+            sourceShipClass: this.shipClass || this.enemyType,
+        });
+        this.game.currentSector?.addEntity(wreck);
 
         super.destroy();
     }
@@ -128,6 +159,10 @@ export class EnemyShip extends Ship {
 
         this.mesh.position.set(this.x, this.y, 0);
         this.mesh.rotation.z = this.rotation;
+
+        // Add weapon turrets
+        this.addTurretHardpoints();
+
         return this.mesh;
     }
 }

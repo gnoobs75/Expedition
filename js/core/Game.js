@@ -4,11 +4,14 @@
 // =============================================
 
 import { CONFIG, UNIVERSE_LAYOUT } from '../config.js';
+import { Wreck } from '../entities/Wreck.js';
 import { Renderer } from '../graphics/Renderer.js';
 import { InputManager } from './InputManager.js';
 import { Camera } from './Camera.js';
 import { Universe } from '../universe/Universe.js';
 import { PlayerShip } from '../entities/PlayerShip.js';
+import { EnemyShip } from '../entities/EnemyShip.js';
+import { SHIP_DATABASE } from '../data/shipDatabase.js';
 import { CombatSystem } from '../systems/CombatSystem.js';
 import { MiningSystem } from '../systems/MiningSystem.js';
 import { CollisionSystem } from '../systems/CollisionSystem.js';
@@ -20,7 +23,13 @@ import { GuildSystem } from '../systems/GuildSystem.js';
 import { CommerceSystem } from '../systems/CommerceSystem.js';
 import { GuildEconomySystem } from '../systems/GuildEconomySystem.js';
 import { TackleSystem } from '../systems/TackleSystem.js';
+import { SurveySystem } from '../systems/SurveySystem.js';
+import { LogisticsSystem } from '../systems/LogisticsSystem.js';
+import { SkillSystem } from '../systems/SkillSystem.js';
+import { AchievementSystem } from '../systems/AchievementSystem.js';
+import { HazardSystem } from '../systems/HazardSystem.js';
 import { AdminDashboardManager } from '../ui/AdminDashboardManager.js';
+import { EncyclopediaManager } from '../ui/EncyclopediaManager.js';
 import { UIManager } from '../ui/UIManager.js';
 import { AudioManager } from './AudioManager.js';
 import { EventBus } from './EventBus.js';
@@ -45,11 +54,20 @@ export class Game {
         this.lockedTarget = null;
         this.selectedTarget = null;
 
-        // Bookmarks
-        this.bookmarks = [];
+        // Bookmarks (persisted)
+        this.bookmarks = this.loadBookmarks();
 
         // Fleet state (persists across sectors)
         this.fleet = { ships: [], hiredPilots: [] };
+
+        // Insurance state
+        this.insurance = this.loadInsurance();
+
+        // Player statistics
+        this.stats = this.loadStats();
+
+        // Power routing (weapons/shields/engines) - percentages summing to 100
+        this.powerRouting = { weapons: 33, shields: 33, engines: 34 };
 
         // Systems will be initialized in init()
         this.renderer = null;
@@ -67,9 +85,32 @@ export class Game {
         this.commerceSystem = null;
         this.guildEconomySystem = null;
         this.tackleSystem = null;
+        this.surveySystem = null;
+        this.logisticsSystem = null;
+        this.skillSystem = null;
+        this.achievementSystem = null;
         this.adminDashboard = null;
+        this.encyclopedia = null;
         this.dialogueManager = null;
         this.playerAggressive = false;
+        this.timeScale = 1.0;
+
+        // DPS tracking for UI
+        this.dpsTracker = {
+            incomingLog: [],  // [{time, damage, source}]
+            outgoingLog: [],  // [{time, damage, target}]
+            threats: new Map(), // entity -> { totalDamage, lastTime }
+            incomingDPS: 0,
+            outgoingDPS: 0,
+            window: 5000,     // 5 second rolling window
+        };
+
+        // Tractor beam / auto-loot state
+        this.tractorTargets = new Map(); // entity -> { timer }
+        this.tractorRange = 250;    // detection range
+        this.tractorPullSpeed = 200; // units/s pull toward player
+        this.autoScoopRange = 40;   // scoop happens at this distance
+
         this.ui = null;
         this.audio = null;
     }
@@ -93,6 +134,9 @@ export class Game {
         // Create audio manager
         this.audio = new AudioManager(this);
 
+        // Store entity class refs for dynamic spawning
+        this._EnemyShipClass = EnemyShip;
+
         // Create universe
         this.universe = new Universe(this);
         this.universe.generate(CONFIG.UNIVERSE_SEED);
@@ -112,12 +156,23 @@ export class Game {
         this.commerceSystem = new CommerceSystem(this);
         this.guildEconomySystem = new GuildEconomySystem(this);
         this.tackleSystem = new TackleSystem(this);
+        this.surveySystem = new SurveySystem(this);
+        this.logisticsSystem = new LogisticsSystem(this);
+        this.skillSystem = new SkillSystem(this);
+        this.achievementSystem = new AchievementSystem(this);
+        this.hazardSystem = new HazardSystem(this);
 
         // Create UI manager (last, needs other systems)
         this.ui = new UIManager(this);
 
         // Create admin dashboard (after UI)
         this.adminDashboard = new AdminDashboardManager(this);
+
+        // Create encyclopedia (after UI)
+        this.encyclopedia = new EncyclopediaManager(this);
+
+        // Apply skill bonuses to player
+        this.skillSystem.applyBonuses();
 
         // Start in hub sector
         this.changeSector('hub');
@@ -183,10 +238,19 @@ export class Game {
         // Sector change
         this.events.on('sector:change', (sectorId) => {
             this.ui.log(`Entering ${this.currentSector.name}`, 'warp');
+            this.ui?.addShipLogEntry(`Jumped to ${this.currentSector.name}`, 'nav');
+            this.ui?.showSectorBanner(this.currentSector);
+            this.stats.jumps++;
+            if (!this.stats.sectorsVisited.includes(sectorId)) {
+                this.stats.sectorsVisited.push(sectorId);
+            }
+            // Encyclopedia discovery: sector
+            this.encyclopedia?.discoverItem('sectors', sectorId);
         });
 
         // Combat events
         this.events.on('combat:hit', (data) => {
+            const now = performance.now();
             if (data.target === this.player) {
                 this.audio.play('hit');
                 // Screen flash based on damage severity
@@ -196,6 +260,69 @@ export class Game {
                 } else if (data.damage > this.player.maxHp * 0.1) {
                     this.ui?.damageFlash(0.2);
                 }
+                // Directional damage indicator
+                if (data.source) {
+                    this.ui?.showDamageDirection(data.source);
+                }
+                this.stats.damageTaken += data.damage || 0;
+                // Track incoming DPS
+                this.dpsTracker.incomingLog.push({ time: now, damage: data.damage, source: data.source });
+                if (data.source) {
+                    const threat = this.dpsTracker.threats.get(data.source) || { totalDamage: 0, lastTime: 0 };
+                    threat.totalDamage += data.damage;
+                    threat.lastTime = now;
+                    this.dpsTracker.threats.set(data.source, threat);
+                }
+            }
+            if (data.source === this.player) {
+                this.stats.damageDealt += data.damage || 0;
+                // Track outgoing DPS
+                this.dpsTracker.outgoingLog.push({ time: now, damage: data.damage, target: data.target });
+            }
+        });
+
+        // Combat log (detailed per-action) + floating damage popups
+        this.events.on('combat:action', (data) => {
+            if (data.source === this.player || data.target === this.player) {
+                this.ui?.addCombatLogEntry(data);
+            }
+            // Floating damage popups for player-involved combat
+            if (data.type === 'hit' && this.input) {
+                if (data.target === this.player) {
+                    const screen = this.input.worldToScreen(this.player.x, this.player.y);
+                    this.ui?.showDamagePopup(Math.floor(data.damage), screen.x, screen.y, data.damageType || 'hull');
+                } else if (data.source === this.player) {
+                    const screen = this.input.worldToScreen(data.target.x, data.target.y);
+                    this.ui?.showDamagePopup(Math.floor(data.damage), screen.x, screen.y, data.damageType || 'hull');
+                }
+            }
+        });
+
+        // Miss popup
+        this.events.on('combat:miss', (data) => {
+            if (!this.input) return;
+            if (data.source === this.player || data.target === this.player) {
+                const screen = this.input.worldToScreen(data.target.x, data.target.y);
+                this.ui?.showDamagePopup(0, screen.x, screen.y, 'miss');
+            }
+        });
+
+        // Repair popups
+        this.events.on('combat:repair', (data) => {
+            if (!this.input || data.ship !== this.player) return;
+            this.ui?.showDamagePopup(Math.floor(data.amount), data.ship.x, data.ship.y, 'repair', true);
+        });
+
+        // Kill/death events for combat log
+        this.events.on('entity:destroyed', (entity) => {
+            if (entity.lastDamageSource === this.player) {
+                this.ui?.addCombatLogEntry({
+                    type: 'kill',
+                    source: this.player,
+                    target: entity,
+                    damage: 0,
+                    bounty: entity.bounty || 0,
+                });
             }
         });
 
@@ -208,12 +335,62 @@ export class Game {
                     const screen = this.input.worldToScreen(entity.x, entity.y);
                     this.ui?.showCreditPopup(entity.bounty, screen.x, screen.y, 'bounty');
                 }
+                // Kill mail log entry
+                this.ui?.logKillMail(entity);
+
+                // Cinematic kill camera - brief slowdown + zoom
+                this.timeScale = 0.3;
+                const savedZoom = this.camera.zoom;
+                this.camera.zoom = Math.min(savedZoom * 1.15, savedZoom + 50);
+                setTimeout(() => {
+                    this.timeScale = 1.0;
+                    this.camera.zoom = savedZoom;
+                }, 400);
+
+                // Track kill statistics
+                this.stats.kills++;
+                this.stats.bountyEarned += entity.bounty || 0;
+                const shipClass = entity.enemyType || entity.shipClass || 'unknown';
+                this.stats.killsByType[shipClass] = (this.stats.killsByType[shipClass] || 0) + 1;
+                this.saveStats();
+
+                // Ship log entry
+                this.ui?.addShipLogEntry(
+                    `Destroyed ${entity.name} (+${entity.bounty} ISK)`,
+                    'combat'
+                );
+
+                // Check bounty board completion
+                this.ui?.checkBountyCompletion(entity);
+            }
+
+            // Spawn wreck for ship-type entities
+            if ((entity.type === 'enemy' || entity.type === 'guild' || entity.type === 'npc')
+                && this.currentSector) {
+                const wreckCredits = Math.floor((entity.bounty || 50) * (0.3 + Math.random() * 0.5));
+                const wreck = new Wreck(this, {
+                    x: entity.x,
+                    y: entity.y,
+                    name: `Wreck: ${entity.name}`,
+                    sourceShipName: entity.name,
+                    sourceShipClass: entity.shipClass || entity.role || '',
+                    credits: wreckCredits,
+                    salvageMaterials: Math.floor(1 + Math.random() * (entity.radius / 10)),
+                    radius: Math.min(entity.radius * 0.8, 40),
+                });
+                this.currentSector.addEntity(wreck);
             }
         });
 
         // Mining events (ore now goes to cargo, not direct credits)
         this.events.on('mining:complete', (data) => {
-            // Log is handled by MiningSystem when ore is added to cargo
+            // Track mining stats
+            this.stats.oreMined += data.units || 0;
+        });
+
+        // Encyclopedia discovery: ship switched
+        this.events.on('ship:switched', (data) => {
+            if (data.shipClass) this.encyclopedia?.discoverItem('ships', data.shipClass);
         });
     }
 
@@ -226,11 +403,42 @@ export class Game {
         this.ui?.damageFlash(0.6);
         this.camera?.shake(15, 0.5);
 
+        // Track death
+        this.stats.deaths++;
+        this.saveStats();
+        this.ui?.addShipLogEntry('Ship destroyed! Respawning...', 'combat');
+        this.ui?.addCombatLogEntry({
+            type: 'death',
+            source: this.player?.lastDamageSource,
+            target: this.player,
+            damage: 0,
+        });
+
         // Lose credits
         const loss = Math.floor(this.credits * CONFIG.DEATH_CREDIT_PENALTY);
         this.credits -= loss;
         this.ui.log(`Lost ${loss} ISK`, 'combat');
         this.ui?.showCreditPopup(loss, window.innerWidth / 2, window.innerHeight / 2, 'loss');
+
+        // Insurance payout
+        if (this.insurance.active) {
+            const shipId = this.player?.shipClass || 'frigate';
+            const shipData = SHIP_DATABASE[shipId];
+            const shipValue = shipData?.price || CONFIG.SHIPS.frigate?.price || 5000;
+            const payout = Math.floor(shipValue * this.insurance.payoutRate);
+            if (payout > 0) {
+                this.credits += payout;
+                this.ui.log(`Insurance payout: +${payout} ISK (${this.insurance.tierName})`, 'system');
+                this.ui?.addShipLogEntry(`Insurance payout: +${payout} ISK`, 'trade');
+                this.audio?.play('sell');
+                setTimeout(() => {
+                    this.ui?.showCreditPopup(payout, window.innerWidth / 2, window.innerHeight / 2 - 40, 'gain');
+                }, 500);
+            }
+            // Insurance is single-use per purchase
+            this.insurance = { active: false, tier: null, tierName: null, payoutRate: 0, premium: 0, shipInsured: null };
+            this.saveInsurance();
+        }
 
         // Respawn after delay
         setTimeout(() => {
@@ -261,6 +469,9 @@ export class Game {
 
         this.player.velocity.set(0, 0);
         this.player.alive = true;
+
+        // Re-apply skill bonuses to new ship
+        this.skillSystem?.applyBonuses();
 
         this.ui.log('Ship reconstructed. Welcome back, capsuleer.', 'system');
     }
@@ -295,6 +506,12 @@ export class Game {
         // Materialize/dematerialize guild ships for this sector
         this.guildEconomySystem?.onSectorChange(sector);
 
+        // Notify hazard system
+        this.hazardSystem?.onSectorChange(sectorId);
+
+        // Cinematic zoom on sector arrival
+        this.camera?.sectorArrivalZoom();
+
         // Fire event
         this.events.emit('sector:change', sectorId);
     }
@@ -310,6 +527,14 @@ export class Game {
         if (entity) {
             entity.selected = true;
             this.events.emit('target:selected', entity);
+
+            // Encyclopedia discovery: ships by class, factions by guild ship encounter
+            if (entity.shipClass && this.encyclopedia) {
+                this.encyclopedia.discoverItem('ships', entity.shipClass);
+            }
+            if (entity.factionId && this.encyclopedia) {
+                this.encyclopedia.discoverItem('factions', entity.factionId);
+            }
         }
     }
 
@@ -325,6 +550,11 @@ export class Game {
         this.ui.log(`Locking ${entity.name}...`, 'system');
         this.audio.play('lock-start');
 
+        // Track locking progress for visual feedback
+        this.lockingTarget = entity;
+        this.lockingStartTime = performance.now();
+        this.lockingDuration = lockTime * 1000;
+
         // Simulate lock time
         setTimeout(() => {
             if (entity.alive && this.player.alive) {
@@ -334,6 +564,7 @@ export class Game {
                 this.ui.log(`Target locked: ${entity.name}`, 'system');
                 this.audio.play('lock-complete');
             }
+            this.lockingTarget = null;
         }, lockTime * 1000);
     }
 
@@ -376,8 +607,16 @@ export class Game {
         this.player.velocity.set(0, 0);
         this.paused = true;
         this.events.emit('station:docked', station);
-        this.ui.showStationPanel(station);
         this.audio.play('dock');
+
+        // Start station ambient + mute engine hum
+        this.audio?.stopEngineHum();
+        this.audio?.startStationAmbient();
+
+        // Play docking animation then show station
+        this.ui.playDockingAnimation(station.name, () => {
+            this.ui.showStationPanel(station);
+        });
     }
 
     /**
@@ -387,17 +626,23 @@ export class Game {
         if (!this.dockedAt) return;
 
         const station = this.dockedAt;
-        this.dockedAt = null;
-        this.paused = false;
 
-        // Position player outside station
-        this.player.x = station.x + 300;
-        this.player.y = station.y;
-
-        this.events.emit('station:undocked');
+        // Play undock animation then actually undock
         this.ui.hideStationPanel();
-        this.ui.log(`Undocked from ${station.name}`, 'system');
-        this.audio.play('undock');
+        this.ui.playUndockAnimation(station.name, () => {
+            this.dockedAt = null;
+            this.paused = false;
+
+            // Position player outside station
+            this.player.x = station.x + 300;
+            this.player.y = station.y;
+
+            this.events.emit('station:undocked');
+            this.ui.log(`Undocked from ${station.name}`, 'system');
+            this.audio.play('undock');
+            this.audio?.stopStationAmbient();
+            this.audio?.startEngineHum();
+        });
     }
 
     /**
@@ -412,7 +657,9 @@ export class Game {
             y: this.player.y,
         };
         this.bookmarks.push(bookmark);
+        this.saveBookmarks();
         this.ui.log(`Bookmark saved: ${bookmark.name}`, 'system');
+        this.ui.showToast(`Bookmark saved: ${bookmark.name}`, 'info');
         return bookmark;
     }
 
@@ -423,7 +670,18 @@ export class Game {
         const index = this.bookmarks.findIndex(b => b.id === id);
         if (index !== -1) {
             this.bookmarks.splice(index, 1);
+            this.saveBookmarks();
         }
+    }
+
+    loadBookmarks() {
+        try {
+            return JSON.parse(localStorage.getItem('expedition-bookmarks') || '[]');
+        } catch { return []; }
+    }
+
+    saveBookmarks() {
+        localStorage.setItem('expedition-bookmarks', JSON.stringify(this.bookmarks));
     }
 
     /**
@@ -457,7 +715,7 @@ export class Game {
 
         // Update game state
         if (!this.paused) {
-            this.update(this.deltaTime);
+            this.update(this.deltaTime * this.timeScale);
         }
 
         // Render
@@ -471,6 +729,8 @@ export class Game {
      * Update game state
      */
     update(dt) {
+        this._lastDt = dt;
+
         // Update autopilot FIRST (sets desiredSpeed/desiredRotation)
         this.autopilot.update(dt);
 
@@ -491,14 +751,152 @@ export class Game {
         this.guildEconomySystem.update(dt);
         this.combat.update(dt);
         this.tackleSystem.update(dt);
+        this.surveySystem.update(dt);
+        this.logisticsSystem.update(dt);
         this.mining.update(dt);
         this.collision.update(dt);
+        this.achievementSystem.update(dt);
+        this.hazardSystem.update(dt);
+
+        // Auto-loot tractor beam
+        this.updateTractorBeams(dt);
+
+        // Update engine hum volume based on player speed
+        if (this.player && this.audio?.engineHumGain) {
+            const speedFrac = this.player.currentSpeed / (this.player.maxSpeed || 1);
+            this.audio.updateEngineHum(speedFrac);
+        }
+
+        // DPS tracking
+        this.updateDPSTracker();
+
+        // Dynamic music mode detection
+        this.updateMusicMode();
 
         // Update camera
         this.camera.update(dt);
 
         // Update UI
         this.ui.update(dt);
+    }
+
+    /**
+     * Calculate rolling DPS from damage logs
+     */
+    updateDPSTracker() {
+        const now = performance.now();
+        const window = this.dpsTracker.window;
+
+        // Prune old entries
+        this.dpsTracker.incomingLog = this.dpsTracker.incomingLog.filter(e => now - e.time < window);
+        this.dpsTracker.outgoingLog = this.dpsTracker.outgoingLog.filter(e => now - e.time < window);
+
+        // Calculate DPS
+        const inTotal = this.dpsTracker.incomingLog.reduce((sum, e) => sum + e.damage, 0);
+        const outTotal = this.dpsTracker.outgoingLog.reduce((sum, e) => sum + e.damage, 0);
+        this.dpsTracker.incomingDPS = Math.round(inTotal / (window / 1000));
+        this.dpsTracker.outgoingDPS = Math.round(outTotal / (window / 1000));
+
+        // Prune stale threats (>10s since last hit)
+        for (const [entity, data] of this.dpsTracker.threats) {
+            if (now - data.lastTime > 10000 || !entity.alive) {
+                this.dpsTracker.threats.delete(entity);
+            }
+        }
+    }
+
+    /**
+     * Detect combat/danger state and set music mode
+     */
+    updateMusicMode() {
+        if (!this.audio?.musicStarted) return;
+
+        // Docked at station = station music
+        if (this.dockedAt) {
+            this.audio.setMusicMode('station');
+            return;
+        }
+
+        // Check if player is in active combat
+        const inCombat = this.player?.alive && (
+            // Player has locked targets that are hostile
+            (this.lockedTarget && this.lockedTarget.alive &&
+                (this.lockedTarget.hostility === 'hostile' || this.lockedTarget.hostility === 'criminal')) ||
+            // Player is being attacked (recent damage)
+            (this.player._lastDamageTime && (performance.now() - this.player._lastDamageTime) < 8000) ||
+            // Player has active weapon modules firing at something
+            (this.player.activeModules && Array.from(this.player.activeModules.values()).some(m => m.damage > 0))
+        );
+
+        if (inCombat) {
+            this.audio.setMusicMode('combat');
+            return;
+        }
+
+        // Check sector danger level
+        const sectorId = this.currentSector?.id;
+        if (sectorId) {
+            const layout = UNIVERSE_LAYOUT[sectorId];
+            const danger = layout?.dangerLevel || 0;
+            if (danger >= 0.6) {
+                this.audio.setMusicMode('danger');
+                return;
+            }
+        }
+
+        // Default: ambient
+        this.audio.setMusicMode('ambient');
+    }
+
+    /**
+     * Update tractor beams - auto-loot nearby containers
+     */
+    updateTractorBeams(dt) {
+        if (!this.player?.alive || this.dockedAt) {
+            this.tractorTargets.clear();
+            return;
+        }
+
+        const entities = this.currentSector?.entities || [];
+        const activeContainers = new Set();
+
+        for (const entity of entities) {
+            if (!entity.alive || entity.type !== 'loot') continue;
+
+            const dist = this.player.distanceTo(entity);
+            if (dist > this.tractorRange) continue;
+
+            activeContainers.add(entity);
+
+            // Track this container
+            if (!this.tractorTargets.has(entity)) {
+                this.tractorTargets.set(entity, { timer: 0 });
+            }
+
+            const data = this.tractorTargets.get(entity);
+            data.timer += dt;
+
+            // Pull container toward player
+            const dx = this.player.x - entity.x;
+            const dy = this.player.y - entity.y;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            const pullSpeed = this.tractorPullSpeed * Math.min(data.timer * 2, 1); // ramp up
+            entity.x += (dx / len) * pullSpeed * dt;
+            entity.y += (dy / len) * pullSpeed * dt;
+
+            // Auto-scoop when close enough
+            if (dist < this.autoScoopRange) {
+                entity.scoop(this.player);
+                this.tractorTargets.delete(entity);
+            }
+        }
+
+        // Remove stale targets
+        for (const [entity] of this.tractorTargets) {
+            if (!activeContainers.has(entity)) {
+                this.tractorTargets.delete(entity);
+            }
+        }
     }
 
     /**
@@ -522,5 +920,105 @@ export class Game {
     getVisibleEntities() {
         const entities = this.getEntities();
         return entities.filter(e => e.alive && e.visible);
+    }
+
+    // ==========================================
+    // Insurance System
+    // ==========================================
+
+    /**
+     * Insurance tiers with payout rates and premium costs
+     */
+    static INSURANCE_TIERS = {
+        basic:    { name: 'Basic',    payoutRate: 0.40, premiumRate: 0.05 },
+        standard: { name: 'Standard', payoutRate: 0.60, premiumRate: 0.10 },
+        platinum: { name: 'Platinum', payoutRate: 0.80, premiumRate: 0.18 },
+        gold:     { name: 'Gold',     payoutRate: 1.00, premiumRate: 0.30 },
+    };
+
+    /**
+     * Purchase insurance for the current ship
+     */
+    purchaseInsurance(tierId) {
+        const tier = Game.INSURANCE_TIERS[tierId];
+        if (!tier) return false;
+
+        const shipId = this.player?.shipClass || 'frigate';
+        const shipData = SHIP_DATABASE[shipId];
+        const shipValue = shipData?.price || 5000;
+        const premium = Math.floor(shipValue * tier.premiumRate);
+
+        if (this.credits < premium) {
+            this.ui?.log('Insufficient funds for insurance', 'system');
+            return false;
+        }
+
+        this.credits -= premium;
+        this.insurance = {
+            active: true,
+            tier: tierId,
+            tierName: tier.name,
+            payoutRate: tier.payoutRate,
+            premium: premium,
+            shipInsured: shipId,
+        };
+        this.saveInsurance();
+
+        this.audio?.play('sell');
+        this.ui?.log(`${tier.name} insurance purchased for ${premium} ISK`, 'system');
+        this.ui?.showCreditPopup(premium, window.innerWidth / 2, window.innerHeight / 2, 'loss');
+        return true;
+    }
+
+    saveInsurance() {
+        try {
+            localStorage.setItem('expedition-insurance', JSON.stringify(this.insurance));
+        } catch (e) { /* storage full */ }
+    }
+
+    loadInsurance() {
+        try {
+            const data = localStorage.getItem('expedition-insurance');
+            if (data) return JSON.parse(data);
+        } catch (e) { /* corrupt */ }
+        return { active: false, tier: null, tierName: null, payoutRate: 0, premium: 0, shipInsured: null };
+    }
+
+    // ==========================================
+    // Statistics System
+    // ==========================================
+
+    static DEFAULT_STATS = {
+        kills: 0,
+        deaths: 0,
+        damageDealt: 0,
+        damageTaken: 0,
+        oreMined: 0,
+        bountyEarned: 0,
+        jumps: 0,
+        sectorsVisited: [],
+        killsByType: {},
+        playTime: 0,
+        sessionStart: Date.now(),
+    };
+
+    saveStats() {
+        try {
+            // Update play time before saving
+            this.stats.playTime += (Date.now() - this.stats.sessionStart) / 1000;
+            this.stats.sessionStart = Date.now();
+            localStorage.setItem('expedition-stats', JSON.stringify(this.stats));
+        } catch (e) { /* storage full */ }
+    }
+
+    loadStats() {
+        try {
+            const data = localStorage.getItem('expedition-stats');
+            if (data) {
+                const parsed = JSON.parse(data);
+                return { ...Game.DEFAULT_STATS, ...parsed, sessionStart: Date.now() };
+            }
+        } catch (e) { /* corrupt */ }
+        return { ...Game.DEFAULT_STATS, sessionStart: Date.now() };
     }
 }

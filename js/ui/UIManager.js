@@ -26,6 +26,10 @@ import { QuestTrackerManager } from './QuestTrackerManager.js';
 import { LootContainer } from '../entities/LootContainer.js';
 import { TRADE_GOODS } from '../data/tradeGoodsDatabase.js';
 import { TacticalReplay } from './TacticalReplay.js';
+import { ManufacturingPanelManager } from './ManufacturingPanelManager.js';
+import { FittingTemplateManager } from './FittingTemplateManager.js';
+import { HackingMinigame } from './HackingMinigame.js';
+import { BountyBoardManager } from './BountyBoardManager.js';
 
 export class UIManager {
     constructor(game) {
@@ -91,6 +95,18 @@ export class UIManager {
         // Tactical replay viewer
         this.tacticalReplay = new TacticalReplay(game);
 
+        // Manufacturing panel manager (station tab)
+        this.manufacturingPanelManager = new ManufacturingPanelManager(game);
+
+        // Fitting template manager
+        this.fittingTemplateManager = new FittingTemplateManager(game);
+
+        // Hacking minigame (data anomalies)
+        this.hackingMinigame = new HackingMinigame(game);
+
+        // Bounty board manager (station tab)
+        this.bountyBoardManager = new BountyBoardManager(game);
+
         // Ship indicator 3D viewer state
         this.shipViewerScene = null;
         this.shipViewerCamera = null;
@@ -120,6 +136,10 @@ export class UIManager {
                 game.renderer?.effects?.spawn('loot', game.player.x, game.player.y);
             }
         });
+
+        // Sector event banner
+        game.events.on('event:started', (data) => this.showEventBanner(data));
+        game.events.on('event:ended', (data) => this.hideEventBanner(data));
 
         // Log messages
         this.maxLogMessages = 50;
@@ -5028,6 +5048,54 @@ export class UIManager {
 
     // Alias for showToast calls
     showToast(message, type) { this.toast(message, type); }
+
+    /**
+     * Show sector event banner at top of screen
+     */
+    showEventBanner(data) {
+        const banner = document.getElementById('sector-event-banner');
+        if (!banner) return;
+        const iconEl = document.getElementById('event-banner-icon');
+        const titleEl = document.getElementById('event-banner-title');
+        const descEl = document.getElementById('event-banner-desc');
+        const timerEl = document.getElementById('event-banner-timer');
+
+        const icons = {
+            pirate_capital_invasion: '&#9760;',
+            wormhole_opening: '&#9678;',
+            trade_embargo: '&#9888;',
+            radiation_storm: '&#9762;',
+            mining_rush: '&#9670;',
+        };
+        const colors = {
+            pirate_capital_invasion: '#ff4444',
+            wormhole_opening: '#8844ff',
+            trade_embargo: '#ffaa00',
+            radiation_storm: '#ff6600',
+            mining_rush: '#44ff88',
+        };
+
+        if (iconEl) { iconEl.innerHTML = icons[data.type] || '&#9733;'; iconEl.style.color = colors[data.type] || '#ffcc44'; }
+        if (titleEl) titleEl.textContent = data.name || 'SECTOR EVENT';
+        if (descEl) descEl.textContent = data.description || '';
+        if (timerEl) {
+            const dur = Math.round((data.duration || 300) / 60);
+            timerEl.textContent = `~${dur}m`;
+        }
+
+        banner.classList.remove('hidden');
+        banner.style.borderColor = colors[data.type] || '#ffcc44';
+
+        // Store event ID for hide matching
+        banner.dataset.eventId = data.id || '';
+    }
+
+    hideEventBanner(data) {
+        const banner = document.getElementById('sector-event-banner');
+        if (!banner) return;
+        if (data && data.id && banner.dataset.eventId && banner.dataset.eventId !== data.id) return;
+        banner.classList.add('hidden');
+    }
 
     /**
      * Show sector arrival banner

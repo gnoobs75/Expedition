@@ -667,6 +667,27 @@ export class SkippyManager {
             this.triggerDialogue('tactical', 'pirateRaid');
         });
 
+        // Sector events
+        e.on('event:started', () => {
+            this.triggerDialogue('sectorEvent');
+        });
+
+        // Bounty hunting
+        e.on('bounty:accepted', () => {
+            this.triggerDialogue('bountyHunting');
+        });
+        e.on('bounty:target-destroyed', () => {
+            this.triggerDialogue('bountyHunting');
+        });
+
+        // Manufacturing
+        e.on('manufacturing:job-completed', () => {
+            this.triggerDialogue('manufacturing');
+        });
+        e.on('blueprint:acquired', () => {
+            this.triggerDialogue('manufacturing');
+        });
+
         // Credits changed - wealth milestones
         e.on('credits:changed', (credits) => {
             if (credits >= 1000000 && !this.hasMilestone('wealth_1m')) {

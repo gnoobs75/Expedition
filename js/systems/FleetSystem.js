@@ -6,6 +6,25 @@
 import { CONFIG } from '../config.js';
 import { SHIP_DATABASE } from '../data/shipDatabase.js';
 import { FleetShip } from '../entities/FleetShip.js';
+import { wrappedDistance } from '../utils/math.js';
+
+// Formation tactical bonuses - applied when ship is within tolerance of ideal position
+export const FORMATION_BONUSES = {
+    spread:   { label: 'Evasion',       signatureRadius: 0.90, description: '-10% signature radius' },
+    vee:      { label: 'Firepower',     damage: 1.15,          description: '+15% weapon damage' },
+    line:     { label: 'Tracking',      tracking: 1.10,        description: '+10% weapon tracking' },
+    diamond:  { label: 'Shield Wall',   shieldRegen: 1.15,     description: '+15% shield regen' },
+    echelon:  { label: 'Speed',         maxSpeed: 1.10,        description: '+10% max speed' },
+};
+
+// War doctrines - fleet-wide combat philosophies
+export const DOCTRINES = {
+    balanced:    { label: 'Balanced',     mods: {},                                                              description: 'No modifiers' },
+    hit_and_run: { label: 'Hit & Run',    mods: { maxSpeed: 1.15, signatureRadius: 0.90, armor: 0.85 },         description: '+15% speed, -10% sig, -15% armor' },
+    siege:       { label: 'Siege',        mods: { damage: 1.20, range: 1.10, maxSpeed: 0.80 },                  description: '+20% damage, +10% range, -20% speed' },
+    guerrilla:   { label: 'Guerrilla',    mods: { signatureRadius: 0.80, tracking: 1.15, damage: 0.90 },        description: '-20% sig, +15% tracking, -10% damage' },
+    shield_wall: { label: 'Shield Wall',  mods: { shield: 1.25, shieldRegen: 1.15, maxSpeed: 0.90 },            description: '+25% shield, +15% regen, -10% speed' },
+};
 
 export class FleetSystem {
     constructor(game) {
@@ -27,6 +46,15 @@ export class FleetSystem {
         // Formation type: 'spread' (default), 'vee', 'line', 'diamond'
         this.formation = 'spread';
         this.formationSpacing = 200;
+
+        // Formation tolerance - ship gets bonus if within this distance of ideal position
+        this.formationTolerance = 250;
+
+        // Active war doctrine
+        this.activeDoctrine = 'balanced';
+
+        // Flagship reference (set when a flagship-class ship is in fleet)
+        this.flagship = null;
     }
 
     /**
@@ -359,5 +387,114 @@ export class FleetSystem {
                 }
             }
         }
+    }
+
+    // ==========================================
+    // Formation Bonuses
+    // ==========================================
+
+    /**
+     * Check if a fleet ship is in formation (within tolerance of ideal position)
+     */
+    isInFormation(ship) {
+        const player = this.game.player;
+        if (!player || !player.alive || !ship.alive) return false;
+        if (ship.aiState !== 'following') return false;
+
+        // Calculate ideal position
+        const cos = Math.cos(player.rotation);
+        const sin = Math.sin(player.rotation);
+        const idealX = player.x + ship.followOffset.x * cos - ship.followOffset.y * sin;
+        const idealY = player.y + ship.followOffset.x * sin + ship.followOffset.y * cos;
+
+        const dist = wrappedDistance(ship.x, ship.y, idealX, idealY, CONFIG.SECTOR_SIZE);
+        return dist <= this.formationTolerance;
+    }
+
+    /**
+     * Get formation bonus modifiers for a ship (returns empty object if not in formation)
+     */
+    getFormationBonus(ship) {
+        if (!this.isInFormation(ship)) return {};
+        return FORMATION_BONUSES[this.formation] || {};
+    }
+
+    /**
+     * Get count of ships in formation / total
+     */
+    getFormationStatus() {
+        const ships = this.game.fleet.ships.filter(s => s.alive);
+        let inFormation = 0;
+        for (const ship of ships) {
+            if (this.isInFormation(ship)) inFormation++;
+        }
+        return { inFormation, total: ships.length };
+    }
+
+    // ==========================================
+    // War Doctrines
+    // ==========================================
+
+    /**
+     * Set the active war doctrine
+     */
+    setDoctrine(doctrineId) {
+        if (!DOCTRINES[doctrineId]) return;
+        this.activeDoctrine = doctrineId;
+        this.game.ui?.showToast(`Doctrine: ${DOCTRINES[doctrineId].label}`, 'system');
+        this.game.events.emit('fleet:doctrine-changed', doctrineId);
+    }
+
+    /**
+     * Get doctrine modifiers for stat calculations
+     */
+    getDoctrineModifiers() {
+        const doctrine = DOCTRINES[this.activeDoctrine];
+        return doctrine ? doctrine.mods : {};
+    }
+
+    // ==========================================
+    // Flagship Command
+    // ==========================================
+
+    /**
+     * Get flagship command bonuses for a ship within command range
+     */
+    getFlagshipCommandBonuses(ship) {
+        if (!this.flagship || !this.flagship.alive) return {};
+        const dist = this.flagship.distanceTo(ship);
+        if (dist > (this.flagship.commandRange || 2000)) return {};
+
+        // Collect active command burst bonuses from flagship modules
+        const bonuses = {};
+        for (let i = 0; i < this.flagship.highSlots; i++) {
+            const mod = this.flagship.modules.high[i];
+            if (!mod) continue;
+            if (mod === 'command-burst-offensive') {
+                bonuses.damage = (bonuses.damage || 1) * 1.10;
+                bonuses.tracking = (bonuses.tracking || 1) * 1.05;
+            } else if (mod === 'command-burst-defensive') {
+                bonuses.shield = (bonuses.shield || 1) * 1.10;
+                bonuses.armor = (bonuses.armor || 1) * 1.10;
+            } else if (mod === 'fleet-repair-array') {
+                bonuses.shieldRegen = (bonuses.shieldRegen || 1) * 1.15;
+            }
+        }
+        return bonuses;
+    }
+
+    /**
+     * Command a fleet ship to scout a sector
+     */
+    commandScout(fleetShip, sectorId) {
+        if (!fleetShip?.hasCaptain()) {
+            this.game.ui?.toast('Ship needs a captain for scouting', 'warning');
+            return false;
+        }
+        fleetShip.scoutTarget = sectorId;
+        fleetShip.aiState = 'scouting';
+        this.game.ui?.log(`${fleetShip.name} dispatched to scout ${sectorId}`, 'system');
+        this.game.events.emit('fleet:scout-dispatched', { ship: fleetShip, sectorId });
+        return true;
     }
 }

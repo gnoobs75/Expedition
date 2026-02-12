@@ -4,6 +4,7 @@
 // =============================================
 
 import { formatDistance } from '../utils/math.js';
+import { FORMATION_BONUSES, DOCTRINES } from '../systems/FleetSystem.js';
 
 export class FleetPanelManager {
     constructor(game) {
@@ -205,12 +206,62 @@ export class FleetPanelManager {
         const avgHp = totalShips > 0 ? allShips.reduce((sum, s) => sum + (s.shield + s.armor + s.hull) / (s.maxShield + s.maxArmor + s.maxHull), 0) / totalShips : 1;
         const avgHpColor = avgHp > 0.6 ? '#44ff88' : avgHp > 0.3 ? '#ffcc44' : '#ff4444';
 
+        // Formation & doctrine info
+        const formationStatus = this.game.fleetSystem?.getFormationStatus() || { inFormation: 0, total: 0 };
+        const currentFormationKey = this.game.fleetSystem?.formation || 'spread';
+        const formBonus = FORMATION_BONUSES[currentFormationKey];
+        const doctrineKey = this.game.fleetSystem?.activeDoctrine || 'balanced';
+        const doctrine = DOCTRINES[doctrineKey];
+
         html += `<div class="fleet-summary-bar">
             <span class="fleet-stat">${totalShips + 1} fleet</span>
             ${miningCount > 0 ? `<span class="fleet-stat mining-stat">${miningCount} mining</span>` : ''}
             ${combatCount > 0 ? `<span class="fleet-stat combat-stat">${combatCount} in combat</span>` : ''}
             <span class="fleet-stat" style="color:${avgHpColor}">${Math.round(avgHp * 100)}% avg HP</span>
         </div>`;
+
+        // Doctrine selector + Formation status row
+        html += `<div class="fleet-doctrine-bar">
+            <div class="fleet-doctrine-select">
+                <label style="color:#888;font-size:10px">DOCTRINE:</label>
+                <select class="fleet-doctrine-dropdown">
+                    ${Object.entries(DOCTRINES).map(([k, d]) =>
+                        `<option value="${k}" ${k === doctrineKey ? 'selected' : ''}>${d.label}</option>`
+                    ).join('')}
+                </select>
+                <span class="fleet-doctrine-desc" style="color:#aaa;font-size:9px">${doctrine?.description || ''}</span>
+            </div>
+            <div class="fleet-formation-status">
+                <span style="color:#888;font-size:10px">FORMATION:</span>
+                <span style="color:#66ccff">${currentFormationKey.toUpperCase()}</span>
+                ${formBonus ? `<span style="color:#44ff88;font-size:9px">${formBonus.description}</span>` : ''}
+                <span style="color:${formationStatus.inFormation === formationStatus.total ? '#44ff88' : '#ffcc44'};font-size:10px">${formationStatus.inFormation}/${formationStatus.total} in position</span>
+            </div>
+        </div>`;
+
+        // Flagship section
+        const flagship = this.game.fleetSystem?.flagship;
+        if (flagship?.alive) {
+            const fHp = Math.round(((flagship.shield + flagship.armor + flagship.hull) / (flagship.maxShield + flagship.maxArmor + flagship.maxHull)) * 100);
+            const hangar = flagship.getHangarContents?.() || [];
+            const hangarCap = flagship.hangarCapacity || 5;
+            html += `<div class="flagship-section">
+                <div class="flagship-header">&#9733; FLAGSHIP: ${flagship.name || 'Command Ship'}</div>
+                <div style="display:flex;gap:12px;font-size:11px;color:#ccc;margin-bottom:4px">
+                    <span>HP: <span style="color:${fHp > 60 ? '#44ff88' : fHp > 30 ? '#ffcc44' : '#ff4444'}">${fHp}%</span></span>
+                    <span>Hangar: ${hangar.length}/${hangarCap}</span>
+                    <span class="flagship-command-status">CMD Range: ${flagship.commandRange || 2000}m</span>
+                </div>`;
+            if (hangar.length > 0) {
+                for (const h of hangar) {
+                    html += `<div class="flagship-hangar-ship">
+                        <span>${h.name || h.shipClass || 'Ship'}</span>
+                        <button class="fleet-btn tiny" data-action="undock-hangar" data-index="${h.index || 0}" style="font-size:9px;padding:1px 6px">UNDOCK</button>
+                    </div>`;
+                }
+            }
+            html += '</div>';
+        }
 
         // Sort direction indicator
         const sortArrow = this.sortAscending ? '&#9650;' : '&#9660;';
@@ -365,6 +416,16 @@ export class FleetPanelManager {
             });
         });
 
+        // Doctrine dropdown
+        const docDropdown = container.querySelector('.fleet-doctrine-dropdown');
+        if (docDropdown) {
+            docDropdown.addEventListener('change', () => {
+                this.game.fleetSystem?.setDoctrine(docDropdown.value);
+                this.game.ui?.showToast(`Doctrine: ${DOCTRINES[docDropdown.value]?.label}`, 'system');
+                this.render();
+            });
+        }
+
         // Sort headers
         container.querySelectorAll('.fleet-sortable').forEach(th => {
             th.addEventListener('click', () => {
@@ -408,6 +469,20 @@ export class FleetPanelManager {
                 this.selectedFleetIds.clear();
                 this.selectedFleetIds.add(fleetId);
                 this.showCommandMenu(e.clientX, e.clientY);
+            });
+        });
+
+        // Flagship undock buttons
+        container.querySelectorAll('[data-action="undock-hangar"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.index);
+                const flagship = this.game.fleetSystem?.flagship;
+                if (flagship?.undockShip) {
+                    flagship.undockShip(idx);
+                    this.game.ui?.showToast('Ship launched from flagship hangar', 'success');
+                    this.render();
+                }
             });
         });
 

@@ -1042,6 +1042,78 @@ export const EQUIPMENT_DATABASE = {
         price: 25000,
         guildExclusive: 'mercenary',
     },
+
+    // =============================================
+    // INTEL / PROBE EQUIPMENT
+    // =============================================
+
+    'probe-launcher': {
+        name: 'Probe Launcher I',
+        slot: 'high',
+        size: 'medium',
+        category: 'utility',
+        description: 'Launches scanner probes to gather intel on adjacent sectors.',
+        cycleTime: 60,
+        capPerCycle: 30,
+        probeTravelTime: 20,
+        range: 0, // not a weapon
+        price: 35000,
+    },
+
+    // =============================================
+    // FLAGSHIP COMMAND MODULES
+    // =============================================
+
+    'fleet-repair-array': {
+        name: 'Fleet Repair Array',
+        slot: 'high',
+        size: 'xlarge',
+        category: 'support',
+        description: 'Capital-class repair system. Repairs nearby fleet ships over time.',
+        cycleTime: 10,
+        capPerCycle: 40,
+        repairAmount: 50,
+        repairRange: 2000,
+        price: 200000,
+    },
+    'command-burst-offensive': {
+        name: 'Command Burst - Offensive',
+        slot: 'mid',
+        size: 'xlarge',
+        category: 'command',
+        description: 'Broadcasts an offensive command burst, boosting fleet damage and tracking.',
+        cycleTime: 60,
+        capPerCycle: 80,
+        duration: 30,
+        damageBonus: 1.10,
+        trackingBonus: 1.10,
+        burstRange: 2500,
+        price: 250000,
+    },
+    'command-burst-defensive': {
+        name: 'Command Burst - Defensive',
+        slot: 'mid',
+        size: 'xlarge',
+        category: 'command',
+        description: 'Broadcasts a defensive command burst, boosting fleet shield and speed.',
+        cycleTime: 60,
+        capPerCycle: 80,
+        duration: 30,
+        shieldRegenBonus: 1.15,
+        speedBonus: 1.05,
+        burstRange: 2500,
+        price: 250000,
+    },
+    'fighter-bay': {
+        name: 'Fighter Bay',
+        slot: 'high',
+        size: 'xlarge',
+        category: 'hangar',
+        description: 'Dedicated fighter launch bay. Allows deployment of hangar-docked ships for combat.',
+        cycleTime: 30,
+        capPerCycle: 50,
+        price: 300000,
+    },
 };
 
 // =============================================

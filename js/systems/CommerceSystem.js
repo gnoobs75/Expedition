@@ -110,8 +110,49 @@ export class CommerceSystem {
         // Quest ID counter
         this.questCounter = 0;
 
+        // Trade volume tracking per sector (for strategic map overlay)
+        this.tradeVolume = {}; // sectorId -> { total, recent }
+        this.tradeVolumeDecayTimer = 0;
+
+        // Event price modifiers: { sectorId: { goodId: multiplier } }
+        this.eventPriceModifiers = {};
+
         // Load saved state
         this.loadState();
+    }
+
+    /**
+     * Get event-adjusted price for a trade good
+     */
+    getEventPriceModifier(goodId, sectorId) {
+        const mods = this.eventPriceModifiers[sectorId];
+        if (!mods) return 1.0;
+        return mods[goodId] || mods['*'] || 1.0;
+    }
+
+    /**
+     * Set event price modifier for a sector
+     */
+    setEventPriceModifier(sectorId, goodId, multiplier) {
+        if (!this.eventPriceModifiers[sectorId]) this.eventPriceModifiers[sectorId] = {};
+        this.eventPriceModifiers[sectorId][goodId] = multiplier;
+    }
+
+    clearEventPriceModifiers(sectorId) {
+        delete this.eventPriceModifiers[sectorId];
+    }
+
+    /**
+     * Record trade volume for strategic map overlay
+     */
+    recordTradeVolume(sectorId, amount) {
+        if (!this.tradeVolume[sectorId]) this.tradeVolume[sectorId] = { total: 0, recent: 0 };
+        this.tradeVolume[sectorId].total += amount;
+        this.tradeVolume[sectorId].recent += amount;
+    }
+
+    getTradeVolumePerSector() {
+        return { ...this.tradeVolume };
     }
 
     /**
@@ -348,6 +389,8 @@ export class CommerceSystem {
      */
     onTradeGoodSold(goodId, quantity, sectorId) {
         if (!sectorId) return;
+        // Track trade volume for strategic overlay
+        this.recordTradeVolume(sectorId, quantity);
         const completed = [];
 
         for (const quest of this.activeQuests) {
@@ -446,6 +489,13 @@ export class CommerceSystem {
      * Update - called each frame (currently no per-frame logic needed)
      */
     update(dt) {
-        // Future: could add dynamic price fluctuation here
+        // Decay recent trade volume every 60s
+        this.tradeVolumeDecayTimer += dt;
+        if (this.tradeVolumeDecayTimer >= 60) {
+            this.tradeVolumeDecayTimer = 0;
+            for (const sid of Object.keys(this.tradeVolume)) {
+                this.tradeVolume[sid].recent = Math.floor(this.tradeVolume[sid].recent * 0.8);
+            }
+        }
     }
 }

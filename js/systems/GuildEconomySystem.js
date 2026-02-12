@@ -1378,6 +1378,21 @@ export class GuildEconomySystem {
         return sectorConfig?.name || sectorId;
     }
 
+    /**
+     * Get faction influence per sector (for strategic map overlay)
+     * Returns { sectorId: { factionId: shipCount } }
+     */
+    getFactionInfluence() {
+        const influence = {};
+        for (const ship of this.abstractShips.values()) {
+            const sid = ship.sectorId;
+            if (!sid) continue;
+            if (!influence[sid]) influence[sid] = {};
+            influence[sid][ship.factionId] = (influence[sid][ship.factionId] || 0) + 1;
+        }
+        return influence;
+    }
+
     // =========================================
     // PIRATE RAID SYSTEM
     // =========================================

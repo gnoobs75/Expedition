@@ -21,9 +21,42 @@ export class HazardSystem {
     }
 
     /**
+     * Add a temporary event-driven hazard
+     */
+    addTemporaryHazard(hazard, duration) {
+        this._tempHazard = hazard;
+        this._tempHazardTimer = duration;
+        this.activeHazard = hazard;
+        this.timer = 0;
+        this.warningShown = false;
+        if (this.hudElement) {
+            this.hudElement.classList.remove('hidden');
+            this.hudElement.style.borderColor = hazard.color;
+            this.hudElement.querySelector('.hazard-name').textContent = hazard.name;
+            this.hudElement.querySelector('.hazard-icon').style.color = hazard.color;
+        }
+        this.game.ui?.showToast(hazard.warning, 'warning');
+    }
+
+    removeTemporaryHazard() {
+        if (!this._tempHazard) return;
+        this._tempHazard = null;
+        this._tempHazardTimer = 0;
+        // Restore sector's base hazard
+        const hazards = CONFIG.SECTOR_HAZARDS || {};
+        const sectorId = this.game.currentSector?.id;
+        this.activeHazard = hazards[sectorId] || null;
+        if (!this.activeHazard && this.hudElement) {
+            this.hudElement.classList.add('hidden');
+        }
+    }
+
+    /**
      * Called when sector changes
      */
     onSectorChange(sectorId) {
+        this._tempHazard = null;
+        this._tempHazardTimer = 0;
         const hazards = CONFIG.SECTOR_HAZARDS || {};
         this.activeHazard = hazards[sectorId] || null;
         this.timer = 0;
@@ -52,6 +85,11 @@ export class HazardSystem {
     }
 
     update(dt) {
+        // Tick temporary hazard duration
+        if (this._tempHazard && this._tempHazardTimer > 0) {
+            this._tempHazardTimer -= dt;
+            if (this._tempHazardTimer <= 0) this.removeTemporaryHazard();
+        }
         if (!this.activeHazard) return;
         const player = this.game.player;
         if (!player?.alive) return;

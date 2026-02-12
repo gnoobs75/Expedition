@@ -11857,3 +11857,177 @@ select:focus-visible {
     border-radius: 50%;
     display: inline-block;
 }
+
+/* =============================================
+   Sector Event Banner
+   ============================================= */
+.sector-event-banner {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, rgba(0, 20, 40, 0.95), rgba(0, 10, 30, 0.98));
+    border: 1px solid #ffcc44;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-family: "Courier New", monospace;
+    box-shadow: 0 0 20px rgba(255, 204, 68, 0.2);
+    animation: eventBannerSlide 0.4s ease-out;
+    pointer-events: none;
+}
+.sector-event-banner.hidden { display: none; }
+.event-banner-icon { font-size: 20px; }
+.event-banner-title { color: #ffcc44; font-size: 13px; font-weight: bold; letter-spacing: 1px; }
+.event-banner-desc { color: #aaa; font-size: 11px; }
+.event-banner-timer { color: #888; font-size: 11px; margin-left: 8px; }
+@keyframes eventBannerSlide {
+    from { transform: translateX(-50%) translateY(-30px); opacity: 0; }
+    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+/* =============================================
+   Map Overlay Toggles
+   ============================================= */
+.map-overlays {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 8px;
+    background: rgba(0, 10, 25, 0.8);
+    border-top: 1px solid rgba(0, 255, 255, 0.15);
+}
+.map-overlay-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #88dddd;
+    font-family: "Courier New", monospace;
+    font-size: 10px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    border-radius: 3px;
+    transition: border-color 0.2s;
+    user-select: none;
+}
+.map-overlay-toggle:hover { border-color: rgba(0, 255, 255, 0.5); }
+.map-overlay-toggle input[type="checkbox"] {
+    accent-color: #00ffff;
+    width: 12px; height: 12px;
+}
+
+/* =============================================
+   Manufacturing Panel
+   ============================================= */
+.blueprint-card {
+    background: rgba(0, 40, 80, 0.3);
+    border: 1px solid rgba(0, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+}
+.blueprint-card:hover { border-color: rgba(0, 255, 255, 0.4); }
+.material-req.has { color: #44ff88; }
+.material-req.missing { color: #ff4444; }
+.craft-progress-bar {
+    height: 4px;
+    background: #1a1a2e;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+.craft-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00ccff, #00ffaa);
+    transition: width 0.3s;
+}
+
+/* =============================================
+   Bounty Board
+   ============================================= */
+.bounty-card {
+    background: rgba(40, 10, 0, 0.3);
+    border-left: 3px solid #ff4444;
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+}
+.bounty-tier-badge {
+    font-size: 10px;
+    font-weight: bold;
+    border: 1px solid;
+    border-radius: 3px;
+    padding: 1px 6px;
+    letter-spacing: 1px;
+}
+
+/* =============================================
+   Fitting Templates
+   ============================================= */
+.template-card {
+    background: rgba(0, 30, 60, 0.3);
+    border: 1px solid rgba(0, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+}
+.template-card:hover { border-color: rgba(0, 255, 255, 0.4); }
+.template-name { color: #00ffff; font-weight: bold; font-size: 12px; }
+
+/* =============================================
+   Doctrine Selector (Fleet Panel)
+   ============================================= */
+.doctrine-selector {
+    background: #0a0a1a;
+    color: #00ffff;
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 3px;
+    padding: 3px 6px;
+    font-family: "Courier New", monospace;
+    font-size: 11px;
+    cursor: pointer;
+}
+.doctrine-selector:hover { border-color: rgba(0, 255, 255, 0.6); }
+.doctrine-selector option { background: #0a0a1a; color: #ccc; }
+.formation-status { color: #44ff88; font-size: 11px; }
+.doctrine-info { color: #ffaa44; font-size: 11px; }
+
+/* =============================================
+   Intel Indicators
+   ============================================= */
+.intel-high { color: #44ff88; }
+.intel-medium { color: #ffcc44; }
+.intel-low { color: #ff8844; }
+.intel-stale { color: #ff4444; }
+
+/* =============================================
+   Flagship Section (Fleet Panel)
+   ============================================= */
+.flagship-section {
+    background: rgba(255, 170, 0, 0.05);
+    border: 1px solid rgba(255, 170, 0, 0.3);
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+.flagship-header {
+    color: #ffaa00;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+.flagship-hangar-ship {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 6px;
+    border-bottom: 1px solid rgba(255, 170, 0, 0.1);
+    font-size: 11px;
+    color: #ccc;
+}
+.flagship-command-status { color: #ffaa00; font-size: 11px; margin-top: 4px; }

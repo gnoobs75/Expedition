@@ -71,6 +71,7 @@ export class Ship extends Entity {
         this.cargoCapacity = options.cargoCapacity || 100;
         this.cargo = {}; // { oreType: { units: number, volume: number } }
         this.tradeGoods = {}; // { goodId: { quantity: number, volumePerUnit: number } }
+        this.materials = {}; // { materialId: quantity } - for manufacturing
         this.cargoUsed = 0;
 
         // Current target
@@ -119,11 +120,21 @@ export class Ship extends Entity {
         // Regenerate capacitor
         this.capacitor = Math.min(this.maxCapacitor, this.capacitor + this.capacitorRegen * dt);
 
-        // Regenerate shield (passive, boosted by power routing)
+        // Regenerate shield (passive, boosted by power routing + doctrine + formation)
         if (this.shield < this.maxShield) {
             let shieldRegenRate = 1;
             if (this.isPlayer && this.game.powerRouting) {
                 shieldRegenRate *= 0.5 + (this.game.powerRouting.shields / 100) * 1.5;
+            }
+            // Doctrine shield regen bonus
+            const dMods = this.game.fleetSystem?.getDoctrineModifiers() || {};
+            if ((this.type === 'fleet' || this.isPlayer) && dMods.shieldRegen) {
+                shieldRegenRate *= dMods.shieldRegen;
+            }
+            // Formation shield regen bonus (fleet only)
+            if (this.type === 'fleet') {
+                const fBonus = this.game.fleetSystem?.getFormationBonus(this) || {};
+                if (fBonus.shieldRegen) shieldRegenRate *= fBonus.shieldRegen;
             }
             this.shield = Math.min(this.maxShield, this.shield + shieldRegenRate * dt);
         }
@@ -202,8 +213,33 @@ export class Ship extends Entity {
             this.signatureRadius = this.baseSignatureRadius;
         }
 
+        // Doctrine + formation signature radius modifier
+        if (this.type === 'fleet' || this.isPlayer) {
+            const dSig = this.game.fleetSystem?.getDoctrineModifiers() || {};
+            if (dSig.signatureRadius) this.signatureRadius *= dSig.signatureRadius;
+            if (this.type === 'fleet') {
+                const fSig = this.game.fleetSystem?.getFormationBonus(this) || {};
+                if (fSig.signatureRadius) this.signatureRadius *= fSig.signatureRadius;
+            }
+        }
+
         // Apply web speed reduction
         effectiveMaxSpeed *= this.webSpeedFactor;
+
+        // Apply doctrine speed modifier (fleet + player faction ships)
+        const doctrineMods = this.game.fleetSystem?.getDoctrineModifiers() || {};
+        if ((this.type === 'fleet' || this.isPlayer) && doctrineMods.maxSpeed) {
+            effectiveMaxSpeed *= doctrineMods.maxSpeed;
+        }
+
+        // Apply formation speed bonus (fleet ships only)
+        if (this.type === 'fleet') {
+            const formBonus = this.game.fleetSystem?.getFormationBonus(this) || {};
+            if (formBonus.maxSpeed) effectiveMaxSpeed *= formBonus.maxSpeed;
+            // Flagship command aura speed bonus
+            const cmdBonus = this.game.fleetSystem?.getFlagshipCommandBonuses(this) || {};
+            if (cmdBonus.maxSpeed) effectiveMaxSpeed *= cmdBonus.maxSpeed;
+        }
 
         // Power routing: engine power affects max speed for player
         if (this.isPlayer && this.game.powerRouting) {
@@ -658,8 +694,28 @@ export class Ship extends Entity {
             damage *= this.skillBonuses.damage;
         }
 
+        // Apply doctrine damage modifier (fleet + player)
+        const doctrineDmg = this.game.fleetSystem?.getDoctrineModifiers() || {};
+        if ((this.type === 'fleet' || this.isPlayer) && doctrineDmg.damage) {
+            damage *= doctrineDmg.damage;
+        }
+
+        // Apply formation damage bonus (fleet ships only)
+        if (this.type === 'fleet') {
+            const formBonus = this.game.fleetSystem?.getFormationBonus(this) || {};
+            if (formBonus.damage) damage *= formBonus.damage;
+            const cmdBonus = this.game.fleetSystem?.getFlagshipCommandBonuses(this) || {};
+            if (cmdBonus.damage) damage *= cmdBonus.damage;
+        }
+
+        // Apply weapon range from doctrine
+        let effectiveRange = moduleConfig.range;
+        if ((this.type === 'fleet' || this.isPlayer) && doctrineDmg.range) {
+            effectiveRange *= doctrineDmg.range;
+        }
+
         // Fire!
-        this.game.combat.fireAt(this, this.target, damage, moduleConfig.range, moduleConfig);
+        this.game.combat.fireAt(this, this.target, damage, effectiveRange, moduleConfig);
         if (this.isPlayer) {
             this.game.audio?.play(moduleConfig.category === 'missile' ? 'missile-launch' : 'laser');
         }
@@ -738,21 +794,33 @@ export class Ship extends Entity {
     takeDamage(amount, source) {
         this._lastDamageTime = performance.now();
         this.lastDamageSource = source;
+
+        // Doctrine defensive modifiers (shield/armor HP scaling = damage resistance)
+        let shieldResist = 1;
+        let armorResist = 1;
+        if (this.type === 'fleet' || this.isPlayer) {
+            const dDef = this.game.fleetSystem?.getDoctrineModifiers() || {};
+            if (dDef.shield) shieldResist = 1 / dDef.shield; // +25% shield = take 80% shield dmg
+            if (dDef.armor) armorResist = 1 / dDef.armor;    // -15% armor = take 118% armor dmg
+        }
+
         let remaining = amount;
 
         // Damage shield first
         if (this.shield > 0) {
-            const shieldDamage = Math.min(this.shield, remaining);
+            const effectiveDmg = remaining * shieldResist;
+            const shieldDamage = Math.min(this.shield, effectiveDmg);
             this.shield -= shieldDamage;
-            remaining -= shieldDamage;
+            remaining -= shieldDamage / shieldResist;
             this.addEffect('shield-hit', 0.2);
         }
 
         // Then armor
         if (remaining > 0 && this.armor > 0) {
-            const armorDamage = Math.min(this.armor, remaining);
+            const effectiveDmg = remaining * armorResist;
+            const armorDamage = Math.min(this.armor, effectiveDmg);
             this.armor -= armorDamage;
-            remaining -= armorDamage;
+            remaining -= armorDamage / armorResist;
             this.addEffect('armor-hit', 0.2);
         }
 
@@ -977,6 +1045,40 @@ export class Ship extends Entity {
      */
     getTradeGoodQuantity(goodId) {
         return this.tradeGoods?.[goodId]?.quantity || 0;
+    }
+
+    // =============================================
+    // Material Cargo (Manufacturing)
+    // =============================================
+
+    /**
+     * Add materials to cargo (volumeless - they don't count against cargo capacity)
+     */
+    addMaterial(materialId, quantity) {
+        if (!this.materials) this.materials = {};
+        this.materials[materialId] = (this.materials[materialId] || 0) + quantity;
+        this.game.events.emit('cargo:updated', { ship: this });
+        return quantity;
+    }
+
+    /**
+     * Remove materials from cargo
+     * @returns {number} Number actually removed
+     */
+    removeMaterial(materialId, quantity) {
+        if (!this.materials?.[materialId]) return 0;
+        const toRemove = Math.min(quantity, this.materials[materialId]);
+        this.materials[materialId] -= toRemove;
+        if (this.materials[materialId] <= 0) delete this.materials[materialId];
+        this.game.events.emit('cargo:updated', { ship: this });
+        return toRemove;
+    }
+
+    /**
+     * Get quantity of a specific material
+     */
+    getMaterialCount(materialId) {
+        return this.materials?.[materialId] || 0;
     }
 
     // =============================================

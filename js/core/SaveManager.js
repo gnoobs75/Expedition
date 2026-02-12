@@ -209,6 +209,7 @@ export class SaveManager {
             } : { high: [], mid: [], low: [] },
             cargo: player ? { ...player.cargo } : {},
             tradeGoods: player ? { ...player.tradeGoods } : {},
+            materials: player ? { ...player.materials } : {},
             moduleInventory: player?.moduleInventory ? [...player.moduleInventory] : [],
             droneBay: player ? {
                 drones: player.droneBay.drones.map(d => ({ type: d.type, hp: d.hp })),
@@ -232,6 +233,7 @@ export class SaveManager {
                 })),
                 hiredPilots: [...(game.fleet.hiredPilots || [])],
                 controlGroups: this.serializeControlGroups(),
+                activeDoctrine: game.fleetSystem?.activeDoctrine || 'balanced',
             },
 
             // Faction
@@ -270,6 +272,17 @@ export class SaveManager {
             bookmarks: this.readLocalStorage('expedition-bookmarks'),
             skippy: this.readLocalStorage('expedition-skippy'),
             aarReports: this.readLocalStorage('expedition-aar-reports'),
+
+            // New systems
+            manufacturing: this.readLocalStorage('expedition-manufacturing'),
+            fittingTemplates: this.readLocalStorage('expedition-fitting-templates'),
+            intelData: this.readLocalStorage('expedition-intel-data'),
+            bountyBoard: this.readLocalStorage('expedition-bounty-board'),
+            flagship: game.fleetSystem?.flagship ? {
+                shipClass: game.fleetSystem.flagship.shipClass,
+                hangar: (game.fleetSystem.flagship.hangar || []).map(s => s.fleetId),
+            } : null,
+            sectorEvents: game.sectorEventSystem?.saveState() || null,
         };
 
         return data;

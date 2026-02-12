@@ -84,6 +84,16 @@ export class StationVendorManager {
             case 'fitting':
                 this.renderFitting();
                 break;
+            case 'manufacturing':
+                this.game.ui?.manufacturingPanelManager?.render(
+                    document.getElementById('manufacturing-content')
+                );
+                break;
+            case 'bounty':
+                this.game.ui?.bountyBoardManager?.render(
+                    document.getElementById('bounty-content')
+                );
+                break;
         }
     }
 
@@ -717,6 +727,12 @@ export class StationVendorManager {
                 this.renderFitting();
             });
         });
+
+        // Fitting templates section
+        const templateContainer = document.createElement('div');
+        templateContainer.style.cssText = 'margin-top:12px;border-top:1px solid #333;padding-top:8px';
+        this.game.ui?.fittingTemplateManager?.renderTemplateSection(templateContainer);
+        fittingDisplay.appendChild(templateContainer);
     }
 
     getModuleIcon(config) {

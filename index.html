@@ -92,6 +92,16 @@
     <!-- Gate Label Container -->
     <div id="gate-labels"></div>
 
+    <!-- Sector Event Banner -->
+    <div id="sector-event-banner" class="sector-event-banner hidden">
+        <div class="event-banner-icon" id="event-banner-icon"></div>
+        <div class="event-banner-text">
+            <div class="event-banner-title" id="event-banner-title">EVENT</div>
+            <div class="event-banner-desc" id="event-banner-desc"></div>
+        </div>
+        <div class="event-banner-timer" id="event-banner-timer"></div>
+    </div>
+
     <!-- UI Overlay -->
     <div id="ui-overlay">
         <!-- Bottom Bar: Ship Status HUD -->
@@ -627,6 +637,7 @@
                     <button class="tab-btn" data-tab="commerce">COMMERCE</button>
                     <button class="tab-btn" data-tab="insurance">INSURANCE</button>
                     <button class="tab-btn" data-tab="bounty">BOUNTY</button>
+                    <button class="tab-btn" data-tab="manufacturing">CRAFT</button>
                     <button class="tab-btn" data-tab="skills">SKILLS</button>
                 </div>
                 <div class="modal-body">
@@ -668,6 +679,9 @@
                     </div>
                     <div id="tab-bounty" class="tab-content">
                         <div id="bounty-content"></div>
+                    </div>
+                    <div id="tab-manufacturing" class="tab-content">
+                        <div id="manufacturing-content"></div>
                     </div>
                     <div id="tab-skills" class="tab-content">
                         <div id="skills-content"></div>
@@ -1008,6 +1022,13 @@
                     <div id="map-tab-universe" class="tab-content">
                         <div class="map-canvas-container">
                             <canvas id="universe-map-canvas"></canvas>
+                        </div>
+                        <div class="map-overlays" id="map-overlays">
+                            <label class="map-overlay-toggle"><input type="checkbox" id="overlay-faction"> Faction</label>
+                            <label class="map-overlay-toggle"><input type="checkbox" id="overlay-trade"> Trade</label>
+                            <label class="map-overlay-toggle"><input type="checkbox" id="overlay-threat"> Threat</label>
+                            <label class="map-overlay-toggle"><input type="checkbox" id="overlay-resources"> Resources</label>
+                            <label class="map-overlay-toggle"><input type="checkbox" id="overlay-events"> Events</label>
                         </div>
                     </div>
                 </div>

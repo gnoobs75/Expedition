@@ -11,6 +11,7 @@ import { Camera } from './Camera.js';
 import { Universe } from '../universe/Universe.js';
 import { PlayerShip } from '../entities/PlayerShip.js';
 import { EnemyShip } from '../entities/EnemyShip.js';
+import { Anomaly } from '../entities/Anomaly.js';
 import { SHIP_DATABASE } from '../data/shipDatabase.js';
 import { CombatSystem } from '../systems/CombatSystem.js';
 import { MiningSystem } from '../systems/MiningSystem.js';
@@ -29,6 +30,11 @@ import { SkillSystem } from '../systems/SkillSystem.js';
 import { AchievementSystem } from '../systems/AchievementSystem.js';
 import { HazardSystem } from '../systems/HazardSystem.js';
 import { EngagementRecorder } from '../systems/EngagementRecorder.js';
+import { ManufacturingSystem } from '../systems/ManufacturingSystem.js';
+import { AnomalySystem } from '../systems/AnomalySystem.js';
+import { SectorEventSystem } from '../systems/SectorEventSystem.js';
+import { BountySystem } from '../systems/BountySystem.js';
+import { IntelSystem } from '../systems/IntelSystem.js';
 import { AdminDashboardManager } from '../ui/AdminDashboardManager.js';
 import { EncyclopediaManager } from '../ui/EncyclopediaManager.js';
 import { SkippyManager } from '../ui/SkippyManager.js';
@@ -145,6 +151,7 @@ export class Game {
 
         // Store entity class refs for dynamic spawning
         this._EnemyShipClass = EnemyShip;
+        this._AnomalyClass = Anomaly;
 
         // Create universe
         this.universe = new Universe(this);
@@ -171,6 +178,11 @@ export class Game {
         this.achievementSystem = new AchievementSystem(this);
         this.hazardSystem = new HazardSystem(this);
         this.engagementRecorder = new EngagementRecorder(this);
+        this.manufacturingSystem = new ManufacturingSystem(this);
+        this.anomalySystem = new AnomalySystem(this);
+        this.sectorEventSystem = new SectorEventSystem(this);
+        this.bountySystem = new BountySystem(this);
+        this.intelSystem = new IntelSystem(this);
 
         // Create UI manager (last, needs other systems)
         this.ui = new UIManager(this);
@@ -819,6 +831,11 @@ export class Game {
         this.achievementSystem.update(dt);
         this.hazardSystem.update(dt);
         this.engagementRecorder?.update(dt);
+        this.manufacturingSystem?.update(dt);
+        this.anomalySystem?.update(dt);
+        this.sectorEventSystem?.update(dt);
+        this.bountySystem?.update(dt);
+        this.intelSystem?.update(dt);
 
         // Auto-loot tractor beam
         this.updateTractorBeams(dt);
@@ -1146,6 +1163,11 @@ export class Game {
                 this.player.tradeGoods = { ...data.tradeGoods };
             }
 
+            // Restore materials
+            if (data.materials) {
+                this.player.materials = { ...data.materials };
+            }
+
             // Restore module inventory
             if (data.moduleInventory) {
                 this.player.moduleInventory = [...data.moduleInventory];
@@ -1220,6 +1242,10 @@ export class Game {
             'expedition-bookmarks': data.bookmarks,
             'expedition-skippy': data.skippy,
             'expedition-aar-reports': data.aarReports,
+            'expedition-manufacturing': data.manufacturing,
+            'expedition-fitting-templates': data.fittingTemplates,
+            'expedition-intel-data': data.intelData,
+            'expedition-bounty-board': data.bountyBoard,
         };
 
         for (const [key, value] of Object.entries(lsMap)) {
@@ -1253,6 +1279,13 @@ export class Game {
         }
         this.skippy?.loadState?.();
         this.engagementRecorder?.loadReports();
+
+        // Load new systems
+        if (data.manufacturing) this.manufacturingSystem?.loadState(data.manufacturing);
+        if (data.bountyBoard) this.bountySystem?.loadState(data.bountyBoard);
+        if (data.intelData) this.intelSystem?.loadState(data.intelData);
+        if (data.fleet?.activeDoctrine) this.fleetSystem?.setDoctrine(data.fleet.activeDoctrine);
+        if (data.sectorEvents) this.sectorEventSystem?.loadState(data.sectorEvents);
 
         // Bookmarks
         this.bookmarks = this.loadBookmarks();

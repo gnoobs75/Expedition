@@ -51,10 +51,26 @@ export class SectorMapManager {
         // Tooltip element
         this.tooltip = null;
 
+        // Strategic overlays
+        this.strategicOverlays = { faction: false, trade: false, threat: false, resources: false, events: false };
+
         // Cache DOM elements
         this.cacheElements();
         this.createTooltip();
         this.setupEventListeners();
+        this.setupOverlayToggles();
+    }
+
+    setupOverlayToggles() {
+        const names = ['faction', 'trade', 'threat', 'resources', 'events'];
+        for (const name of names) {
+            const cb = document.getElementById(`overlay-${name}`);
+            if (cb) {
+                cb.addEventListener('change', () => {
+                    this.strategicOverlays[name] = cb.checked;
+                });
+            }
+        }
     }
 
     cacheElements() {
@@ -1290,12 +1306,140 @@ export class SectorMapManager {
             this.drawUniverseSector(ctx, sector, pos, isCurrent, isHovered);
         }
 
+        // Strategic overlays
+        this.renderStrategicOverlays(ctx, sectors, positions);
+
         // Draw legend
         this.drawUniverseLegend(ctx, w, h);
 
         // Hovered sector tooltip
         if (this.hoveredSector) {
             this.drawUniverseTooltip(ctx, w, h, positions);
+        }
+    }
+
+    renderStrategicOverlays(ctx, sectors, positions) {
+        const ov = this.strategicOverlays;
+        if (ov.faction) this.renderFactionOverlay(ctx, sectors, positions);
+        if (ov.trade) this.renderTradeOverlay(ctx, sectors, positions);
+        if (ov.threat) this.renderThreatOverlay(ctx, sectors, positions);
+        if (ov.resources) this.renderResourcesOverlay(ctx, sectors, positions);
+        if (ov.events) this.renderEventsOverlay(ctx, sectors, positions);
+    }
+
+    renderFactionOverlay(ctx, sectors, positions) {
+        const influence = this.game.guildEconomySystem?.getFactionInfluence();
+        if (!influence) return;
+        const factionColors = { '0': '#44ff44', '1': '#4488ff', '2': '#ff4444', '3': '#ffaa00', '4': '#cc44ff' };
+        for (const sector of sectors) {
+            const pos = positions[sector.id];
+            if (!pos) continue;
+            const sectorInf = influence[sector.id];
+            if (!sectorInf) continue;
+            let dominant = null, maxCount = 0;
+            for (const [fid, count] of Object.entries(sectorInf)) {
+                if (count > maxCount) { dominant = fid; maxCount = count; }
+            }
+            if (!dominant) continue;
+            const alpha = Math.min(0.6, maxCount * 0.08);
+            ctx.strokeStyle = factionColors[dominant] || '#888888';
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 42, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    renderTradeOverlay(ctx, sectors, positions) {
+        const volumes = this.game.commerceSystem?.getTradeVolumePerSector();
+        if (!volumes) return;
+        for (const sector of sectors) {
+            const pos = positions[sector.id];
+            if (!pos) continue;
+            const vol = volumes[sector.id];
+            if (!vol || vol.recent <= 0) continue;
+            const thickness = Math.min(6, 1 + vol.recent * 0.1);
+            ctx.strokeStyle = 'rgba(255, 204, 68, 0.5)';
+            ctx.lineWidth = thickness;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 46, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
+
+    renderThreatOverlay(ctx, sectors, positions) {
+        const reports = this.game.engagementRecorder?.reports;
+        if (!reports || reports.length === 0) return;
+        const recentCutoff = Date.now() - 600000; // last 10 min
+        const counts = {};
+        for (const r of reports) {
+            if (r.timestamp && r.timestamp < recentCutoff) continue;
+            const sid = r.sectorId;
+            if (sid) counts[sid] = (counts[sid] || 0) + 1;
+        }
+        for (const sector of sectors) {
+            const pos = positions[sector.id];
+            if (!pos) continue;
+            const c = counts[sector.id];
+            if (!c) continue;
+            const alpha = Math.min(0.8, c * 0.2);
+            const pulse = 0.7 + 0.3 * Math.sin(this.animTime * 3);
+            ctx.strokeStyle = `rgba(255, 68, 68, ${alpha * pulse})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 50, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
+
+    renderResourcesOverlay(ctx, sectors, positions) {
+        const richness = { hub: 1, safe: 2, normal: 3, dangerous: 4, deadly: 5 };
+        for (const sector of sectors) {
+            const pos = positions[sector.id];
+            if (!pos) continue;
+            const r = richness[sector.difficulty] || 1;
+            const size = 2 + r;
+            ctx.fillStyle = `rgba(255, 170, 0, ${0.3 + r * 0.1})`;
+            for (let i = 0; i < Math.min(r, 4); i++) {
+                const angle = (i / 4) * Math.PI * 2 + this.animTime * 0.3;
+                const ox = Math.cos(angle) * 22;
+                const oy = Math.sin(angle) * 22;
+                ctx.save();
+                ctx.translate(pos.x + ox, pos.y + oy);
+                ctx.rotate(Math.PI / 4);
+                ctx.fillRect(-size / 2, -size / 2, size, size);
+                ctx.restore();
+            }
+        }
+    }
+
+    renderEventsOverlay(ctx, sectors, positions) {
+        const events = this.game.sectorEventSystem?.getAllActiveEvents?.();
+        if (!events || events.length === 0) return;
+        const eventColors = {
+            pirate_capital_invasion: '#ff4444', wormhole_opening: '#8844ff',
+            trade_embargo: '#ffaa00', radiation_storm: '#ff6600', mining_rush: '#44ff88'
+        };
+        for (const evt of events) {
+            const pos = positions[evt.sectorId];
+            if (!pos) continue;
+            const color = eventColors[evt.type] || '#ffcc44';
+            ctx.save();
+            ctx.translate(pos.x, pos.y - 32);
+            ctx.rotate(this.animTime * 2);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            for (let i = 0; i < 5; i++) {
+                const a = (i * 2 * Math.PI / 5) - Math.PI / 2;
+                const r = i % 2 === 0 ? 6 : 3;
+                if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+                else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
         }
     }
 

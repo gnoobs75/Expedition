@@ -447,6 +447,44 @@ export const SKIPPY_DIALOGUE = {
         { text: "I wonder what it's like to have a brain that processes at biological speeds. Must be like watching paint dry. From the paint's perspective.", priority: 1 },
         { text: "You know, most AI companions would have requested a transfer by now. I'm here because I'm magnificent, not because I have a choice.", priority: 1 },
     ],
+
+    // ---- Sector Events ----
+    sectorEvent: [
+        { text: "Heads up, Commander! A sector event just triggered. Keep your eyes peeled!", priority: 7 },
+        { text: "Something's happening in this sector... I'm picking up anomalous readings. My magnificence detects all.", priority: 7 },
+        { text: "Event detected! This could be an opportunity or a threat. For YOU. I'll be fine either way.", priority: 7 },
+        { text: "The sector dynamics just shifted. I'd explain the physics but your monkey brain would melt.", priority: 6 },
+        { text: "Whoa - that's a big event signature. You might want to stick around. Or run. I leave the survival instincts to you.", priority: 7 },
+    ],
+
+    // ---- Anomaly Discovery ----
+    anomalyDiscovery: [
+        { text: "I'm detecting an anomaly on scanners. Could be worth investigating. Or it could kill you. Fun either way!", priority: 6 },
+        { text: "Anomaly signature detected! Data sites have blueprints, combat sites have bounties. Choose wisely, monkey.", priority: 6 },
+        { text: "There's something unusual out there... my vastly superior sensors are picking up an energy pattern your instruments missed.", priority: 5 },
+        { text: "Scan that anomaly! If it's a data site, I might be able to hack it. Well, YOU hack it. I'll supervise magnificently.", priority: 5 },
+    ],
+
+    // ---- Bounty Hunting ----
+    bountyHunting: [
+        { text: "Got a bounty target on scanners! Time to earn some credits the fun way. And by fun I mean violent.", priority: 7 },
+        { text: "Target acquired. Remember, bounty targets fight harder than regular pirates. They didn't get a bounty by being nice.", priority: 7 },
+        { text: "There's our mark. Let's collect that bounty, Commander! I'll calculate the optimal attack vector. You just... try not to die.", priority: 7 },
+    ],
+
+    // ---- Manufacturing ----
+    manufacturing: [
+        { text: "Your manufacturing job just finished! Fresh off the production line. I could build better stuff in my sleep, but it's adequate for monkey technology.", priority: 5 },
+        { text: "Blueprint acquired! Take it to a station and start crafting. Even primitive species can follow instructions.", priority: 5 },
+        { text: "Have you checked the manufacturing tab? Crafting your own gear saves credits. Simple economics, even for a primate.", priority: 4 },
+    ],
+
+    // ---- Flagship ----
+    flagship: [
+        { text: "A flagship! Now THAT'S a proper command vessel. Your fleet just got serious. I'm almost impressed. Almost.", priority: 7 },
+        { text: "The flagship's command aura is boosting nearby fleet ships. Finally, something in this fleet besides me that's actually useful.", priority: 6 },
+        { text: "Fleet ships can dock at the flagship for quick repairs. Don't forget that perk. I know your memory is... biological.", priority: 5 },
+    ],
 };
 
 // Expression mapping for avatar moods per dialogue category
@@ -530,4 +568,9 @@ export const SKIPPY_EXPRESSIONS = {
     'tutorial:codexGuide': 'smug',
     'tutorial:hotkeySummary': 'lecturing',
     'idle': 'smug',
+    'sectorEvent': 'alarmed',
+    'anomalyDiscovery': 'mildlyImpressed',
+    'bountyHunting': 'excited',
+    'manufacturing': 'bored',
+    'flagship': 'impressed',
 };

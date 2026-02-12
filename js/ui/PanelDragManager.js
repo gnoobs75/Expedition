@@ -1,14 +1,12 @@
 // =============================================
 // Panel Drag Manager
-// Handles draggable UI panels with Z key toggle
+// Handles draggable & resizable UI panels
+// Always-on drag by panel headers, persistent positions
 // =============================================
 
 export class PanelDragManager {
     constructor(game) {
         this.game = game;
-
-        // Move mode state
-        this.moveMode = false;
 
         // Registered panels
         this.panels = new Map();
@@ -34,11 +32,12 @@ export class PanelDragManager {
             'achievements-panel': { top: 100, right: 10 },
             'ship-log-panel': { top: 300, right: 10 },
             'combat-log-panel': { top: 150, left: 350 },
+            'skippy-panel': { bottom: 200, right: 240 },
         };
 
         // Storage key - bump version to force reset when layout changes
         this.storageKey = 'expedition-panel-layout';
-        this.layoutVersion = 4;
+        this.layoutVersion = 5;
         this.versionKey = 'expedition-panel-layout-version';
 
         // Force reset if layout version changed
@@ -52,7 +51,6 @@ export class PanelDragManager {
         this.saveTimer = null;
 
         // Bind methods
-        this.handleMouseDown = this.handleMouseDown.bind(this);
         this.handleMouseMove = this.handleMouseMove.bind(this);
         this.handleMouseUp = this.handleMouseUp.bind(this);
     }
@@ -72,8 +70,7 @@ export class PanelDragManager {
         setTimeout(() => this.constrainAllPanels(), 500);
 
         // ResizeObserver to detect CSS resize-handle usage and save sizes
-        this.resizeObserver = new ResizeObserver((entries) => {
-            // Debounce saves while user is actively resizing
+        this.resizeObserver = new ResizeObserver(() => {
             clearTimeout(this.saveTimer);
             this.saveTimer = setTimeout(() => this.saveLayout(), 300);
         });
@@ -83,7 +80,7 @@ export class PanelDragManager {
      * Constrain all panels to viewport bounds
      */
     constrainAllPanels() {
-        for (const [panelId, panelData] of this.panels) {
+        for (const [panelId] of this.panels) {
             this.constrainPanel(panelId);
         }
     }
@@ -102,30 +99,25 @@ export class PanelDragManager {
 
         const vw = window.innerWidth;
         const vh = window.innerHeight;
-        // Ensure the panel header (top 40px) is fully visible so user can always grab it
         const headerH = 40;
-        const minVisible = Math.min(rect.width, 100); // at least 100px wide visible
+        const minVisible = Math.min(rect.width, 100);
 
         let left = rect.left;
         let top = rect.top;
         let changed = false;
 
-        // Don't let the left edge go so far right that less than minVisible is showing
         if (left > vw - minVisible) {
             left = vw - minVisible;
             changed = true;
         }
-        // Don't let the right edge go past the left side
         if (left + minVisible < 0) {
             left = 0;
             changed = true;
         }
-        // Don't let the top go below the viewport (header must be visible)
         if (top > vh - headerH) {
             top = vh - headerH;
             changed = true;
         }
-        // Don't let it go above the viewport
         if (top < 0) {
             top = 0;
             changed = true;
@@ -140,7 +132,7 @@ export class PanelDragManager {
     }
 
     /**
-     * Constrain a panel when it becomes visible (call after removing 'hidden' class)
+     * Constrain a panel when it becomes visible
      */
     onPanelShown(panelId) {
         requestAnimationFrame(() => this.constrainPanel(panelId));
@@ -151,15 +143,11 @@ export class PanelDragManager {
      */
     registerPanel(panelId) {
         const panel = document.getElementById(panelId);
-        if (!panel) {
-            console.warn(`[PanelDragManager] Panel not found: ${panelId}`);
-            return;
-        }
+        if (!panel) return;
 
-        // Skip docked panels - they should not be draggable
+        // Skip docked panels
         if (panel.classList.contains('docked')) return;
 
-        // Store panel reference (header will be set below)
         const panelData = {
             element: panel,
             header: null,
@@ -169,97 +157,43 @@ export class PanelDragManager {
         // Apply saved position and size
         this.applyLayout(panelId);
 
-        // Constrain to viewport immediately after applying layout
+        // Constrain to viewport immediately
         requestAnimationFrame(() => this.constrainPanel(panelId));
 
         // Observe size changes (CSS resize handle)
         this.resizeObserver?.observe(panel);
 
-        // Watch for hidden class removal so we can constrain when panel becomes visible
+        // Watch for hidden class removal
         const classObserver = new MutationObserver((mutations) => {
             for (const m of mutations) {
                 if (m.attributeName === 'class' && !panel.classList.contains('hidden')) {
-                    // Panel just became visible - constrain to viewport
                     requestAnimationFrame(() => this.constrainPanel(panelId));
                 }
             }
         });
         classObserver.observe(panel, { attributes: true, attributeFilter: ['class'] });
 
-        // Add mousedown listener to header (or label for minimap, or entire panel as fallback)
+        // Find header element for drag handle
         const header = panel.querySelector('.panel-header') ||
                        panel.querySelector('#minimap-label') ||
-                       panel;
+                       null;
+
         if (header) {
             header.addEventListener('mousedown', (e) => this.handleMouseDown(e, panelId));
-            header.style.cursor = 'default';
-            // Store reference for cursor updates
+            header.style.cursor = 'grab';
             panelData.header = header;
         }
     }
 
     /**
-     * Toggle move mode on/off
-     */
-    toggleMoveMode() {
-        this.moveMode = !this.moveMode;
-
-        // Update visual state for all panels
-        for (const [panelId, panelData] of this.panels) {
-            const { element, header } = panelData;
-
-            if (this.moveMode) {
-                element.classList.add('move-mode');
-                if (header) {
-                    header.style.cursor = 'grab';
-                }
-            } else {
-                element.classList.remove('move-mode');
-                if (header) {
-                    header.style.cursor = 'default';
-                }
-            }
-        }
-
-        // Show indicator
-        this.showModeIndicator();
-
-        // Log status
-        this.game.ui?.log(
-            this.moveMode ? 'Panel move mode: ON (drag headers)' : 'Panel move mode: OFF',
-            'system'
-        );
-
-        return this.moveMode;
-    }
-
-    /**
-     * Show visual indicator for move mode
-     */
-    showModeIndicator() {
-        // Remove existing indicator
-        const existing = document.getElementById('move-mode-indicator');
-        if (existing) {
-            existing.remove();
-        }
-
-        if (this.moveMode) {
-            const indicator = document.createElement('div');
-            indicator.id = 'move-mode-indicator';
-            indicator.textContent = 'MOVE MODE - Drag panel headers (Z to exit)';
-            document.body.appendChild(indicator);
-        }
-    }
-
-    /**
-     * Handle mouse down on panel header
+     * Handle mouse down on panel header - always active (no move mode needed)
      */
     handleMouseDown(e, panelId) {
-        // Only drag in move mode
-        if (!this.moveMode) return;
-
         // Only left click
         if (e.button !== 0) return;
+
+        // Don't drag if clicking a button inside header
+        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
 
         const panelData = this.panels.get(panelId);
         if (!panelData) return;
@@ -270,17 +204,14 @@ export class PanelDragManager {
         const panel = panelData.element;
         const rect = panel.getBoundingClientRect();
 
-        // Calculate offset from mouse to panel corner
         this.dragOffset = {
             x: e.clientX - rect.left,
             y: e.clientY - rect.top,
         };
 
-        // Start dragging
         this.dragging = panelId;
         panel.classList.add('dragging');
 
-        // Update cursor
         if (panelData.header) {
             panelData.header.style.cursor = 'grabbing';
         }
@@ -296,20 +227,17 @@ export class PanelDragManager {
         if (!panelData) return;
 
         const panel = panelData.element;
+        const rect = panel.getBoundingClientRect();
 
-        // Calculate new position
         let newX = e.clientX - this.dragOffset.x;
         let newY = e.clientY - this.dragOffset.y;
 
-        // Constrain to viewport
-        const rect = panel.getBoundingClientRect();
         const maxX = window.innerWidth - rect.width;
         const maxY = window.innerHeight - rect.height;
 
         newX = Math.max(0, Math.min(newX, maxX));
         newY = Math.max(0, Math.min(newY, maxY));
 
-        // Apply position (use left/top, clear right/bottom)
         panel.style.left = `${newX}px`;
         panel.style.top = `${newY}px`;
         panel.style.right = 'auto';
@@ -319,22 +247,18 @@ export class PanelDragManager {
     /**
      * Handle mouse up to end drag
      */
-    handleMouseUp(e) {
+    handleMouseUp() {
         if (!this.dragging) return;
 
         const panelData = this.panels.get(this.dragging);
         if (panelData) {
             panelData.element.classList.remove('dragging');
-
-            // Update cursor
             if (panelData.header) {
-                panelData.header.style.cursor = this.moveMode ? 'grab' : 'default';
+                panelData.header.style.cursor = 'grab';
             }
         }
 
-        // Save layout after drag
         this.saveLayout();
-
         this.dragging = null;
     }
 
@@ -357,7 +281,6 @@ export class PanelDragManager {
         panel.style.left = 'auto';
 
         if (layout) {
-            // Validate saved position against current viewport with tighter bounds
             const w = window.innerWidth;
             const h = window.innerHeight;
             const savedW = layout.width || 200;
@@ -369,18 +292,15 @@ export class PanelDragManager {
                 (layout.top !== undefined && layout.top < -10);
 
             if (offscreen && defaultPos) {
-                // Saved position is off-screen, use defaults
                 this.applyDefaultPos(panel, defaultPos);
                 return;
             }
 
-            // Restore saved position
             if (layout.top !== undefined) panel.style.top = `${layout.top}px`;
             if (layout.left !== undefined) panel.style.left = `${layout.left}px`;
             if (layout.right !== undefined) panel.style.right = `${layout.right}px`;
             if (layout.bottom !== undefined) panel.style.bottom = `${layout.bottom}px`;
 
-            // Restore saved size (skip 0 values from corrupted saves)
             if (layout.width && layout.width > 0) panel.style.width = `${layout.width}px`;
             if (layout.height && layout.height > 0) panel.style.height = `${layout.height}px`;
         } else if (defaultPos) {
@@ -388,9 +308,6 @@ export class PanelDragManager {
         }
     }
 
-    /**
-     * Apply default position to a panel
-     */
     applyDefaultPos(panel, defaultPos) {
         if (defaultPos.top !== undefined) panel.style.top = `${defaultPos.top}px`;
         if (defaultPos.right !== undefined) panel.style.right = `${defaultPos.right}px`;
@@ -398,33 +315,24 @@ export class PanelDragManager {
         if (defaultPos.left !== undefined) panel.style.left = `${defaultPos.left}px`;
     }
 
-    /**
-     * Get saved layout from localStorage
-     */
     getSavedLayout() {
         try {
-            // Try new key first, fall back to old key for migration
             let saved = localStorage.getItem(this.storageKey);
             if (!saved) {
                 saved = localStorage.getItem('expedition-panel-positions');
                 if (saved) localStorage.removeItem('expedition-panel-positions');
             }
             return saved ? JSON.parse(saved) : {};
-        } catch (e) {
+        } catch {
             return {};
         }
     }
 
-    /**
-     * Save current layout (position + size) to localStorage
-     */
     saveLayout() {
         const layout = {};
 
         for (const [panelId, panelData] of this.panels) {
             const panel = panelData.element;
-
-            // Skip hidden panels - they report 0x0 which would corrupt saved layout
             if (panel.classList.contains('hidden') || panel.offsetParent === null) continue;
 
             const rect = panel.getBoundingClientRect();
@@ -440,35 +348,24 @@ export class PanelDragManager {
 
         try {
             localStorage.setItem(this.storageKey, JSON.stringify(layout));
-        } catch (e) {
+        } catch {
             // Ignore
         }
     }
 
-    /**
-     * Reset all panels to default positions and sizes
-     */
     resetPositions() {
         try {
             localStorage.removeItem(this.storageKey);
-        } catch (e) {
+        } catch {
             // Ignore
         }
 
         for (const [panelId, panelData] of this.panels) {
-            // Clear saved sizes back to CSS defaults
             panelData.element.style.width = '';
             panelData.element.style.height = '';
             this.applyLayout(panelId);
         }
 
         this.game.ui?.log('Panel layout reset to defaults', 'system');
-    }
-
-    /**
-     * Check if move mode is active
-     */
-    isMoveModeActive() {
-        return this.moveMode;
     }
 }

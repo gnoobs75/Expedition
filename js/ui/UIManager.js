@@ -25,6 +25,7 @@ import { CommercePanelManager } from './CommercePanelManager.js';
 import { QuestTrackerManager } from './QuestTrackerManager.js';
 import { LootContainer } from '../entities/LootContainer.js';
 import { TRADE_GOODS } from '../data/tradeGoodsDatabase.js';
+import { TacticalReplay } from './TacticalReplay.js';
 
 export class UIManager {
     constructor(game) {
@@ -86,6 +87,9 @@ export class UIManager {
 
         // Quest tracker
         this.questTracker = new QuestTrackerManager(game);
+
+        // Tactical replay viewer
+        this.tacticalReplay = new TacticalReplay(game);
 
         // Ship indicator 3D viewer state
         this.shipViewerScene = null;
@@ -183,6 +187,16 @@ export class UIManager {
 
         // Gate label pool
         this._gateLabelPool = [];
+
+        // Global tooltip state
+        this._globalTooltipTarget = null;
+
+        // Confirmation dialog state
+        this._confirmCallback = null;
+        this._confirmCancelCallback = null;
+
+        // Previous credit value for pulse detection
+        this._prevCredits = 0;
     }
 
     /**
@@ -301,6 +315,19 @@ export class UIManager {
             // Hull warning elements
             hullWarningText: document.getElementById('hull-warning-text'),
             hullVignette: document.getElementById('hull-vignette'),
+
+            // Global tooltip
+            globalTooltip: document.getElementById('global-tooltip'),
+
+            // Confirmation dialog
+            confirmDialog: document.getElementById('confirm-dialog'),
+            confirmTitle: document.getElementById('confirm-title'),
+            confirmMessage: document.getElementById('confirm-message'),
+            confirmYesBtn: document.getElementById('confirm-yes-btn'),
+            confirmNoBtn: document.getElementById('confirm-no-btn'),
+
+            // Damage direction
+            damageDirectionContainer: document.getElementById('damage-direction-container'),
         };
     }
 
@@ -599,9 +626,17 @@ export class UIManager {
             }
         });
 
-        // Sell all ore button
+        // Sell all ore button (with confirmation for large amounts)
         document.getElementById('sell-all-ore-btn')?.addEventListener('click', () => {
-            this.sellAllOre();
+            const player = this.game.player;
+            if (!player?.cargo) return;
+            let totalUnits = 0;
+            for (const data of Object.values(player.cargo)) totalUnits += data.units || 0;
+            if (totalUnits > 100) {
+                this.showConfirmDialog('Sell All Ore', `Sell ${totalUnits.toLocaleString()} units of ore?`, () => this.sellAllOre());
+            } else {
+                this.sellAllOre();
+            }
         });
 
         // D-Scan range/angle sliders with value display
@@ -664,6 +699,39 @@ export class UIManager {
             const target = this.game.selectedTarget;
             if (target) {
                 this.showContextMenu(e.clientX, e.clientY, target);
+            }
+        });
+
+        // Global tooltip delegation on status bar elements
+        this.setupStatusBarTooltips();
+
+        // Global tooltip delegation via data-tooltip attribute
+        document.addEventListener('mouseenter', (e) => {
+            const target = e.target.closest('[data-tooltip]');
+            if (target) this.showGlobalTooltip(target);
+        }, true);
+        document.addEventListener('mouseleave', (e) => {
+            const target = e.target.closest('[data-tooltip]');
+            if (target) this.hideGlobalTooltip();
+        }, true);
+
+        // Confirmation dialog buttons
+        this.elements.confirmYesBtn?.addEventListener('click', () => {
+            const cb = this._confirmCallback;
+            this.hideConfirmDialog();
+            if (cb) cb();
+        });
+        this.elements.confirmNoBtn?.addEventListener('click', () => {
+            const cb = this._confirmCancelCallback;
+            this.hideConfirmDialog();
+            if (cb) cb();
+        });
+        // Close confirm on overlay click (outside dialog box)
+        this.elements.confirmDialog?.addEventListener('click', (e) => {
+            if (e.target === this.elements.confirmDialog) {
+                const cb = this._confirmCancelCallback;
+                this.hideConfirmDialog();
+                if (cb) cb();
             }
         });
     }
@@ -734,13 +802,12 @@ export class UIManager {
         this.panelDragManager.registerPanel('locked-targets-container');
         this.panelDragManager.registerPanel('ship-indicator');
         this.panelDragManager.registerPanel('drone-bar');
-        this.panelDragManager.registerPanel('performance-monitor');
         this.panelDragManager.registerPanel('fleet-panel');
-        this.panelDragManager.registerPanel('quest-tracker');
         this.panelDragManager.registerPanel('minimap');
         this.panelDragManager.registerPanel('stats-panel');
         this.panelDragManager.registerPanel('achievements-panel');
         this.panelDragManager.registerPanel('ship-log-panel');
+        this.panelDragManager.registerPanel('combat-log-panel');
 
         // Setup minimap range buttons
         document.querySelectorAll('.minimap-range-btn').forEach(btn => {
@@ -815,6 +882,13 @@ export class UIManager {
             this.overviewTimer = 0;
             this.updateOverview();
         }
+
+        // Credit change pulse detection
+        const currentCredits = this.game.credits || 0;
+        if (this._prevCredits > 0 && currentCredits !== this._prevCredits) {
+            this.pulseCreditsDisplay(currentCredits > this._prevCredits);
+        }
+        this._prevCredits = currentCredits;
 
         // Update fleet panel
         this.fleetPanelManager?.update(dt);
@@ -892,6 +966,18 @@ export class UIManager {
         // Update credits
         this.elements.creditsValue.textContent = formatCredits(this.game.credits);
 
+        // Update faction treasury
+        const treasuryEl = document.getElementById('faction-treasury-value');
+        if (treasuryEl) {
+            treasuryEl.textContent = formatCredits(this.game.faction?.treasury || 0);
+        }
+
+        // Update stardate
+        const stardateEl = document.getElementById('stardate-value');
+        if (stardateEl) {
+            stardateEl.textContent = this.game.getStardate();
+        }
+
         // Update cargo display
         this.updateCargoDisplay(player);
 
@@ -900,6 +986,14 @@ export class UIManager {
 
         // Update autopilot route indicator
         this.updateRouteIndicator(player);
+
+        // Status bar pulse on significant changes (>5%)
+        for (const type of ['shield', 'armor', 'hull', 'capacitor']) {
+            const diff = health[type] - this.prevHealth[type];
+            if (Math.abs(diff) > 5) {
+                this.pulseStatusBar(type, diff > 0);
+            }
+        }
 
         // Store previous health values
         this.prevHealth = { ...health };
@@ -1928,14 +2022,27 @@ export class UIManager {
 
         const entities = this.game.currentSector?.entities || [];
         let nearStation = null;
+        let nearGate = null;
 
         for (const entity of entities) {
-            if (!entity.alive || entity.type !== 'station') continue;
+            if (!entity.alive) continue;
             const dist = player.distanceTo(entity);
-            if (dist < 300) {
+            if (entity.type === 'station' && dist < 300) {
                 nearStation = entity;
-                break;
             }
+            if (entity.type === 'gate' && entity.destinationSectorId && dist < 100) {
+                nearGate = entity;
+            }
+        }
+
+        // Auto-jump when touching a gate (within 100m)
+        if (nearGate && !this._gateJumpCooldown) {
+            this._gateJumpCooldown = true;
+            nearGate.use(player);
+            // Cooldown prevents re-triggering during warp animation
+            setTimeout(() => { this._gateJumpCooldown = false; }, 3000);
+            prompt.classList.add('hidden');
+            return;
         }
 
         if (nearStation) {
@@ -2373,13 +2480,18 @@ export class UIManager {
         const player = this.game.player;
         if (!player) return;
 
+        let globalIndex = 0;
         const buildSlots = (prefix, count) => {
             let html = '';
             for (let i = 1; i <= count; i++) {
+                const keyHint = prefix === 'high' ? `F${globalIndex + 1}` : '';
                 html += `<div class="module-slot" data-slot="${prefix}-${i}">
                     <div class="module-icon"></div>
                     <div class="module-cooldown"></div>
+                    <div class="module-cooldown-text"></div>
+                    ${keyHint ? `<div class="module-slot-keybind">${keyHint}</div>` : ''}
                 </div>`;
+                globalIndex++;
             }
             return html;
         };
@@ -2470,6 +2582,30 @@ export class UIManager {
                 slotElement.classList.remove('cap-warning');
             }
 
+            // Out-of-range dimming for weapons/miners with range
+            const target = this.game.selectedTarget;
+            if (mod.config?.range && target && target !== player) {
+                const dx = target.x - player.x;
+                const dy = target.y - player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                slotElement.classList.toggle('out-of-range', dist > mod.config.range);
+            } else {
+                slotElement.classList.remove('out-of-range');
+            }
+
+            // Cooldown percentage text
+            const cdTextEl = slotElement.querySelector('.module-cooldown-text');
+            if (cdTextEl) {
+                if (mod.cooldown > 0 && mod.config?.cycleTime) {
+                    const pct = Math.ceil((mod.cooldown / mod.config.cycleTime) * 100);
+                    cdTextEl.textContent = `${pct}%`;
+                    cdTextEl.style.display = '';
+                } else {
+                    cdTextEl.textContent = '';
+                    cdTextEl.style.display = 'none';
+                }
+            }
+
             // Add/update tooltip
             this.updateModuleTooltip(slotElement, mod);
         });
@@ -2555,9 +2691,18 @@ export class UIManager {
                 statsHtml += `<div class="module-tooltip-stat"><span class="label">Range</span><span class="value">${formatDistance(config.range)}</span></div>`;
             }
 
+            // Determine hotkey hint from slot id
+            const slotId = slotElement.dataset.slot || '';
+            let hotkeyHint = '';
+            if (slotId.startsWith('high-')) {
+                const num = parseInt(slotId.split('-')[1]);
+                hotkeyHint = `<div class="module-tooltip-stat"><span class="label">Hotkey</span><span class="value">F${num}</span></div>`;
+            }
+
             tooltipEl.innerHTML = `
                 <div class="module-tooltip-name">${config.name}</div>
                 ${statsHtml}
+                ${hotkeyHint}
             `;
         } else if (tooltipEl) {
             tooltipEl.remove();
@@ -2685,6 +2830,14 @@ export class UIManager {
                 const canDock = entity.canDock?.(this.game.player);
                 const dockClass = canDock ? '' : ' disabled';
                 items.push(`<div class="menu-item${dockClass}" data-action="dock">Dock</div>`);
+            }
+
+            // Jump (only for gates)
+            if (entity.type === 'gate' && entity.destinationSectorId) {
+                const canJump = entity.canUse?.(this.game.player);
+                const jumpClass = canJump ? '' : ' disabled';
+                const destName = entity.destinationName || entity.destinationSectorId;
+                items.push(`<div class="menu-item${jumpClass}" data-action="jump-gate">Jump to ${destName}</div>`);
             }
 
             // Hail NPC ships
@@ -2821,6 +2974,15 @@ export class UIManager {
                 break;
             case 'warp':
                 this.game.autopilot.warpTo(target);
+                break;
+            case 'jump-gate':
+                if (target.type === 'gate' && target.canUse?.(this.game.player)) {
+                    target.use(this.game.player);
+                } else {
+                    this.log('Too far from gate - approach within activation range', 'system');
+                    this.toast('Too far from gate', 'warning');
+                    this.game.audio?.play('warning');
+                }
                 break;
             case 'dock':
                 if (target.type === 'station' && target.canDock(this.game.player)) {
@@ -4135,7 +4297,7 @@ export class UIManager {
             </div>
         `).join('');
 
-        container.innerHTML = html || '<div style="color: var(--text-dim)">No bookmarks saved</div>';
+        container.innerHTML = html || '<div class="empty-state"><div class="empty-state-icon">\u2606</div><div class="empty-state-title">No Bookmarks</div><div class="empty-state-hint">Right-click in space to save a location</div></div>';
     }
 
     /**
@@ -4222,7 +4384,13 @@ export class UIManager {
         }).join('');
 
         const resultsEl = document.getElementById('dscan-results');
-        if (resultsEl) resultsEl.innerHTML = html;
+        if (resultsEl) {
+            if (html) {
+                resultsEl.innerHTML = html;
+            } else {
+                resultsEl.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">\u{1F4E1}</div><div class="empty-state-title">No Objects Detected</div><div class="empty-state-hint">Try a wider scan angle or range</div></div></td></tr>';
+            }
+        }
 
         // Make rows clickable to select entities
         resultsEl?.querySelectorAll('tr[data-entity-id]').forEach(row => {
@@ -4834,13 +5002,23 @@ export class UIManager {
         const container = document.getElementById('toast-container');
         if (!container) return;
 
+        const icons = {
+            info: '\u2139',      // ℹ
+            success: '\u2714',   // ✔
+            warning: '\u26A0',   // ⚠
+            danger: '\u2716',    // ✖
+            error: '\u2716',
+        };
+        const icon = icons[type] || icons.info;
+        const duration = type === 'danger' || type === 'error' ? 4000 : 3000;
+
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        toast.textContent = message;
+        toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text">${message}</span><div class="toast-progress" style="animation-duration:${duration}ms"></div>`;
         container.appendChild(toast);
 
         // Auto-remove after animation
-        setTimeout(() => toast.remove(), 3000);
+        setTimeout(() => toast.remove(), duration);
 
         // Limit visible toasts
         while (container.children.length > 5) {
@@ -5014,6 +5192,17 @@ export class UIManager {
      * Jettison all cargo into a floating container
      */
     jettisonCargo() {
+        const player = this.game.player;
+        if (!player || player.cargoUsed <= 0) return;
+
+        this.showConfirmDialog(
+            'Jettison Cargo',
+            'All cargo will be ejected into space. This action cannot be undone. Continue?',
+            () => this._doJettisonCargo()
+        );
+    }
+
+    _doJettisonCargo() {
         const player = this.game.player;
         if (!player || player.cargoUsed <= 0) return;
 
@@ -5281,7 +5470,7 @@ export class UIManager {
         const player = this.game.player;
         if (!player || !source) return;
 
-        const container = document.getElementById('damage-direction-container');
+        const container = this.elements.damageDirectionContainer || document.getElementById('damage-direction-container');
         if (!container) return;
 
         // Calculate angle from player to source
@@ -5289,13 +5478,13 @@ export class UIManager {
         const dy = source.y - player.y;
         const angle = Math.atan2(dy, dx);
 
-        // Convert to screen angle (Three.js Y is up, screen Y is down)
-        const screenAngleDeg = -(angle * 180 / Math.PI) + 90;
+        // Convert to CSS rotation (0deg = top, clockwise)
+        const screenAngleDeg = (angle * 180 / Math.PI) + 90;
 
         const indicator = document.createElement('div');
-        const extraClass = type === 'missile' ? ' missile-warning' : type === 'hostile' ? ' hostile-warning' : '';
-        indicator.className = `damage-direction-indicator${extraClass}`;
-        indicator.style.transform = `rotate(${screenAngleDeg}deg)`;
+        const typeClass = type === 'missile' ? ' missile' : type === 'hostile' ? ' hostile' : '';
+        indicator.className = `damage-dir-arrow${typeClass}`;
+        indicator.style.setProperty('--angle', `${screenAngleDeg}deg`);
         container.appendChild(indicator);
 
         // Remove after animation
@@ -5306,6 +5495,174 @@ export class UIManager {
         while (container.children.length > 6) {
             container.firstChild.remove();
         }
+    }
+
+    // =========================================
+    // Global Tooltip System
+    // =========================================
+
+    /**
+     * Add data-tooltip attributes to status bar elements
+     */
+    setupStatusBarTooltips() {
+        const bars = [
+            { el: this.elements.shieldContainer, type: 'shield' },
+            { el: this.elements.armorContainer, type: 'armor' },
+            { el: this.elements.hullContainer, type: 'hull' },
+            { el: this.elements.capacitorContainer, type: 'capacitor' },
+        ];
+        for (const { el, type } of bars) {
+            if (el) el.setAttribute('data-tooltip', type);
+        }
+        // Cargo bar
+        const cargoContainer = this.elements.cargoBar?.parentElement;
+        if (cargoContainer) cargoContainer.setAttribute('data-tooltip', 'cargo');
+        // Credits
+        const creditsEl = this.elements.creditsValue?.parentElement;
+        if (creditsEl) creditsEl.setAttribute('data-tooltip', 'credits');
+    }
+
+    /**
+     * Show global tooltip near target element
+     */
+    showGlobalTooltip(target) {
+        const tooltip = this.elements.globalTooltip;
+        if (!tooltip) return;
+
+        const type = target.getAttribute('data-tooltip');
+        const player = this.game.player;
+        let html = '';
+
+        if (type === 'shield' && player) {
+            html = `<div class="global-tooltip-title">Shield</div>
+                <div class="global-tooltip-row"><span class="global-tooltip-label">HP</span><span class="global-tooltip-value">${Math.floor(player.shield)} / ${Math.floor(player.maxShield)}</span></div>
+                <div class="global-tooltip-row"><span class="global-tooltip-label">Resist</span><span class="global-tooltip-value">${Math.round((player.shieldResist || 0) * 100)}%</span></div>
+                <div class="global-tooltip-divider"></div>
+                <div class="global-tooltip-hint">EM/Thermal resist layer</div>`;
+        } else if (type === 'armor' && player) {
+            html = `<div class="global-tooltip-title">Armor</div>
+                <div class="global-tooltip-row"><span class="global-tooltip-label">HP</span><span class="global-tooltip-value">${Math.floor(player.armor)} / ${Math.floor(player.maxArmor)}</span></div>
+                <div class="global-tooltip-row"><span class="global-tooltip-label">Resist</span><span class="global-tooltip-value">${Math.round((player.armorResist || 0) * 100)}%</span></div>
+                <div class="global-tooltip-divider"></div>
+                <div class="global-tooltip-hint">Explosive/Kinetic resist layer</div>`;
+        } else if (type === 'hull' && player) {
+            html = `<div class="global-tooltip-title">Hull</div>
+                <div class="global-tooltip-row"><span class="global-tooltip-label">HP</span><span class="global-tooltip-value">${Math.floor(player.hull)} / ${Math.floor(player.maxHull)}</span></div>
+                <div class="global-tooltip-divider"></div>
+                <div class="global-tooltip-hint">Ship destroyed at 0 hull</div>`;
+        } else if (type === 'capacitor' && player) {
+            html = `<div class="global-tooltip-title">Capacitor</div>
+                <div class="global-tooltip-row"><span class="global-tooltip-label">Energy</span><span class="global-tooltip-value">${Math.floor(player.capacitor)} / ${Math.floor(player.maxCapacitor)}</span></div>
+                <div class="global-tooltip-row"><span class="global-tooltip-label">Recharge</span><span class="global-tooltip-value">${(player.capacitorRecharge || 0).toFixed(1)}/s</span></div>
+                <div class="global-tooltip-divider"></div>
+                <div class="global-tooltip-hint">Powers modules &amp; warp drive</div>`;
+        } else if (type === 'cargo' && player) {
+            const used = player.cargoUsed || 0;
+            const max = player.cargoCapacity || 0;
+            html = `<div class="global-tooltip-title">Cargo Hold</div>
+                <div class="global-tooltip-row"><span class="global-tooltip-label">Used</span><span class="global-tooltip-value">${used} / ${max} m\u00B3</span></div>
+                <div class="global-tooltip-divider"></div>
+                <div class="global-tooltip-hint">Dock at station to sell cargo</div>`;
+        } else if (type === 'credits') {
+            html = `<div class="global-tooltip-title">Credits</div>
+                <div class="global-tooltip-row"><span class="global-tooltip-label">Balance</span><span class="global-tooltip-value">${formatCredits(this.game.credits || 0)} ISK</span></div>
+                <div class="global-tooltip-divider"></div>
+                <div class="global-tooltip-hint">Earned from bounties, mining &amp; trade</div>`;
+        } else {
+            // Generic tooltip from data-tooltip-text attribute
+            const text = target.getAttribute('data-tooltip-text') || type;
+            html = `<div class="global-tooltip-title">${text}</div>`;
+        }
+
+        tooltip.innerHTML = html;
+
+        // Position near target
+        const rect = target.getBoundingClientRect();
+        const tooltipW = 200;
+        let left = rect.left + rect.width / 2 - tooltipW / 2;
+        let top = rect.top - 8;
+
+        // Clamp to viewport
+        left = Math.max(4, Math.min(window.innerWidth - tooltipW - 4, left));
+        if (top < 60) top = rect.bottom + 8; // flip below if too close to top
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+        tooltip.style.transform = 'translateY(-100%)';
+        if (top === rect.bottom + 8) tooltip.style.transform = 'translateY(0)';
+
+        tooltip.classList.remove('hidden');
+        this._globalTooltipTarget = target;
+    }
+
+    /**
+     * Hide global tooltip
+     */
+    hideGlobalTooltip() {
+        const tooltip = this.elements.globalTooltip;
+        if (tooltip) tooltip.classList.add('hidden');
+        this._globalTooltipTarget = null;
+    }
+
+    // =========================================
+    // Confirmation Dialog
+    // =========================================
+
+    /**
+     * Show styled confirmation dialog
+     */
+    showConfirmDialog(title, message, onConfirm, onCancel) {
+        this._confirmCallback = onConfirm || null;
+        this._confirmCancelCallback = onCancel || null;
+
+        if (this.elements.confirmTitle) this.elements.confirmTitle.textContent = title;
+        if (this.elements.confirmMessage) this.elements.confirmMessage.innerHTML = message;
+        if (this.elements.confirmDialog) this.elements.confirmDialog.classList.remove('hidden');
+
+        this.game.audio?.play('click');
+    }
+
+    /**
+     * Hide confirmation dialog
+     */
+    hideConfirmDialog() {
+        if (this.elements.confirmDialog) this.elements.confirmDialog.classList.add('hidden');
+        this._confirmCallback = null;
+        this._confirmCancelCallback = null;
+    }
+
+    // =========================================
+    // Status Bar Pulse Animations
+    // =========================================
+
+    /**
+     * Pulse credits display on gain/loss
+     */
+    pulseCreditsDisplay(gained) {
+        const el = this.elements.creditsValue;
+        if (!el) return;
+        el.classList.remove('pulse-gain', 'pulse-loss');
+        void el.offsetWidth;
+        el.classList.add(gained ? 'pulse-gain' : 'pulse-loss');
+        setTimeout(() => el.classList.remove('pulse-gain', 'pulse-loss'), 500);
+    }
+
+    /**
+     * Pulse a status bar on significant change
+     */
+    pulseStatusBar(type, gained) {
+        const containerMap = {
+            shield: this.elements.shieldContainer,
+            armor: this.elements.armorContainer,
+            hull: this.elements.hullContainer,
+            capacitor: this.elements.capacitorContainer,
+        };
+        const el = containerMap[type];
+        if (!el) return;
+        el.classList.remove('pulse-gain', 'pulse-loss');
+        void el.offsetWidth;
+        el.classList.add(gained ? 'pulse-gain' : 'pulse-loss');
+        setTimeout(() => el.classList.remove('pulse-gain', 'pulse-loss'), 400);
     }
 
     /**
@@ -5331,10 +5688,10 @@ export class UIManager {
     }
 
     /**
-     * Toggle panel move mode (Z key)
+     * Reset panel positions (Z key)
      */
     toggleMoveMode() {
-        return this.panelDragManager.toggleMoveMode();
+        this.panelDragManager.resetPositions();
     }
 
     /**
@@ -6264,6 +6621,13 @@ export class UIManager {
 
         html += `</div>`;
         return html;
+    }
+
+    /**
+     * Show tactical replay for an AAR report
+     */
+    showTacticalReplay(report) {
+        this.tacticalReplay?.show(report);
     }
 }
 

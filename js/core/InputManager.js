@@ -591,6 +591,65 @@ export class InputManager {
                 this.game.ui?.showToast(on ? 'Weapon range overlay ON' : 'Weapon range overlay OFF', 'system');
                 break;
             }
+
+            case 'quickSave': {
+                e.preventDefault();
+                const ok = this.game.saveManager?.save('slot-1');
+                if (ok) {
+                    this.game.ui?.showToast('Game saved to Slot 1', 'success');
+                    this.game.audio?.play('click');
+                } else {
+                    this.game.ui?.showToast('Save failed', 'error');
+                }
+                break;
+            }
+
+            // Fleet Control Groups - Select
+            case 'selectGroup1':
+            case 'selectGroup2':
+            case 'selectGroup3':
+            case 'selectGroup4':
+            case 'selectGroup5': {
+                const groupNum = parseInt(action.replace('selectGroup', ''));
+                this.game.ui?.fleetPanelManager?.selectGroup(groupNum);
+                this.game.audio?.play('click');
+                break;
+            }
+
+            // Fleet Control Groups - Assign
+            case 'assignGroup1':
+            case 'assignGroup2':
+            case 'assignGroup3':
+            case 'assignGroup4':
+            case 'assignGroup5': {
+                e.preventDefault();
+                const assignNum = parseInt(action.replace('assignGroup', ''));
+                this.game.ui?.fleetPanelManager?.assignSelectedToGroup(assignNum);
+                this.game.audio?.play('click');
+                break;
+            }
+
+            // Fleet-wide Commands
+            case 'fleetFollowAll':
+                this.game.fleetSystem?.commandAll('following', this.game.selectedTarget);
+                this.game.ui?.showToast('Fleet: Follow', 'system');
+                break;
+            case 'fleetAttackAll':
+                this.game.fleetSystem?.commandAll('attacking', this.game.selectedTarget);
+                this.game.ui?.showToast('Fleet: Attack', 'system');
+                break;
+            case 'fleetMineAll':
+                this.game.fleetSystem?.commandAll('mining', this.game.selectedTarget);
+                this.game.ui?.showToast('Fleet: Mine', 'system');
+                break;
+            case 'fleetDefendAll':
+                this.game.fleetSystem?.commandAll('defending', this.game.selectedTarget);
+                this.game.ui?.showToast('Fleet: Defend', 'system');
+                break;
+            case 'fleetHoldAll':
+                this.game.fleetSystem?.commandAll('holding', null);
+                this.game.ui?.showToast('Fleet: Hold Position', 'system');
+                break;
         }
     }
 

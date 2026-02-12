@@ -36,7 +36,7 @@ export const DEFAULT_BINDINGS = {
     'toggleSettings': { key: 'Escape', description: 'Toggle Settings Menu', category: 'UI' },
     'toggleOverview': { key: 'KeyO', description: 'Toggle Overview', category: 'UI' },
     'toggleMap': { key: 'KeyM', description: 'Toggle Sector Map', category: 'UI' },
-    'toggleMoveMode': { key: 'KeyZ', description: 'Toggle Panel Move Mode', category: 'UI' },
+    'toggleMoveMode': { key: 'KeyZ', description: 'Reset Panel Positions', category: 'UI' },
     'toggleObjectViewer': { key: 'KeyI', description: 'Toggle Object Viewer', category: 'UI' },
     'toggleShipMenu': { key: 'KeyC', description: 'Toggle Ship Menu', category: 'UI' },
     'togglePerformanceMonitor': { key: 'F3', description: 'Toggle Performance Monitor', category: 'UI' },
@@ -55,6 +55,24 @@ export const DEFAULT_BINDINGS = {
     'toggleCombatLog': { key: 'KeyY', description: 'Toggle Combat Log', category: 'UI' },
     'toggleSensorSweep': { key: 'Semicolon', description: 'Toggle Sensor Sweep', category: 'UI' },
     'toggleWeaponRange': { key: 'Period', description: 'Toggle Weapon Range', category: 'UI' },
+    'quickSave': { key: 'F5', description: 'Quick Save (Slot 1)', category: 'System' },
+
+    // Fleet Control Groups
+    'selectGroup1': { key: 'Digit1', description: 'Select Group 1', category: 'Fleet' },
+    'selectGroup2': { key: 'Digit2', description: 'Select Group 2', category: 'Fleet' },
+    'selectGroup3': { key: 'Digit3', description: 'Select Group 3', category: 'Fleet' },
+    'selectGroup4': { key: 'Digit4', description: 'Select Group 4', category: 'Fleet' },
+    'selectGroup5': { key: 'Digit5', description: 'Select Group 5', category: 'Fleet' },
+    'assignGroup1': { key: 'ctrl+Digit1', description: 'Assign to Group 1', category: 'Fleet' },
+    'assignGroup2': { key: 'ctrl+Digit2', description: 'Assign to Group 2', category: 'Fleet' },
+    'assignGroup3': { key: 'ctrl+Digit3', description: 'Assign to Group 3', category: 'Fleet' },
+    'assignGroup4': { key: 'ctrl+Digit4', description: 'Assign to Group 4', category: 'Fleet' },
+    'assignGroup5': { key: 'ctrl+Digit5', description: 'Assign to Group 5', category: 'Fleet' },
+    'fleetFollowAll': { key: 'shift+Digit1', description: 'All Fleet: Follow', category: 'Fleet' },
+    'fleetAttackAll': { key: 'shift+Digit2', description: 'All Fleet: Attack', category: 'Fleet' },
+    'fleetMineAll': { key: 'shift+Digit3', description: 'All Fleet: Mine', category: 'Fleet' },
+    'fleetDefendAll': { key: 'shift+Digit4', description: 'All Fleet: Defend', category: 'Fleet' },
+    'fleetHoldAll': { key: 'shift+Digit5', description: 'All Fleet: Hold Position', category: 'Fleet' },
 };
 
 export class KeyBindings {

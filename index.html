@@ -7,6 +7,21 @@
     <link rel="stylesheet" href="css/ui.css">
 </head>
 <body>
+    <!-- Splash / Title Screen -->
+    <div id="splash-screen">
+        <canvas id="splash-bg-canvas"></canvas>
+        <div class="splash-content">
+            <div class="splash-skippy-container" id="splash-skippy-container">
+                <div id="splash-skippy-speech" class="splash-skippy-speech"></div>
+            </div>
+            <h1 class="splash-title">EXPEDITION</h1>
+            <p class="splash-subtitle">A Space Exploration Game</p>
+            <div class="splash-menu" id="splash-menu"></div>
+            <div class="splash-version">v1.0</div>
+        </div>
+        <div id="splash-sub-screen" class="splash-sub hidden"></div>
+    </div>
+
     <!-- Three.js Canvas Container -->
     <div id="game-container"></div>
 
@@ -24,6 +39,25 @@
 
     <!-- Damage Direction Indicators -->
     <div id="damage-direction-container"></div>
+
+    <!-- Confirmation Dialog -->
+    <div id="confirm-dialog" class="confirm-overlay hidden">
+        <div class="confirm-dialog-box">
+            <div class="confirm-dialog-header">
+                <span id="confirm-title">Confirm Action</span>
+            </div>
+            <div class="confirm-dialog-body">
+                <div id="confirm-message"></div>
+                <div class="confirm-buttons">
+                    <button id="confirm-yes-btn" class="confirm-btn confirm-btn-yes">CONFIRM</button>
+                    <button id="confirm-no-btn" class="confirm-btn confirm-btn-no">CANCEL</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Tooltip -->
+    <div id="global-tooltip" class="global-tooltip hidden"></div>
 
     <!-- Salvage Beam Container -->
     <div id="salvage-beam-container"></div>
@@ -135,12 +169,20 @@
                     <span class="label">ISK</span>
                     <span id="credits-value">10,000</span>
                 </div>
+                <div id="faction-treasury-display" class="faction-treasury-display" title="Faction Treasury">
+                    <span class="faction-treasury-icon">&#9733;</span>
+                    <span id="faction-treasury-value">0</span>
+                </div>
                 <div id="cargo-display">
                     <span class="label">CARGO</span>
                     <div class="cargo-bar-container">
                         <div id="cargo-bar" class="cargo-bar"></div>
                         <span id="cargo-text">0 / 200 m³</span>
                     </div>
+                </div>
+                <div id="stardate-display" class="stardate-display" title="Stardate (Game Time)">
+                    <span class="stardate-label">SD</span>
+                    <span id="stardate-value">3301.001.00</span>
                 </div>
                 <div id="danger-indicator" title="Sector Security Level">
                     <span class="danger-label">SEC</span>
@@ -303,10 +345,10 @@
             </div>
         </div>
 
-        <!-- Bottom Panel: Module Rack -->
+        <!-- Bottom Panel: Module Rack (stacked: High top, Mid middle, Low bottom) -->
         <div id="module-rack">
             <div class="module-section">
-                <div class="section-label">WEAPONS</div>
+                <div class="section-label">HIGH</div>
                 <div class="module-slots" id="high-slots">
                     <div class="module-slot" data-slot="high-1">
                         <div class="module-icon">&#9889;</div>
@@ -323,7 +365,7 @@
                 </div>
             </div>
             <div class="module-section">
-                <div class="section-label">MODULES</div>
+                <div class="section-label">MID</div>
                 <div class="module-slots" id="mid-slots">
                     <div class="module-slot" data-slot="mid-1">
                         <div class="module-icon">&#9211;</div>
@@ -336,7 +378,7 @@
                 </div>
             </div>
             <div class="module-section">
-                <div class="section-label">SUBSYS</div>
+                <div class="section-label">LOW</div>
                 <div class="module-slots" id="low-slots">
                     <div class="module-slot" data-slot="low-1">
                         <div class="module-icon">&#9881;</div>
@@ -421,6 +463,10 @@
                 <span class="panel-title">FLEET</span>
                 <button class="panel-close">&times;</button>
             </div>
+            <div class="fleet-sub-tabs">
+                <button class="fleet-sub-tab active" data-subtab="fleet">FLEET</button>
+                <button class="fleet-sub-tab" data-subtab="aar">AARs</button>
+            </div>
             <div class="panel-content">
                 <div id="fleet-panel-body">
                     <div class="fleet-empty">
@@ -428,6 +474,7 @@
                         <div class="fleet-hint">Buy ships at stations and add them to your fleet</div>
                     </div>
                 </div>
+                <div id="aar-panel-body" class="hidden"></div>
             </div>
         </div>
 

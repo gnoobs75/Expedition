@@ -134,6 +134,7 @@ export class FleetSystem {
             mining: 'Mine',
             attacking: 'Attack',
             defending: 'Defend',
+            holding: 'Hold Position',
         };
         this.game.ui?.log(`Group ${groupId}: ${commandNames[command] || command}`, 'system');
     }

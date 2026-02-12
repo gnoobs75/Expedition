@@ -4,6 +4,7 @@
 // =============================================
 
 import { Game } from './core/Game.js';
+import { SplashScreen } from './ui/SplashScreen.js';
 import { DEBUG, debug, FPSMonitor, EntityInspector } from './utils/debug.js';
 
 // Global game instance
@@ -12,7 +13,7 @@ let fpsMonitor = null;
 let entityInspector = null;
 
 /**
- * Initialize and start the game
+ * Show splash screen, then initialize and start the game
  */
 async function init() {
     console.log('Starting Expedition...');
@@ -22,20 +23,53 @@ async function init() {
         fpsMonitor = new FPSMonitor();
     }
 
+    // Show splash / title screen
+    const splash = new SplashScreen();
+    const result = await splash.show();
+
+    // Fade out splash
+    await splash.hide();
+
     // Create game instance
     game = new Game();
-
-    // Make game globally accessible for UI callbacks
     window.game = game;
 
     // Initialize all systems
     await game.init();
 
+    // Apply faction data for new game
+    if (result.faction) {
+        game.faction = { ...result.faction };
+    }
+
+    // If loading a save, restore state before starting game loop
+    if (result.action === 'load' && result.slotData) {
+        game.loadFromSave(result.slotData);
+    }
+
+    // If tutorial mode, enable guided tutorial arc
+    if (result.tutorial && game.skippy) {
+        game.skippy.milestones = new Set();
+        game.skippy.guidedTutorial = true;
+        game.skippy.guidedStep = 0;
+        game.skippy.saveState();
+        setTimeout(() => {
+            game.skippy.startGuidedTutorial();
+        }, 2000);
+    } else if (game.skippy && !result.slotData) {
+        // New game (non-tutorial) - still start the guided tutorial
+        game.skippy.guidedTutorial = true;
+        game.skippy.guidedStep = 0;
+        game.skippy.saveState();
+        setTimeout(() => {
+            game.skippy.startGuidedTutorial();
+        }, 2000);
+    }
+
     // Create debug tools after game init
     if (DEBUG) {
         entityInspector = new EntityInspector(game);
 
-        // Hook into game loop for debug updates
         const originalUpdate = game.update.bind(game);
         game.update = function(dt) {
             originalUpdate(dt);

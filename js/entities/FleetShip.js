@@ -54,6 +54,18 @@ export class FleetShip extends Ship {
         // Mining AI
         this.miningTarget = null;
 
+        // Stance: 'aggressive' auto-engages, 'passive' only attacks on command
+        this.stance = 'aggressive';
+
+        // Hold position flag
+        this.holdPosition = false;
+        this.holdX = 0;
+        this.holdY = 0;
+
+        // Auto-cargo transfer timer
+        this.cargoTransferTimer = 0;
+        this.cargoTransferInterval = 5; // seconds
+
         // Default loadout based on ship role
         this.setupDefaultLoadout(shipConfig);
 
@@ -154,9 +166,9 @@ export class FleetShip extends Ship {
      */
     getAvailableStates() {
         if (this.hasCaptain()) {
-            return ['following', 'orbiting', 'mining', 'attacking', 'defending', 'docked'];
+            return ['following', 'orbiting', 'mining', 'attacking', 'defending', 'holding', 'docked'];
         }
-        return ['following', 'defending'];
+        return ['following', 'defending', 'holding'];
     }
 
     /**
@@ -178,6 +190,13 @@ export class FleetShip extends Ship {
         if (state === 'mining' && target) {
             this.miningTarget = target;
         }
+        if (state === 'holding') {
+            this.holdPosition = true;
+            this.holdX = this.x;
+            this.holdY = this.y;
+        } else {
+            this.holdPosition = false;
+        }
     }
 
     /**
@@ -197,8 +216,10 @@ export class FleetShip extends Ship {
     aiUpdate(dt) {
         if (!this.alive || this.aiState === 'docked') return;
 
-        // Check for threats (always, regardless of state)
-        this.checkThreats();
+        // Check for threats (always, regardless of state) - but only if aggressive stance
+        if (this.stance === 'aggressive') {
+            this.checkThreats();
+        }
 
         switch (this.aiState) {
             case 'following':
@@ -216,6 +237,16 @@ export class FleetShip extends Ship {
             case 'defending':
                 this.aiDefend();
                 break;
+            case 'holding':
+                this.aiHold();
+                break;
+        }
+
+        // Auto-cargo transfer to player when mining cargo is nearly full
+        this.cargoTransferTimer += dt;
+        if (this.cargoTransferTimer >= this.cargoTransferInterval) {
+            this.cargoTransferTimer = 0;
+            this.checkAutoCargoTransfer();
         }
     }
 
@@ -449,6 +480,93 @@ export class FleetShip extends Ship {
     }
 
     /**
+     * Hold position - stay at fixed coordinates and defend if attacked
+     */
+    aiHold() {
+        const dist = wrappedDistance(this.x, this.y, this.holdX, this.holdY, CONFIG.SECTOR_SIZE);
+
+        if (dist > 50) {
+            // Return to hold position
+            const angle = wrappedDirection(this.x, this.y, this.holdX, this.holdY, CONFIG.SECTOR_SIZE);
+            this.desiredRotation = angle;
+            this.desiredSpeed = this.maxSpeed * 0.5;
+        } else {
+            this.desiredSpeed = 0;
+        }
+
+        // Still defend if something attacks us (even in hold)
+        if (this.engagedTarget && this.engagedTarget.alive) {
+            this.target = this.engagedTarget;
+            const eDist = this.distanceTo(this.engagedTarget);
+            if (eDist <= this.attackRange) {
+                this.activateWeapons();
+            }
+        }
+    }
+
+    /**
+     * Auto-transfer cargo when cargo is nearly full.
+     * Sells ore to faction treasury if player is far/docked; transfers to player if nearby.
+     */
+    checkAutoCargoTransfer() {
+        if (this.aiState !== 'mining') return;
+        if (this.cargoUsed < this.cargoCapacity * 0.85) return;
+
+        const player = this.game.player;
+        const CONFIG_REF = this.game.constructor.name === 'Game' ? null : null;
+
+        // Calculate total ore value
+        let totalValue = 0;
+        let totalUnits = 0;
+        for (const [ore, data] of Object.entries(this.cargo)) {
+            if (!data || !data.units) continue;
+            const oreConfig = CONFIG.ASTEROID_TYPES[ore];
+            const pricePerUnit = oreConfig?.value || 10;
+            totalValue += data.units * pricePerUnit;
+            totalUnits += data.units;
+        }
+
+        if (totalUnits === 0) return;
+
+        // Try to transfer to player if nearby
+        if (player?.alive) {
+            const dist = this.distanceTo(player);
+            if (dist <= 1000) {
+                let transferred = 0;
+                for (const [ore, data] of Object.entries(this.cargo)) {
+                    if (!data || !data.units) continue;
+                    const units = data.units;
+                    const vol = data.volume || units;
+                    if (player.cargoUsed + vol <= player.cargoCapacity) {
+                        if (!player.cargo[ore]) player.cargo[ore] = { units: 0, volume: 0 };
+                        player.cargo[ore].units += units;
+                        player.cargo[ore].volume += vol;
+                        player.cargoUsed += vol;
+                        transferred += units;
+                    }
+                }
+                if (transferred > 0) {
+                    this.cargo = {};
+                    this.cargoUsed = 0;
+                    this.game.ui?.showToast(`${this.name} transferred ${transferred} ore`, 'success');
+                    this.game.events.emit('fleet:cargo-transferred', { ship: this, units: transferred });
+                    this.game.events.emit('cargo:updated', { ship: player });
+                    return;
+                }
+            }
+        }
+
+        // Sell ore to faction treasury (remote sale at reduced rate)
+        const saleRate = 0.8; // 80% of market value for remote fleet sales
+        const saleValue = Math.round(totalValue * saleRate);
+        this.game.addFactionTreasury(saleValue);
+        this.cargo = {};
+        this.cargoUsed = 0;
+        this.game.ui?.showToast(`${this.name} sold ${totalUnits} ore to ${this.game.faction?.name || 'faction'} (+${saleValue} ISK)`, 'success');
+        this.game.events.emit('fleet:ore-sold', { ship: this, units: totalUnits, value: saleValue });
+    }
+
+    /**
      * Activate weapon modules
      */
     activateWeapons() {
@@ -457,7 +575,6 @@ export class FleetShip extends Ship {
             const moduleId = this.modules.high[i];
             if (!moduleId) continue;
 
-            const config = this.game.combat ? true : false;
             // Only activate weapons (not mining lasers) for combat
             if (moduleId.includes('laser') && !moduleId.includes('mining')) {
                 if (!this.activeModules.has(slotId) && !this.moduleCooldowns.has(slotId)) {

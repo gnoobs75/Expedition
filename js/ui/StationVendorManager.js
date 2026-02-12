@@ -207,6 +207,9 @@ export class StationVendorManager {
                         ? '<span class="current-label">CURRENT</span>'
                         : `<button class="buy-btn" ${!canAfford ? 'disabled' : ''} data-action="buy-ship" data-ship-id="${shipId}">
                             ${canAfford ? 'BUY' : 'INSUFFICIENT'}
+                          </button>
+                          <button class="buy-fleet-btn" ${this.game.credits < config.price ? 'disabled' : ''} data-action="buy-fleet-ship" data-ship-id="${shipId}" title="Buy for fleet">
+                            +FLEET
                           </button>`
                     }
                 </div>
@@ -238,6 +241,15 @@ export class StationVendorManager {
                 e.stopPropagation();
                 const shipId = btn.dataset.shipId;
                 this.purchaseShip(shipId);
+            });
+        });
+
+        // Wire up "Buy for Fleet" buttons
+        container.querySelectorAll('[data-action="buy-fleet-ship"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const shipId = btn.dataset.shipId;
+                this.purchaseFleetShip(shipId);
             });
         });
 
@@ -761,6 +773,31 @@ export class StationVendorManager {
         this.game.ui?.updateHUD();
 
         // Refresh ships display
+        this.renderShips();
+    }
+
+    purchaseFleetShip(shipId) {
+        const config = SHIP_DATABASE[shipId];
+        if (!config) return;
+
+        if (this.game.credits < config.price) {
+            this.game.ui?.toast('Insufficient funds', 'error');
+            return;
+        }
+
+        // Deduct full price (no trade-in for fleet ships)
+        this.game.credits -= config.price;
+
+        // Add ship to fleet via FleetSystem
+        const fleetShip = this.game.fleetSystem?.addShip(shipId, null);
+        if (fleetShip) {
+            this.game.audio?.play('purchase');
+            this.game.ui?.toast(`${config.name} added to fleet!`, 'success');
+            this.game.ui?.log(`Purchased ${config.name} for fleet - ${formatCredits(config.price)} ISK`, 'system');
+            this.game.events.emit('fleet:ship-purchased', { shipId, ship: fleetShip });
+        }
+
+        this.game.ui?.updateHUD();
         this.renderShips();
     }
 

@@ -28,10 +28,13 @@ import { LogisticsSystem } from '../systems/LogisticsSystem.js';
 import { SkillSystem } from '../systems/SkillSystem.js';
 import { AchievementSystem } from '../systems/AchievementSystem.js';
 import { HazardSystem } from '../systems/HazardSystem.js';
+import { EngagementRecorder } from '../systems/EngagementRecorder.js';
 import { AdminDashboardManager } from '../ui/AdminDashboardManager.js';
 import { EncyclopediaManager } from '../ui/EncyclopediaManager.js';
+import { SkippyManager } from '../ui/SkippyManager.js';
 import { UIManager } from '../ui/UIManager.js';
 import { AudioManager } from './AudioManager.js';
+import { SaveManager } from './SaveManager.js';
 import { EventBus } from './EventBus.js';
 
 export class Game {
@@ -59,6 +62,9 @@ export class Game {
 
         // Fleet state (persists across sectors)
         this.fleet = { ships: [], hiredPilots: [] };
+
+        // Player faction
+        this.faction = { name: 'Unnamed Faction', color: '#00ccff', treasury: 0 };
 
         // Insurance state
         this.insurance = this.loadInsurance();
@@ -91,9 +97,11 @@ export class Game {
         this.achievementSystem = null;
         this.adminDashboard = null;
         this.encyclopedia = null;
+        this.skippy = null;
         this.dialogueManager = null;
         this.playerAggressive = false;
         this.timeScale = 1.0;
+        this.engagementRecorder = null;
 
         // DPS tracking for UI
         this.dpsTracker = {
@@ -113,6 +121,7 @@ export class Game {
 
         this.ui = null;
         this.audio = null;
+        this.saveManager = null;
     }
 
     /**
@@ -161,6 +170,7 @@ export class Game {
         this.skillSystem = new SkillSystem(this);
         this.achievementSystem = new AchievementSystem(this);
         this.hazardSystem = new HazardSystem(this);
+        this.engagementRecorder = new EngagementRecorder(this);
 
         // Create UI manager (last, needs other systems)
         this.ui = new UIManager(this);
@@ -170,6 +180,10 @@ export class Game {
 
         // Create encyclopedia (after UI)
         this.encyclopedia = new EncyclopediaManager(this);
+
+        // Create Skippy AI advisor (after UI)
+        this.skippy = new SkippyManager(this);
+        this.skippy.init();
 
         // Apply skill bonuses to player
         this.skillSystem.applyBonuses();
@@ -187,6 +201,10 @@ export class Game {
             this.player.x = CONFIG.SECTOR_SIZE / 2 + 6000;
             this.player.y = CONFIG.SECTOR_SIZE / 2;
         }
+
+        // Set up save manager
+        this.saveManager = new SaveManager(this);
+        this.saveManager.enableAutoSave(60000);
 
         // Set up event listeners
         this.setupEvents();
@@ -222,6 +240,14 @@ export class Game {
      * Set up game event listeners
      */
     setupEvents() {
+        // Auto-save hooks
+        this.events.on('station:docked', () => {
+            setTimeout(() => this.saveManager?.autoSaveNow(), 500);
+        });
+        this.events.on('sector:change', () => {
+            setTimeout(() => this.saveManager?.autoSaveNow(), 2000);
+        });
+
         // Player death
         this.events.on('player:death', () => this.handlePlayerDeath());
 
@@ -509,6 +535,9 @@ export class Game {
         // Notify hazard system
         this.hazardSystem?.onSectorChange(sectorId);
 
+        // End any active engagement recording on sector change
+        this.engagementRecorder?.forceEnd();
+
         // Cinematic zoom on sector arrival
         this.camera?.sectorArrivalZoom();
 
@@ -597,6 +626,38 @@ export class Game {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Get current stardate from play time
+     * Format: YYYY.DDD.HH  (1 real second = 1 game minute)
+     * Epoch: 3301.001.00
+     */
+    getStardate() {
+        const playSeconds = this.stats?.playTime || 0;
+        const gameMinutes = playSeconds; // 1 real sec = 1 game min
+        const gameHours = gameMinutes / 60;
+        const gameDays = gameHours / 24;
+
+        const epochYear = 3301;
+        const totalDays = Math.floor(gameDays);
+        const yearDays = 365;
+
+        const year = epochYear + Math.floor(totalDays / yearDays);
+        const dayOfYear = (totalDays % yearDays) + 1; // 1-indexed
+        const hour = Math.floor(gameHours % 24);
+
+        const ddd = String(dayOfYear).padStart(3, '0');
+        const hh = String(hour).padStart(2, '0');
+        return `${year}.${ddd}.${hh}`;
+    }
+
+    /**
+     * Add credits to faction treasury (from fleet miners, etc.)
+     */
+    addFactionTreasury(amount) {
+        this.faction.treasury += amount;
+        this.events.emit('faction:treasury-changed', this.faction.treasury);
     }
 
     /**
@@ -757,6 +818,7 @@ export class Game {
         this.collision.update(dt);
         this.achievementSystem.update(dt);
         this.hazardSystem.update(dt);
+        this.engagementRecorder?.update(dt);
 
         // Auto-loot tractor beam
         this.updateTractorBeams(dt);
@@ -775,6 +837,9 @@ export class Game {
 
         // Update camera
         this.camera.update(dt);
+
+        // Update Skippy advisor
+        this.skippy?.update(dt);
 
         // Update UI
         this.ui.update(dt);
@@ -1020,5 +1085,191 @@ export class Game {
             }
         } catch (e) { /* corrupt */ }
         return { ...Game.DEFAULT_STATS, sessionStart: Date.now() };
+    }
+
+    // ==========================================
+    // Save/Load System
+    // ==========================================
+
+    /**
+     * Restore game state from a save data object.
+     * Called after init() completes.
+     */
+    loadFromSave(data) {
+        if (!data) return;
+
+        // 1. Credits
+        if (data.credits !== undefined) {
+            this.credits = data.credits;
+        }
+
+        // 2. Ship class + modules + cargo
+        if (data.shipClass && this.player) {
+            if (data.shipClass !== this.player.shipClass) {
+                this.player.switchShip(data.shipClass);
+            }
+
+            // Restore fitted modules
+            if (data.shipModules) {
+                // Clear first
+                this.player.modules = {
+                    high: new Array(this.player.highSlots).fill(null),
+                    mid: new Array(this.player.midSlots).fill(null),
+                    low: new Array(this.player.lowSlots).fill(null),
+                };
+                this.player.activeModules = new Set();
+
+                // Re-fit saved modules
+                for (const slotType of ['high', 'mid', 'low']) {
+                    const mods = data.shipModules[slotType] || [];
+                    for (let i = 0; i < mods.length; i++) {
+                        if (mods[i]) {
+                            this.player.fitModule(`${slotType}-${i + 1}`, mods[i]);
+                        }
+                    }
+                }
+            }
+
+            // Restore cargo
+            if (data.cargo) {
+                this.player.cargo = { ...data.cargo };
+                // Recalculate cargoUsed
+                let used = 0;
+                for (const key in this.player.cargo) {
+                    used += this.player.cargo[key].volume || 0;
+                }
+                this.player.cargoUsed = used;
+            }
+
+            // Restore trade goods
+            if (data.tradeGoods) {
+                this.player.tradeGoods = { ...data.tradeGoods };
+            }
+
+            // Restore module inventory
+            if (data.moduleInventory) {
+                this.player.moduleInventory = [...data.moduleInventory];
+            }
+
+            // Restore drone bay
+            if (data.droneBay) {
+                this.player.droneBay.drones = (data.droneBay.drones || []).map(d => ({ ...d }));
+                this.player.droneBay.capacity = data.droneBay.capacity || 0;
+                this.player.droneBay.bandwidth = data.droneBay.bandwidth || 0;
+            }
+        }
+
+        // 3. Fleet
+        if (data.fleet) {
+            // Clear current fleet
+            this.fleet = { ships: [], hiredPilots: data.fleet.hiredPilots || [] };
+
+            // Re-add fleet ships
+            for (const shipData of (data.fleet.ships || [])) {
+                const ship = this.fleetSystem?.addShip(
+                    shipData.shipClass,
+                    shipData.pilot
+                );
+                if (ship) {
+                    ship.groupId = shipData.groupId || 0;
+                    ship.stance = shipData.stance || 'aggressive';
+                }
+            }
+
+            // Restore control groups from groupId already set on ships
+            if (this.fleetSystem) {
+                for (const [, group] of this.fleetSystem.controlGroups) {
+                    group.clear();
+                }
+                for (const ship of this.fleet.ships) {
+                    if (ship.groupId > 0) {
+                        const group = this.fleetSystem.controlGroups.get(ship.groupId);
+                        if (group) group.add(ship.fleetId);
+                    }
+                }
+            }
+        }
+
+        // 3b. Faction
+        if (data.faction) {
+            this.faction = { ...data.faction };
+        }
+
+        // 4. Insurance
+        if (data.insurance) {
+            this.insurance = { ...data.insurance };
+        }
+
+        // 5. Power routing
+        if (data.powerRouting) {
+            this.powerRouting = { ...data.powerRouting };
+        }
+
+        // 6. Write subsystem localStorage keys so their load() methods pick them up
+        const lsMap = {
+            'expedition-skills': data.skills,
+            'expedition-achievements': data.achievements,
+            'expedition-guild-state': data.guildState,
+            'expedition-guild-economy': data.guildEconomy,
+            'expedition-commerce-state': data.commerceState,
+            'expedition-discoveries': data.discoveries,
+            'expedition-survey-data': data.surveyData,
+            'expedition-bounties': data.bounties,
+            'expedition-completed-bounties': data.completedBounties,
+            'expedition-ship-log': data.shipLog,
+            'expedition-bookmarks': data.bookmarks,
+            'expedition-skippy': data.skippy,
+            'expedition-aar-reports': data.aarReports,
+        };
+
+        for (const [key, value] of Object.entries(lsMap)) {
+            if (value !== null && value !== undefined) {
+                localStorage.setItem(key, JSON.stringify(value));
+            }
+        }
+
+        // Raw string keys
+        if (data.bountyCounter !== null && data.bountyCounter !== undefined) {
+            localStorage.setItem('expedition-bounty-counter', String(data.bountyCounter));
+        }
+        if (data.bountyRefresh !== null && data.bountyRefresh !== undefined) {
+            localStorage.setItem('expedition-bounty-refresh', String(data.bountyRefresh));
+        }
+
+        // 7. Reload subsystems that read from localStorage
+        if (this.skillSystem) {
+            this.skillSystem.skills = this.skillSystem.load();
+            this.skillSystem.applyBonuses();
+        }
+        if (this.achievementSystem) {
+            this.achievementSystem.unlocked = this.achievementSystem.load();
+        }
+        this.guildSystem?.loadState?.();
+        this.guildEconomySystem?.loadState?.();
+        this.commerceSystem?.loadState?.();
+        this.surveySystem?.loadState?.();
+        if (this.encyclopedia) {
+            this.encyclopedia.discoveries = this.encyclopedia.loadDiscoveries();
+        }
+        this.skippy?.loadState?.();
+        this.engagementRecorder?.loadReports();
+
+        // Bookmarks
+        this.bookmarks = this.loadBookmarks();
+
+        // Insurance
+        this.insurance = data.insurance || this.insurance;
+
+        // 8. Change sector to saved sector
+        if (data.currentSectorId && data.currentSectorId !== this.currentSector?.id) {
+            this.changeSector(data.currentSectorId);
+        }
+
+        // 9. Stats
+        if (data.stats) {
+            this.stats = { ...Game.DEFAULT_STATS, ...data.stats, sessionStart: Date.now() };
+        }
+
+        console.log('Game state restored from save');
     }
 }

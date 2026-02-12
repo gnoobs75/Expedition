@@ -12,6 +12,11 @@ export class ShipMenuManager {
     constructor(game) {
         this.game = game;
 
+        // Live-refresh inventory when cargo changes
+        game.events.on('cargo:updated', () => {
+            if (this.visible) this.updateInventory();
+        });
+
         // DOM elements
         this.modal = null;
         this.statsCanvas = null;

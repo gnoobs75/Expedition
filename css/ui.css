@@ -1527,6 +1527,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 
 /* Power Routing Panel */
 #power-routing {
+    display: none;  /* Hidden - power routing still works internally */
     position: absolute;
     bottom: 100px;
     left: 50%;
@@ -5645,6 +5646,7 @@ select:focus-visible {
    ============================================= */
 
 #fleet-panel {
+    position: absolute;
     width: 400px;
     max-height: 450px;
 }
@@ -8212,6 +8214,7 @@ select:focus-visible {
    Statistics Panel
    ============================================= */
 #stats-panel {
+    position: absolute;
     width: 260px;
 }
 
@@ -8418,6 +8421,7 @@ select:focus-visible {
    Achievements Panel
    ============================================= */
 #achievements-panel {
+    position: absolute;
     width: 300px;
     max-height: 500px;
 }
@@ -8508,6 +8512,7 @@ select:focus-visible {
    Ship Log Panel
    ============================================= */
 #ship-log-panel {
+    position: absolute;
     width: 320px;
     max-height: 400px;
 }
@@ -8583,6 +8588,7 @@ select:focus-visible {
    Combat Log Panel
    ============================================= */
 #combat-log-panel {
+    position: absolute;
     width: 360px;
     max-height: 480px;
 }
@@ -10841,6 +10847,7 @@ select:focus-visible {
    ======================================== */
 
 #skippy-panel {
+    position: absolute;
     width: 220px;
     z-index: 100;
 }

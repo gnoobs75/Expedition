@@ -94,7 +94,17 @@ class ShipMeshFactory {
 
         // Add universal details (running lights, panel greebles)
         this.addRunningLights(group, sizeConfig, rng, palette);
+        this.addLightHalos(group, sizeConfig, palette);
         this.addPanelGreebles(group, sizeConfig, rng, palette, role);
+
+        // Enhanced visual detail layers
+        this.addArmorPlates(group, sizeConfig, rng, palette);
+        this.addHullTrim(group, sizeConfig, palette, role);
+        this.addHullRibbing(group, sizeConfig, rng, palette);
+        this.addWindowRows(group, sizeConfig, rng, palette);
+        this.addAntennaArrays(group, sizeConfig, rng, palette);
+        this.addPowerConduits(group, sizeConfig, rng, palette);
+        this.addDockingClamps(group, sizeConfig, rng, palette);
 
         return group;
     }
@@ -1494,6 +1504,31 @@ class ShipMeshFactory {
             halo.position.set(pos.x - trailLen * 0.2, pos.y, 0.005);
             halo.renderOrder = 0;
             group.add(halo);
+
+            // Inner vane structure (cross-shaped engine internals)
+            const vaneMat = new THREE.MeshBasicMaterial({
+                color: ec.housing, transparent: true, opacity: 0.35,
+            });
+            for (let v = 0; v < 4; v++) {
+                const angle = (v / 4) * Math.PI;
+                const vaneLen = nacSize * 0.55;
+                const vaneGeo = new THREE.PlaneGeometry(vaneLen, nacSize * 0.04);
+                const vane = new THREE.Mesh(vaneGeo, vaneMat);
+                vane.position.set(pos.x, pos.y, 0.028);
+                vane.rotation.z = angle;
+                vane.renderOrder = 2;
+                group.add(vane);
+            }
+
+            // Heat distortion ring (subtle outer shimmer)
+            const heatGeo = new THREE.RingGeometry(nacSize * 1.05, nacSize * 1.15, 16);
+            const heatMat = new THREE.MeshBasicMaterial({
+                color: ec.boost, transparent: true, opacity: 0.08 + speedFactor * 0.04,
+            });
+            const heat = new THREE.Mesh(heatGeo, heatMat);
+            heat.position.set(pos.x, pos.y, 0.015);
+            heat.renderOrder = 1;
+            group.add(heat);
         }
     }
 
@@ -1587,6 +1622,27 @@ class ShipMeshFactory {
         dot.position.set(x, y, 0.075);
         dot.renderOrder = 6;
         group.add(dot);
+
+        // Canopy reflection highlight (elongated ellipse offset for specular look)
+        const reflGeo = new THREE.PlaneGeometry(size * 0.9, size * 0.3);
+        const reflMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff, transparent: true, opacity: 0.12,
+        });
+        const refl = new THREE.Mesh(reflGeo, reflMat);
+        refl.position.set(x + size * 0.15, y - size * 0.2, 0.078);
+        refl.rotation.z = -0.3;
+        refl.renderOrder = 7;
+        group.add(refl);
+
+        // Instrument panel glow (dim colored bar below center)
+        const instrGeo = new THREE.PlaneGeometry(size * 0.6, size * 0.12);
+        const instrMat = new THREE.MeshBasicMaterial({
+            color: cc.glow, transparent: true, opacity: 0.25,
+        });
+        const instr = new THREE.Mesh(instrGeo, instrMat);
+        instr.position.set(x - size * 0.1, y, 0.072);
+        instr.renderOrder = 6;
+        group.add(instr);
     }
 
     /**
@@ -2328,6 +2384,330 @@ class ShipMeshFactory {
                     break;
                 }
             }
+        }
+    }
+
+    // =============================================
+    // ENHANCED VISUAL DETAIL COMPONENTS
+    // =============================================
+
+    /**
+     * Add illuminated window rows along the hull.
+     * Scales with ship size - frigates get a few, capitals get dense rows.
+     */
+    addWindowRows(group, sizeConfig, rng, palette) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const complexity = sizeConfig.complexity || 1;
+
+        // Window count scales with ship size
+        const rowCount = Math.floor(complexity * 1.5) + 1;
+        const windowColor = 0xaaddff;
+        const windowMat = new THREE.MeshBasicMaterial({
+            color: windowColor, transparent: true, opacity: 0.55,
+        });
+        const frameMat = new THREE.MeshBasicMaterial({
+            color: palette.dark, transparent: true, opacity: 0.4,
+        });
+
+        for (let row = 0; row < rowCount; row++) {
+            const yBand = (row / rowCount - 0.5) * s * 0.55 * a;
+            const windowsInRow = Math.floor(3 + complexity * 2 + rng() * 3);
+            const startX = -s * 0.3 + rng() * s * 0.05;
+            const endX = s * 0.2 + rng() * s * 0.1;
+            const span = endX - startX;
+
+            for (let w = 0; w < windowsInRow; w++) {
+                const t = w / windowsInRow;
+                const wx = startX + t * span;
+                const wy = yBand + (rng() - 0.5) * s * 0.03;
+                const ww = s * (0.012 + rng() * 0.008);
+                const wh = s * (0.006 + rng() * 0.004);
+
+                // Window frame (dark border)
+                const fGeo = new THREE.PlaneGeometry(ww * 1.4, wh * 1.6);
+                const frame = new THREE.Mesh(fGeo, frameMat);
+                frame.position.set(wx, wy, 0.045);
+                frame.renderOrder = 3;
+                group.add(frame);
+
+                // Lit window
+                const wGeo = new THREE.PlaneGeometry(ww, wh);
+                const win = new THREE.Mesh(wGeo, windowMat);
+                win.position.set(wx, wy, 0.048);
+                win.renderOrder = 4;
+                group.add(win);
+            }
+        }
+    }
+
+    /**
+     * Add hull armor plate overlays with subtle color variation.
+     * Creates a layered, armored look.
+     */
+    addArmorPlates(group, sizeConfig, rng, palette) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const complexity = sizeConfig.complexity || 1;
+        const plateCount = Math.floor(2 + complexity * 2);
+
+        for (let i = 0; i < plateCount; i++) {
+            const px = (rng() - 0.3) * s * 0.7;
+            const py = (rng() - 0.5) * s * 0.6 * a;
+            const pw = s * (0.1 + rng() * 0.15);
+            const ph = s * (0.05 + rng() * 0.08) * a;
+
+            // Plate - slightly lighter/darker than hull
+            const shade = rng() > 0.5 ? palette.secondary : palette.dark;
+            const plateGeo = new THREE.PlaneGeometry(pw, ph);
+            const plateMat = new THREE.MeshBasicMaterial({
+                color: shade, transparent: true, opacity: 0.15 + rng() * 0.1,
+            });
+            const plate = new THREE.Mesh(plateGeo, plateMat);
+            plate.position.set(px, py, 0.015);
+            plate.rotation.z = (rng() - 0.5) * 0.1;
+            plate.renderOrder = 1;
+            group.add(plate);
+
+            // Plate edge highlight (top edge)
+            const edgeGeo = new THREE.PlaneGeometry(pw, ph * 0.06);
+            const edgeMat = new THREE.MeshBasicMaterial({
+                color: palette.trim, transparent: true, opacity: 0.15,
+            });
+            const edge = new THREE.Mesh(edgeGeo, edgeMat);
+            edge.position.set(px, py + ph * 0.47, 0.018);
+            edge.rotation.z = plate.rotation.z;
+            edge.renderOrder = 1;
+            group.add(edge);
+        }
+    }
+
+    /**
+     * Add antenna/mast arrays extending from hull.
+     * Line geometry - virtually free performance cost.
+     */
+    addAntennaArrays(group, sizeConfig, rng, palette) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const complexity = sizeConfig.complexity || 1;
+        const antennaCount = Math.floor(1 + complexity);
+
+        const antennaMat = new THREE.LineBasicMaterial({
+            color: palette.trim, transparent: true, opacity: 0.5,
+        });
+        const tipMat = new THREE.MeshBasicMaterial({
+            color: palette.glow, transparent: true, opacity: 0.6,
+        });
+
+        for (let i = 0; i < antennaCount; i++) {
+            const ax = (rng() - 0.2) * s * 0.5;
+            const side = i % 2 === 0 ? 1 : -1;
+            const ay = side * s * (0.35 + rng() * 0.15) * a;
+            const length = s * (0.08 + rng() * 0.06);
+
+            // Antenna mast line
+            const pts = [
+                new THREE.Vector3(ax, ay, 0.06),
+                new THREE.Vector3(ax + (rng() - 0.5) * s * 0.02, ay + side * length, 0.06),
+            ];
+            const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+            const line = new THREE.Line(lineGeo, antennaMat);
+            line.renderOrder = 5;
+            group.add(line);
+
+            // Antenna tip light
+            const tipGeo = new THREE.CircleGeometry(s * 0.006, 4);
+            const tip = new THREE.Mesh(tipGeo, tipMat);
+            tip.position.copy(pts[1]);
+            tip.renderOrder = 6;
+            group.add(tip);
+        }
+    }
+
+    /**
+     * Add glow halos around running lights for bloom-like effect.
+     */
+    addLightHalos(group, sizeConfig, palette) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const haloSize = Math.max(3, s * 0.05);
+
+        // Port halo (red)
+        const portHaloGeo = new THREE.CircleGeometry(haloSize, 8);
+        const portHaloMat = new THREE.MeshBasicMaterial({
+            color: 0xff2200, transparent: true, opacity: 0.12,
+        });
+        const portHalo = new THREE.Mesh(portHaloGeo, portHaloMat);
+        portHalo.position.set(-s * 0.1, s * 0.45 * a, 0.065);
+        portHalo.renderOrder = 5;
+        group.add(portHalo);
+
+        // Starboard halo (green)
+        const stbdHaloGeo = new THREE.CircleGeometry(haloSize, 8);
+        const stbdHaloMat = new THREE.MeshBasicMaterial({
+            color: 0x00ff22, transparent: true, opacity: 0.12,
+        });
+        const stbdHalo = new THREE.Mesh(stbdHaloGeo, stbdHaloMat);
+        stbdHalo.position.set(-s * 0.1, -s * 0.45 * a, 0.065);
+        stbdHalo.renderOrder = 5;
+        group.add(stbdHalo);
+
+        // Forward strobe halo
+        const fwdHaloGeo = new THREE.CircleGeometry(haloSize * 0.8, 8);
+        const fwdHaloMat = new THREE.MeshBasicMaterial({
+            color: palette.glow, transparent: true, opacity: 0.1,
+        });
+        const fwdHalo = new THREE.Mesh(fwdHaloGeo, fwdHaloMat);
+        fwdHalo.position.set(s * 0.5, 0, 0.065);
+        fwdHalo.renderOrder = 5;
+        group.add(fwdHalo);
+    }
+
+    /**
+     * Add hull edge trim - bright accent lines along the hull perimeter.
+     * Uses the hull shape to trace an accent edge line.
+     */
+    addHullTrim(group, sizeConfig, palette, role) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+
+        // Simple perimeter accent - two lateral trim strips
+        const trimMat = new THREE.MeshBasicMaterial({
+            color: palette.accent, transparent: true, opacity: 0.2,
+        });
+
+        // Port trim
+        const portTrimGeo = new THREE.PlaneGeometry(s * 0.9, s * 0.015);
+        const portTrim = new THREE.Mesh(portTrimGeo, trimMat);
+        portTrim.position.set(-s * 0.05, s * 0.38 * a, 0.042);
+        portTrim.renderOrder = 3;
+        group.add(portTrim);
+
+        // Starboard trim
+        const stbdTrim = new THREE.Mesh(portTrimGeo.clone(), trimMat);
+        stbdTrim.position.set(-s * 0.05, -s * 0.38 * a, 0.042);
+        stbdTrim.renderOrder = 3;
+        group.add(stbdTrim);
+
+        // Forward accent mark
+        const fwdGeo = new THREE.PlaneGeometry(s * 0.03, s * 0.3 * a);
+        const fwdTrim = new THREE.Mesh(fwdGeo, trimMat);
+        fwdTrim.position.set(s * 0.35, 0, 0.042);
+        fwdTrim.renderOrder = 3;
+        group.add(fwdTrim);
+    }
+
+    /**
+     * Add structural hull ribbing for larger ships.
+     * Capitals get dense ribbing, frigates get minimal.
+     */
+    addHullRibbing(group, sizeConfig, rng, palette) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const complexity = sizeConfig.complexity || 1;
+        // Only add ribbing for destroyer+ ships
+        if (complexity < 1.5) return;
+
+        const ribCount = Math.floor(complexity * 2);
+        const ribMat = new THREE.MeshBasicMaterial({
+            color: palette.dark, transparent: true, opacity: 0.2,
+        });
+
+        for (let i = 0; i < ribCount; i++) {
+            const t = (i + 1) / (ribCount + 1);
+            const xPos = s * (0.3 - t * 0.8);
+            const ribHeight = s * (0.6 + (1 - Math.abs(t - 0.5) * 2) * 0.3) * a;
+            const ribGeo = new THREE.PlaneGeometry(s * 0.008, ribHeight);
+            const rib = new THREE.Mesh(ribGeo, ribMat);
+            rib.position.set(xPos, 0, 0.02);
+            rib.renderOrder = 1;
+            group.add(rib);
+        }
+    }
+
+    /**
+     * Add power conduit network lines along the hull.
+     * Visual energy distribution lines with junction nodes.
+     */
+    addPowerConduits(group, sizeConfig, rng, palette) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const complexity = sizeConfig.complexity || 1;
+        const pc = SUBSYSTEM_COLORS.power;
+
+        const conduitCount = Math.floor(1 + complexity);
+        const lineMat = new THREE.LineBasicMaterial({
+            color: pc.conduit, transparent: true, opacity: 0.25,
+        });
+        const nodeMat = new THREE.MeshBasicMaterial({
+            color: pc.pulse, transparent: true, opacity: 0.3,
+        });
+
+        for (let i = 0; i < conduitCount; i++) {
+            // Main conduit run from stern to bow
+            const yOffset = (rng() - 0.5) * s * 0.3 * a;
+            const segments = 3 + Math.floor(rng() * 3);
+            const pts = [];
+            for (let j = 0; j <= segments; j++) {
+                const t = j / segments;
+                pts.push(new THREE.Vector3(
+                    -s * 0.4 + t * s * 0.7,
+                    yOffset + (rng() - 0.5) * s * 0.04,
+                    0.038
+                ));
+            }
+            const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+            const line = new THREE.Line(lineGeo, lineMat);
+            line.renderOrder = 3;
+            group.add(line);
+
+            // Junction nodes along the conduit
+            for (let j = 1; j < pts.length - 1; j++) {
+                if (rng() > 0.5) continue;
+                const nodeGeo = new THREE.CircleGeometry(s * 0.008, 4);
+                const node = new THREE.Mesh(nodeGeo, nodeMat);
+                node.position.copy(pts[j]);
+                node.position.z = 0.04;
+                node.renderOrder = 3;
+                group.add(node);
+            }
+        }
+    }
+
+    /**
+     * Add docking clamp indicators on larger ships.
+     */
+    addDockingClamps(group, sizeConfig, rng, palette) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        if (sizeConfig.complexity < 2) return; // Cruiser+ only
+
+        const clampCount = Math.floor(sizeConfig.complexity - 1);
+        const clampMat = new THREE.MeshBasicMaterial({
+            color: palette.secondary, transparent: true, opacity: 0.3,
+        });
+        const lightMat = new THREE.MeshBasicMaterial({
+            color: 0x44ff88, transparent: true, opacity: 0.5,
+        });
+
+        for (let i = 0; i < clampCount; i++) {
+            const side = i % 2 === 0 ? 1 : -1;
+            const cx = -s * (0.15 + i * 0.08);
+            const cy = side * s * 0.42 * a;
+
+            // Clamp bracket (U-shape via two small rectangles)
+            const bracketGeo = new THREE.PlaneGeometry(s * 0.04, s * 0.02);
+            const bracket = new THREE.Mesh(bracketGeo, clampMat);
+            bracket.position.set(cx, cy, 0.04);
+            bracket.renderOrder = 3;
+            group.add(bracket);
+
+            // Docking status light
+            const dLightGeo = new THREE.CircleGeometry(s * 0.006, 4);
+            const dLight = new THREE.Mesh(dLightGeo, lightMat);
+            dLight.position.set(cx, cy + side * s * 0.015, 0.045);
+            dLight.renderOrder = 4;
+            group.add(dLight);
         }
     }
 

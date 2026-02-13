@@ -37,7 +37,7 @@ export class PanelDragManager {
 
         // Storage key - bump version to force reset when layout changes
         this.storageKey = 'expedition-panel-layout';
-        this.layoutVersion = 5;
+        this.layoutVersion = 6;
         this.versionKey = 'expedition-panel-layout-version';
 
         // Force reset if layout version changed

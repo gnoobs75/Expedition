@@ -98,6 +98,7 @@ export class AISystem {
 
     /**
      * Find the best target for an enemy (player or NPC)
+     * Uses focus fire: prefer targets already being attacked by allies
      */
     findBestTarget(enemy, player, distToPlayer) {
         // If already chasing an NPC target from raid, keep it
@@ -107,47 +108,53 @@ export class AISystem {
 
         // Check if player is in aggro range
         if (player && player.alive && distToPlayer < enemy.aggroRange && Math.random() < enemy.aggression) {
+            // Focus fire: check if allies are already attacking the player
             return player;
         }
 
         // Look for nearby NPCs and non-pirate guild ships to attack
         const entities = this.game.currentSector?.entities || [];
-        let closestMiner = null;
-        let closestMinerDist = enemy.aggroRange;
-        let closestNPC = null;
-        let closestNPCDist = enemy.aggroRange;
+        const candidates = [];
 
         for (const e of entities) {
-            if (!e.alive) continue;
+            if (!e.alive || e === enemy) continue;
 
-            // Target NPC miners and security
-            if (e.type === 'npc') {
-                const d = enemy.distanceTo(e);
-                if (e.role === 'miner' && d < closestMinerDist) {
-                    closestMiner = e;
-                    closestMinerDist = d;
-                }
-                if (e.role === 'security' && d < closestNPCDist) {
-                    closestNPC = e;
-                    closestNPCDist = d;
-                }
+            const d = enemy.distanceTo(e);
+            if (d > enemy.aggroRange) continue;
+
+            // Valid hostile targets
+            if (e.type === 'npc' && (e.role === 'miner' || e.role === 'security')) {
+                const priority = e.role === 'miner' ? 2 : 1;
+                candidates.push({ target: e, dist: d, priority });
             }
-
-            // Also target non-pirate guild ships (miners/haulers preferred)
             if (e.type === 'guild' && !e.isPirate) {
-                const d = enemy.distanceTo(e);
-                if ((e.role === 'miner' || e.role === 'hauler') && d < closestMinerDist) {
-                    closestMiner = e;
-                    closestMinerDist = d;
-                } else if (e.role === 'ratter' && d < closestNPCDist) {
-                    closestNPC = e;
-                    closestNPCDist = d;
-                }
+                const priority = (e.role === 'miner' || e.role === 'hauler') ? 2 : 1;
+                candidates.push({ target: e, dist: d, priority });
             }
         }
 
-        // Prefer miners/haulers, fall back to security/ratters
-        return closestMiner || closestNPC;
+        if (candidates.length === 0) return null;
+
+        // Focus fire: score targets higher if allies are already attacking them
+        const enemies = this.game.currentSector?.getEnemies() || [];
+        for (const c of candidates) {
+            let allyCount = 0;
+            for (const ally of enemies) {
+                if (ally !== enemy && ally.alive && ally.aiTarget === c.target) {
+                    allyCount++;
+                }
+            }
+            // Boost priority for targets already engaged by allies (focus fire)
+            c.focusScore = c.priority + allyCount * 3;
+            // Prefer lower HP targets
+            const hpPct = (c.target.shield + c.target.armor + c.target.hull) /
+                (c.target.maxShield + c.target.maxArmor + c.target.maxHull);
+            c.focusScore += (1 - hpPct) * 2;
+        }
+
+        // Sort by focus score descending, then distance ascending
+        candidates.sort((a, b) => b.focusScore - a.focusScore || a.dist - b.dist);
+        return candidates[0].target;
     }
 
     /**
@@ -242,6 +249,7 @@ export class AISystem {
 
     /**
      * Handle attack state
+     * Supports two behaviors: close orbit (brawlers) and kiting (long-range ships)
      */
     handleAttackState(enemy, player, distToPlayer) {
         const target = enemy.aiTarget;
@@ -276,15 +284,47 @@ export class AISystem {
         // Activate tackle modules
         activateTackleModules(enemy);
 
-        // Orbit the target
-        const orbitAngle = Math.atan2(enemy.y - target.y, enemy.x - target.x);
-        const orbitDist = enemy.attackRange * 0.7;
+        // Determine combat style: kite if attack range is long and enemy is faster than target
+        const isKiter = enemy.attackRange > 800 && enemy.maxSpeed >= (target.maxSpeed || 0) * 0.8;
 
-        const targetX = target.x + Math.cos(orbitAngle + 0.1) * orbitDist;
-        const targetY = target.y + Math.sin(orbitAngle + 0.1) * orbitDist;
+        if (isKiter) {
+            // Kiting: maintain distance at ~70-90% of attack range
+            const idealDist = enemy.attackRange * 0.8;
+            const angleFromTarget = Math.atan2(enemy.y - target.y, enemy.x - target.x);
 
-        enemy.setDestination(targetX, targetY);
-        enemy.desiredSpeed = enemy.maxSpeed * 0.5;
+            if (distToTarget < idealDist * 0.6) {
+                // Too close - pull away
+                enemy.setDestination(
+                    enemy.x + Math.cos(angleFromTarget) * idealDist,
+                    enemy.y + Math.sin(angleFromTarget) * idealDist
+                );
+                enemy.desiredSpeed = enemy.maxSpeed;
+            } else if (distToTarget > idealDist * 1.1) {
+                // Too far - close in slightly
+                enemy.setDestination(
+                    target.x + Math.cos(angleFromTarget) * idealDist,
+                    target.y + Math.sin(angleFromTarget) * idealDist
+                );
+                enemy.desiredSpeed = enemy.maxSpeed * 0.7;
+            } else {
+                // Good range - orbit at distance
+                const orbitAngle = angleFromTarget + 0.08;
+                enemy.setDestination(
+                    target.x + Math.cos(orbitAngle) * idealDist,
+                    target.y + Math.sin(orbitAngle) * idealDist
+                );
+                enemy.desiredSpeed = enemy.maxSpeed * 0.6;
+            }
+        } else {
+            // Close orbit (brawler behavior)
+            const orbitAngle = Math.atan2(enemy.y - target.y, enemy.x - target.x);
+            const orbitDist = enemy.attackRange * 0.7;
+            enemy.setDestination(
+                target.x + Math.cos(orbitAngle + 0.1) * orbitDist,
+                target.y + Math.sin(orbitAngle + 0.1) * orbitDist
+            );
+            enemy.desiredSpeed = enemy.maxSpeed * 0.5;
+        }
 
         // Activate weapons if not already
         if (!enemy.activeModules.has('high-1')) {

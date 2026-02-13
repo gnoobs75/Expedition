@@ -104,6 +104,7 @@ export class CollisionSystem {
                 break;
 
             case 'station':
+            case 'player-station':
                 // Check for docking
                 this.handleStationCollision(player, entity);
                 break;
@@ -125,7 +126,7 @@ export class CollisionSystem {
         if (relVel > 50) {
             // Take bump damage
             const damage = relVel * 0.1;
-            player.takeDamage(damage, asteroid);
+            player.takeDamage(damage, asteroid, 'kinetic');
 
             // Push apart
             this.pushApart(player, asteroid);
@@ -146,8 +147,8 @@ export class CollisionSystem {
         if (relVel > 30) {
             // Both take ram damage
             const damage = relVel * 0.2;
-            player.takeDamage(damage, enemy);
-            enemy.takeDamage(damage, player);
+            player.takeDamage(damage, enemy, 'kinetic');
+            enemy.takeDamage(damage, player, 'kinetic');
 
             // Push apart
             this.pushApart(player, enemy);

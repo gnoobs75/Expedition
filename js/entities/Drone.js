@@ -349,7 +349,7 @@ export class Drone extends Entity {
         if (dist > this.attackRange) return;
 
         // Deal damage
-        this.game.combat?.fireAt(this, this.target, this.damage, this.attackRange);
+        this.game.combat?.fireAt(this, this.target, this.damage, this.attackRange, { damageType: 'thermal' });
     }
 
     /**

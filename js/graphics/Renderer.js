@@ -968,7 +968,7 @@ export class Renderer {
             this._stationParticleTimer = 0;
             const entities = this.game.currentSector?.entities || [];
             for (const e of entities) {
-                if (e.type === 'station' && e.alive && e.visible) {
+                if ((e.type === 'station' || e.type === 'player-station') && e.alive && e.visible) {
                     if (Math.random() < 0.4) {
                         const angle = Math.random() * Math.PI * 2;
                         const dist = e.radius * (0.5 + Math.random() * 0.5);
@@ -1457,7 +1457,7 @@ export class Renderer {
             const entities = this.game.currentSector?.entities || [];
             let nearStation = null;
             for (const e of entities) {
-                if (e.type === 'station' && e.alive) {
+                if ((e.type === 'station' || e.type === 'player-station') && e.alive) {
                     const dx = player.x - e.x;
                     const dy = player.y - e.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);

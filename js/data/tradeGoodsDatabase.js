@@ -518,8 +518,63 @@ export const TRADE_CATEGORIES = {
 };
 
 /**
+ * Dynamic market state - tracks supply levels that shift prices.
+ * Supply > 0 means oversupply (prices drop), supply < 0 means shortage (prices rise).
+ * Supply decays toward 0 over time.
+ */
+const _marketState = {};
+
+/**
+ * Get the supply modifier for a good at a station.
+ * Returns a multiplier (e.g., 0.85 means 15% cheaper, 1.2 means 20% more expensive).
+ */
+function getSupplyModifier(goodId, sectorId) {
+    const key = `${sectorId}:${goodId}`;
+    const supply = _marketState[key] || 0;
+    // Each unit of supply shifts price by ~2%, clamped to +-40%
+    return Math.max(0.6, Math.min(1.4, 1 - supply * 0.02));
+}
+
+/**
+ * Record a trade that shifts supply. Called when player buys or sells.
+ * buying = true means player bought (station supply decreased)
+ * buying = false means player sold (station supply increased)
+ */
+export function recordTrade(goodId, sectorId, quantity, buying) {
+    const key = `${sectorId}:${goodId}`;
+    if (!_marketState[key]) _marketState[key] = 0;
+    // Buying removes supply (prices rise), selling adds supply (prices drop)
+    _marketState[key] += buying ? -quantity : quantity;
+    // Clamp to prevent extreme swings
+    _marketState[key] = Math.max(-20, Math.min(20, _marketState[key]));
+}
+
+/**
+ * Decay all market supply levels toward 0 (call periodically, e.g. every 30s)
+ */
+export function decayMarketState() {
+    for (const key of Object.keys(_marketState)) {
+        if (Math.abs(_marketState[key]) < 0.1) {
+            delete _marketState[key];
+        } else {
+            _marketState[key] *= 0.92; // 8% decay per tick
+        }
+    }
+}
+
+/**
+ * Get/set raw market state for save/load
+ */
+export function getMarketState() { return { ..._marketState }; }
+export function loadMarketState(data) {
+    for (const key of Object.keys(_marketState)) delete _marketState[key];
+    if (data) Object.assign(_marketState, data);
+}
+
+/**
  * Get buy/sell prices for a trade good at a specific station
  * Stations sell produced goods cheap and buy consumed goods at premium
+ * Prices shift based on dynamic supply/demand from player trading
  */
 export function getStationPrice(goodId, sectorId) {
     const good = TRADE_GOODS[goodId];
@@ -541,6 +596,11 @@ export function getStationPrice(goodId, sectorId) {
         buyMultiplier = 1.4;   // More expensive to buy here (high demand)
         sellMultiplier = 1.2;  // Player gets premium for bringing what they need
     }
+
+    // Apply dynamic supply/demand modifier
+    const supplyMod = getSupplyModifier(goodId, sectorId);
+    buyMultiplier *= supplyMod;
+    sellMultiplier *= supplyMod;
 
     return {
         buy: Math.floor(good.basePrice * buyMultiplier),

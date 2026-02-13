@@ -3,7 +3,7 @@
 // Station tab for trade goods market + transport quests
 // =============================================
 
-import { TRADE_GOODS, TRADE_CATEGORIES, STATION_SPECIALTIES, getStationPrice, getBestTradeRoute } from '../data/tradeGoodsDatabase.js';
+import { TRADE_GOODS, TRADE_CATEGORIES, STATION_SPECIALTIES, getStationPrice, getBestTradeRoute, recordTrade } from '../data/tradeGoodsDatabase.js';
 import { COMMERCE_RANKS } from '../systems/CommerceSystem.js';
 import { formatCredits } from '../utils/math.js';
 
@@ -369,6 +369,9 @@ export class CommercePanelManager {
 
         player.addTradeGood(goodId, quantity, good.volume);
 
+        // Shift market supply (player buying = station supply decreases)
+        recordTrade(goodId, station.sectorId || this.game.currentSector?.id, quantity, true);
+
         this.game.ui?.log(`Bought ${quantity} ${good.name} for ${formatCredits(result.cost)} ISK`, 'system');
         this.game.ui?.toast(`Bought ${good.name}`, 'success');
         this.game.audio?.play('click');
@@ -393,6 +396,9 @@ export class CommercePanelManager {
 
         player.removeTradeGood(goodId, quantity);
         const result = station.sellTradeGood(goodId, quantity);
+
+        // Shift market supply (player selling = station supply increases)
+        recordTrade(goodId, station.sectorId || this.game.currentSector?.id, quantity, false);
 
         // Notify commerce system for quest tracking
         this.game.commerceSystem?.onTradeGoodSold(goodId, quantity, station.sectorId);

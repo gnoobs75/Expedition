@@ -48,7 +48,7 @@ export class CombatSystem {
         }
 
         // Calculate hit chance
-        const hitChance = this.calculateHitChance(source, target, range);
+        const hitChance = this.calculateHitChance(source, target, range, moduleConfig);
         const hits = Math.random() < hitChance;
 
         const isMissile = moduleConfig?.category === 'missile';
@@ -128,14 +128,15 @@ export class CombatSystem {
                     finalDamage *= 0.5 + (this.game.powerRouting.weapons / 100) * 1.5;
                 }
 
-                // Apply damage
-                target.takeDamage(finalDamage, source);
+                // Apply damage (with damage type from weapon config)
+                const dmgType = moduleConfig?.damageType || 'em';
+                target.takeDamage(finalDamage, source, dmgType);
 
                 // Emit hit event for combat log
                 const weaponName = moduleConfig?.name || (isMissile ? 'Missile' : 'Laser');
                 this.game.events.emit('combat:action', {
                     type: 'hit',
-                    source, target, damage: finalDamage, damageType,
+                    source, target, damage: finalDamage, damageType, weaponDamageType: dmgType,
                     weapon: weaponName, hitChance,
                 });
 
@@ -376,9 +377,15 @@ export class CombatSystem {
         const dist = source.distanceTo(target);
         if (dist > range) return 0;
 
-        // Range modifier: 1.0 at close range, drops to 0.3 at max range
-        const rangeFraction = dist / range;
-        const rangeModifier = 1 - rangeFraction * 0.7;
+        // Optimal + falloff range modifier (EVE-style)
+        // Within optimal: no range penalty. Beyond optimal: exponential drop per falloff distance
+        const optimal = weaponConfig?.optimalRange || (range * 0.6);
+        const falloff = weaponConfig?.falloff || (range * 0.25);
+        let rangeModifier = 1.0;
+        if (dist > optimal && falloff > 0) {
+            const overshoot = (dist - optimal) / falloff;
+            rangeModifier = Math.pow(0.5, overshoot * overshoot);
+        }
 
         // Get weapon tracking speed (higher = better at hitting fast targets)
         let weaponTracking = 1.0;

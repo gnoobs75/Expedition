@@ -88,6 +88,31 @@ const TRANSPORT_QUEST_TEMPLATES = [
         dialogueOffer: "Only our most trusted merchants get these contracts. {amount} units of {good} from {source}. The payout is enormous, but so is the risk. Pirates love targeting fat cargo holds.",
         dialogueComplete: "A hundred units delivered without a scratch. You're building an empire, trader. The Guild is proud to have you.",
     },
+    // Tier 5: Endgame Expedition Contracts (MAGNATE)
+    {
+        tier: 5,
+        minRank: 'MAGNATE',
+        titlePattern: 'Expedition: {good} Supply Chain',
+        descPattern: 'Establish a supply chain: deliver {amount} units of {good} from {source}, then return with a cargo of {returnGood} from the destination. Double payout.',
+        amountRange: [80, 150],
+        rewardMultiplier: 3.5,
+        repReward: 600,
+        isExpedition: true,
+        dialogueOffer: "This is an expedition-class contract. {amount} units of {good} from {source}, but that's only half the job. On arrival, you'll pick up {returnGood} for the return leg. Double the risk, double the payout. Only Trade Magnates need apply.",
+        dialogueComplete: "A full round-trip expedition completed flawlessly. The Commerce Guild's highest honor goes to those who move mountains of cargo across hostile space. Legendary work, Magnate.",
+    },
+    {
+        tier: 5,
+        minRank: 'MAGNATE',
+        titlePattern: 'Fleet Logistics: {good}',
+        descPattern: 'Organize fleet-scale transport of {amount} units of {good} from {source}. Requires substantial cargo capacity.',
+        amountRange: [120, 200],
+        rewardMultiplier: 4.0,
+        repReward: 800,
+        isExpedition: true,
+        dialogueOffer: "Fleet-scale logistics operation. {amount} units of {good} - you'll likely need your fleet haulers for this one. {source} has the cargo ready. This is the kind of contract that builds empires.",
+        dialogueComplete: "Fleet logistics at its finest. That volume of cargo moved safely through contested space... the Commerce Guild will sing your praises across every station in the sector.",
+    },
 ];
 
 export class CommerceSystem {
@@ -223,7 +248,7 @@ export class CommerceSystem {
                 // Skip if already active
                 if (this.activeQuests.find(q => q.goodId === goodId && q.destSector === sectorId)) continue;
 
-                quests.push({
+                const quest = {
                     id: questId,
                     guild: 'commerce',
                     title: template.titlePattern
@@ -254,7 +279,31 @@ export class CommerceSystem {
                             .replace('{source}', sourceName),
                         complete: template.dialogueComplete,
                     },
-                });
+                };
+
+                // Expedition contracts: add return leg with a different good
+                if (template.isExpedition) {
+                    quest.isExpedition = true;
+                    const sourceSpec = STATION_SPECIALTIES[sourceStation];
+                    const returnGoods = sourceSpec?.produces?.filter(g => g !== goodId) || [];
+                    if (returnGoods.length > 0) {
+                        const returnGoodId = returnGoods[Math.floor(Math.random() * returnGoods.length)];
+                        const returnGood = TRADE_GOODS[returnGoodId];
+                        if (returnGood) {
+                            quest.returnGoodId = returnGoodId;
+                            quest.returnGoodName = returnGood.name;
+                            quest.returnAmount = Math.floor(amount * 0.6);
+                            quest.returnDestSector = sectorId;
+                            quest.description = quest.description
+                                .replace('{returnGood}', returnGood.name);
+                            quest.dialogue.offer = quest.dialogue.offer
+                                .replace('{returnGood}', returnGood.name);
+                            quest.rewards.credits = Math.floor(guildBonus * 1.5);
+                        }
+                    }
+                }
+
+                quests.push(quest);
 
                 // Only 1 quest per good per station
                 break;
@@ -394,11 +443,31 @@ export class CommerceSystem {
         const completed = [];
 
         for (const quest of this.activeQuests) {
+            // Check return leg of expedition contracts
+            if (quest.isExpedition && quest.returnPhase &&
+                quest.returnGoodId === goodId && quest.returnDestSector === sectorId) {
+                quest.progress.returnDelivered = Math.min(
+                    (quest.progress.returnDelivered || 0) + quantity, quest.returnAmount);
+                if (quest.progress.returnDelivered >= quest.returnAmount) {
+                    completed.push(quest);
+                }
+                continue;
+            }
+
+            // Normal delivery
             if (quest.goodId === goodId && quest.destSector === sectorId) {
                 quest.progress.delivered = Math.min(quest.progress.delivered + quantity, quest.amount);
 
                 if (quest.progress.delivered >= quest.amount) {
-                    completed.push(quest);
+                    // Expedition contracts: transition to return phase
+                    if (quest.isExpedition && quest.returnGoodId && !quest.returnPhase) {
+                        quest.returnPhase = true;
+                        quest.progress.returnDelivered = 0;
+                        this.game.ui?.toast(`Outbound delivery complete! Pick up ${quest.returnAmount} ${quest.returnGoodName} for the return leg.`, 'success');
+                        this.game.ui?.log(`Expedition outbound leg complete. Return: ${quest.returnAmount} ${quest.returnGoodName} to ${quest.destName}`, 'system');
+                    } else {
+                        completed.push(quest);
+                    }
                 }
             }
         }

@@ -75,7 +75,7 @@ export class PlayerStationDefenseSystem {
         if (!target || !target.alive) return;
 
         // Deal damage
-        target.takeDamage(turret.damage, station);
+        target.takeDamage(turret.damage, station, 'em');
         turret.cooldown = turret.cycleTime;
 
         // Visual effect -- laser beam from station to target

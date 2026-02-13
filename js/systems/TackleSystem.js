@@ -30,7 +30,7 @@ export class TackleSystem {
             player.webSpeedFactor = 1.0;
         }
         for (const e of entities) {
-            if (!e.alive || e.type === 'asteroid' || e.type === 'station' || e.type === 'planet' || e.type === 'gate') continue;
+            if (!e.alive || e.type === 'asteroid' || e.type === 'station' || e.type === 'player-station' || e.type === 'planet' || e.type === 'gate') continue;
             e.isPointed = false;
             e.isWebbed = false;
             e.isNosed = false;

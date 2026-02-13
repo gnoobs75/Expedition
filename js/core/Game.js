@@ -44,6 +44,7 @@ import { UIManager } from '../ui/UIManager.js';
 import { AudioManager } from './AudioManager.js';
 import { SaveManager } from './SaveManager.js';
 import { EventBus } from './EventBus.js';
+import { decayMarketState, getMarketState, loadMarketState } from '../data/tradeGoodsDatabase.js';
 
 export class Game {
     constructor() {
@@ -856,52 +857,74 @@ export class Game {
     };
 
     /**
+     * Safely update a system, catching errors to prevent game loop death
+     */
+    _safeUpdate(system, name, dt) {
+        try {
+            system.update(dt);
+        } catch (e) {
+            if (!this._errorCounts) this._errorCounts = {};
+            this._errorCounts[name] = (this._errorCounts[name] || 0) + 1;
+            if (this._errorCounts[name] <= 3) {
+                console.error(`[${name}] update error (${this._errorCounts[name]}/3):`, e);
+            }
+        }
+    }
+
+    /**
      * Update game state
      */
     update(dt) {
         this._lastDt = dt;
 
         // Update autopilot FIRST (sets desiredSpeed/desiredRotation)
-        this.autopilot.update(dt);
+        this._safeUpdate(this.autopilot, 'Autopilot', dt);
 
         // Update player (uses desiredSpeed/desiredRotation)
         if (this.player && this.player.alive) {
-            this.player.update(dt);
+            try { this.player.update(dt); } catch (e) { console.error('[Player] update error:', e); }
         }
 
         // Update current sector entities
         if (this.currentSector) {
-            this.currentSector.update(dt);
+            try { this.currentSector.update(dt); } catch (e) { console.error('[Sector] update error:', e); }
         }
 
         // Update game systems
-        this.ai.update(dt);
-        this.npcSystem.update(dt);
-        this.fleetSystem.update(dt);
-        this.guildEconomySystem.update(dt);
-        this.combat.update(dt);
-        this.tackleSystem.update(dt);
-        this.surveySystem.update(dt);
-        this.logisticsSystem.update(dt);
-        this.mining.update(dt);
-        this.collision.update(dt);
-        this.achievementSystem.update(dt);
-        this.hazardSystem.update(dt);
-        this.engagementRecorder?.update(dt);
-        this.manufacturingSystem?.update(dt);
-        this.anomalySystem?.update(dt);
-        this.sectorEventSystem?.update(dt);
-        this.bountySystem?.update(dt);
-        this.intelSystem?.update(dt);
-        this.posDefenseSystem?.update(dt);
+        this._safeUpdate(this.ai, 'AI', dt);
+        this._safeUpdate(this.npcSystem, 'NPC', dt);
+        this._safeUpdate(this.fleetSystem, 'Fleet', dt);
+        this._safeUpdate(this.guildEconomySystem, 'GuildEconomy', dt);
+        this._safeUpdate(this.combat, 'Combat', dt);
+        this._safeUpdate(this.tackleSystem, 'Tackle', dt);
+        this._safeUpdate(this.surveySystem, 'Survey', dt);
+        this._safeUpdate(this.logisticsSystem, 'Logistics', dt);
+        this._safeUpdate(this.mining, 'Mining', dt);
+        this._safeUpdate(this.collision, 'Collision', dt);
+        this._safeUpdate(this.achievementSystem, 'Achievement', dt);
+        this._safeUpdate(this.hazardSystem, 'Hazard', dt);
+        if (this.engagementRecorder) this._safeUpdate(this.engagementRecorder, 'Engagement', dt);
+        if (this.manufacturingSystem) this._safeUpdate(this.manufacturingSystem, 'Manufacturing', dt);
+        if (this.anomalySystem) this._safeUpdate(this.anomalySystem, 'Anomaly', dt);
+        if (this.sectorEventSystem) this._safeUpdate(this.sectorEventSystem, 'SectorEvent', dt);
+        if (this.bountySystem) this._safeUpdate(this.bountySystem, 'Bounty', dt);
+        if (this.intelSystem) this._safeUpdate(this.intelSystem, 'Intel', dt);
+        if (this.posDefenseSystem) this._safeUpdate(this.posDefenseSystem, 'POSDefense', dt);
 
         // Auto-loot tractor beam
-        this.updateTractorBeams(dt);
+        try { this.updateTractorBeams(dt); } catch (e) { console.error('[TractorBeam] error:', e); }
 
         // Update engine hum volume based on player speed
         if (this.player && this.audio?.engineHumGain) {
             const speedFrac = this.player.currentSpeed / (this.player.maxSpeed || 1);
             this.audio.updateEngineHum(speedFrac);
+        }
+
+        // Market supply/demand decay (every 30s game time)
+        this._marketDecayTimer = (this._marketDecayTimer || 0) + dt;
+        if (this._marketDecayTimer >= 30) {
+            this._marketDecayTimer = 0;
+            decayMarketState();
         }
 
         // DPS tracking
@@ -911,13 +934,13 @@ export class Game {
         this.updateMusicMode();
 
         // Update camera
-        this.camera.update(dt);
+        this._safeUpdate(this.camera, 'Camera', dt);
 
         // Update Skippy advisor
-        this.skippy?.update(dt);
+        if (this.skippy) this._safeUpdate(this.skippy, 'Skippy', dt);
 
         // Update UI
-        this.ui.update(dt);
+        this._safeUpdate(this.ui, 'UI', dt);
     }
 
     /**
@@ -1386,6 +1409,18 @@ export class Game {
             this.stats = { ...Game.DEFAULT_STATS, ...data.stats, sessionStart: Date.now() };
         }
 
+        // 10. Market state
+        if (data.marketState) {
+            loadMarketState(data.marketState);
+        }
+
         console.log('Game state restored from save');
+    }
+
+    /**
+     * Get market state for saving
+     */
+    getMarketState() {
+        return getMarketState();
     }
 }

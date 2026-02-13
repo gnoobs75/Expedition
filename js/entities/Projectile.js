@@ -68,7 +68,7 @@ export class Projectile extends Entity {
      */
     hit() {
         if (this.target && this.target.alive) {
-            this.target.takeDamage(this.damage, this.source);
+            this.target.takeDamage(this.damage, this.source, this.damageType || 'em');
         }
         this.destroy();
     }

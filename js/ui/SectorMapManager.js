@@ -573,6 +573,7 @@ export class SectorMapManager {
                 this.drawPlanet(ctx, entity, sx, sy, scale, isSelected);
                 break;
             case 'station':
+            case 'player-station':
                 this.drawStation(ctx, entity, sx, sy, scale, isSelected, isHovered, pulse);
                 break;
             case 'gate':
@@ -621,7 +622,7 @@ export class SectorMapManager {
         }
 
         // Label for important entities
-        const showLabel = entity.type === 'station' || entity.type === 'gate' || entity.type === 'warpgate' ||
+        const showLabel = entity.type === 'station' || entity.type === 'player-station' || entity.type === 'gate' || entity.type === 'warpgate' ||
             isHovered || isSelected || isLocked ||
             (entity.type === 'enemy' && this.localZoom > 0.8);
 
@@ -960,8 +961,8 @@ export class SectorMapManager {
             if (entity.oreRemaining !== undefined) {
                 lines.push(`Remaining: ${entity.oreRemaining} units`);
             }
-        } else if (entity.type === 'station') {
-            lines.push('Station');
+        } else if (entity.type === 'station' || entity.type === 'player-station') {
+            lines.push(entity.type === 'player-station' ? 'Player Station' : 'Station');
             if (entity.specialty) lines.push(`Specialty: ${entity.specialty}`);
         } else if (entity.type === 'gate' || entity.type === 'warpgate') {
             const dest = entity.destinationName || entity.destinationSectorId || 'unknown';

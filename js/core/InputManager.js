@@ -346,7 +346,7 @@ export class InputManager {
                 const player = this.game.player;
                 const entities = this.game.currentSector?.entities || [];
                 for (const entity of entities) {
-                    if (entity.alive && entity.type === 'station' && player?.distanceTo(entity) < 300) {
+                    if (entity.alive && (entity.type === 'station' || entity.type === 'player-station') && player?.distanceTo(entity) < 300) {
                         this.game.dockAtStation(entity);
                         return;
                     }

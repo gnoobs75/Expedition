@@ -34,6 +34,15 @@ export class Ship extends Entity {
         this.armor = this.maxArmor;
         this.hull = this.maxHull;
 
+        // Damage resistances (fraction reduced: 0 = no resist, 0.5 = 50% resist)
+        // Shields: strong vs explosive/kinetic, weak vs EM
+        // Armor: strong vs EM/thermal, weak vs explosive
+        this.resistances = options.resistances || {
+            shield:  { em: 0.0,  thermal: 0.2, kinetic: 0.4, explosive: 0.5  },
+            armor:   { em: 0.5,  thermal: 0.35, kinetic: 0.25, explosive: 0.1 },
+            hull:    { em: 0.0,  thermal: 0.0, kinetic: 0.0, explosive: 0.0  },
+        };
+
         // Capacitor (energy)
         this.maxCapacitor = options.capacitor || 100;
         this.capacitorRegen = options.capacitorRegen || 5;
@@ -791,7 +800,7 @@ export class Ship extends Entity {
     /**
      * Take damage
      */
-    takeDamage(amount, source) {
+    takeDamage(amount, source, damageType = 'em') {
         this._lastDamageTime = performance.now();
         this.lastDamageSource = source;
 
@@ -808,25 +817,28 @@ export class Ship extends Entity {
 
         // Damage shield first
         if (this.shield > 0) {
-            const effectiveDmg = remaining * shieldResist;
+            const typeResist = this.resistances?.shield?.[damageType] || 0;
+            const effectiveDmg = remaining * shieldResist * (1 - typeResist);
             const shieldDamage = Math.min(this.shield, effectiveDmg);
             this.shield -= shieldDamage;
-            remaining -= shieldDamage / shieldResist;
+            remaining -= shieldDamage / (shieldResist * (1 - typeResist));
             this.addEffect('shield-hit', 0.2);
         }
 
         // Then armor
         if (remaining > 0 && this.armor > 0) {
-            const effectiveDmg = remaining * armorResist;
+            const typeResist = this.resistances?.armor?.[damageType] || 0;
+            const effectiveDmg = remaining * armorResist * (1 - typeResist);
             const armorDamage = Math.min(this.armor, effectiveDmg);
             this.armor -= armorDamage;
-            remaining -= armorDamage / armorResist;
+            remaining -= armorDamage / (armorResist * (1 - typeResist));
             this.addEffect('armor-hit', 0.2);
         }
 
         // Finally hull
         if (remaining > 0) {
-            this.hull -= remaining;
+            const typeResist = this.resistances?.hull?.[damageType] || 0;
+            this.hull -= remaining * (1 - typeResist);
             this.addEffect('hull-hit', 0.3);
 
             if (this.hull <= 0) {
@@ -834,7 +846,7 @@ export class Ship extends Entity {
             }
         }
 
-        this.game.events.emit('combat:hit', { target: this, damage: amount, source });
+        this.game.events.emit('combat:hit', { target: this, damage: amount, damageType, source });
     }
 
     /**

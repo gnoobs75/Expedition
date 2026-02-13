@@ -13,6 +13,24 @@ export const SKILL_DEFINITIONS = {
             { stat: 'warpSpeedBonus', value: 0.08, label: '+8% warp speed' },
             { stat: 'maxSpeedBonus', value: 0.04, label: '+4% max speed' },
         ],
+        specializations: {
+            warpExpert: {
+                name: 'Warp Expert',
+                description: 'Master of FTL travel',
+                perLevel: [
+                    { stat: 'warpSpeedBonus', value: 0.12, label: '+12% warp speed' },
+                    { stat: 'warpSpoolBonus', value: 0.10, label: '-10% spool time' },
+                ],
+            },
+            speedDemon: {
+                name: 'Speed Demon',
+                description: 'Unmatched sublight velocity',
+                perLevel: [
+                    { stat: 'maxSpeedBonus', value: 0.08, label: '+8% max speed' },
+                    { stat: 'accelerationBonus', value: 0.10, label: '+10% acceleration' },
+                ],
+            },
+        },
     },
     gunnery: {
         name: 'Gunnery',
@@ -23,6 +41,24 @@ export const SKILL_DEFINITIONS = {
             { stat: 'damageBonus', value: 0.06, label: '+6% damage' },
             { stat: 'trackingBonus', value: 0.05, label: '+5% tracking' },
         ],
+        specializations: {
+            sniper: {
+                name: 'Sniper',
+                description: 'Precision strikes at extreme range',
+                perLevel: [
+                    { stat: 'damageBonus', value: 0.04, label: '+4% damage' },
+                    { stat: 'rangeBonus', value: 0.10, label: '+10% weapon range' },
+                ],
+            },
+            brawler: {
+                name: 'Brawler',
+                description: 'Devastating close-range firepower',
+                perLevel: [
+                    { stat: 'damageBonus', value: 0.10, label: '+10% damage' },
+                    { stat: 'trackingBonus', value: 0.08, label: '+8% tracking' },
+                ],
+            },
+        },
     },
     mining: {
         name: 'Mining',
@@ -32,6 +68,24 @@ export const SKILL_DEFINITIONS = {
         perLevel: [
             { stat: 'miningYieldBonus', value: 0.10, label: '+10% yield' },
         ],
+        specializations: {
+            stripMiner: {
+                name: 'Strip Miner',
+                description: 'Maximum extraction rate',
+                perLevel: [
+                    { stat: 'miningYieldBonus', value: 0.15, label: '+15% yield' },
+                    { stat: 'miningSpeedBonus', value: 0.10, label: '+10% cycle speed' },
+                ],
+            },
+            deepCore: {
+                name: 'Deep Core',
+                description: 'Specialist in rare ores',
+                perLevel: [
+                    { stat: 'miningYieldBonus', value: 0.08, label: '+8% yield' },
+                    { stat: 'refineryBonus', value: 0.12, label: '+12% refinery output' },
+                ],
+            },
+        },
     },
     engineering: {
         name: 'Engineering',
@@ -42,6 +96,24 @@ export const SKILL_DEFINITIONS = {
             { stat: 'shieldBonus', value: 0.05, label: '+5% shield HP' },
             { stat: 'capacitorBonus', value: 0.06, label: '+6% capacitor' },
         ],
+        specializations: {
+            shieldSpec: {
+                name: 'Shield Specialist',
+                description: 'Advanced shield technology',
+                perLevel: [
+                    { stat: 'shieldBonus', value: 0.08, label: '+8% shield HP' },
+                    { stat: 'shieldResistBonus', value: 0.05, label: '+5% shield resist' },
+                ],
+            },
+            armorSpec: {
+                name: 'Armor Specialist',
+                description: 'Reinforced hull plating expert',
+                perLevel: [
+                    { stat: 'armorBonus', value: 0.08, label: '+8% armor HP' },
+                    { stat: 'armorResistBonus', value: 0.05, label: '+5% armor resist' },
+                ],
+            },
+        },
     },
     trade: {
         name: 'Trade',
@@ -52,6 +124,24 @@ export const SKILL_DEFINITIONS = {
             { stat: 'priceBonus', value: 0.04, label: '+4% trade margin' },
             { stat: 'cargoBonus', value: 0.05, label: '+5% cargo space' },
         ],
+        specializations: {
+            tycoon: {
+                name: 'Tycoon',
+                description: 'Market domination through better deals',
+                perLevel: [
+                    { stat: 'priceBonus', value: 0.08, label: '+8% trade margin' },
+                    { stat: 'taxReduction', value: 0.06, label: '-6% station tax' },
+                ],
+            },
+            smuggler: {
+                name: 'Smuggler',
+                description: 'Haul more, move faster',
+                perLevel: [
+                    { stat: 'cargoBonus', value: 0.12, label: '+12% cargo space' },
+                    { stat: 'maxSpeedBonus', value: 0.03, label: '+3% speed with cargo' },
+                ],
+            },
+        },
     },
 };
 
@@ -153,21 +243,80 @@ export class SkillSystem {
             this.game.renderer?.effects?.spawnEffect('level-up', p.x, p.y);
         }
 
+        // At level 3, prompt specialization choice if not already chosen
+        if (newLevel === 3 && def.specializations && !this.skills[skillId].spec) {
+            this.promptSpecialization(skillId);
+        }
+
+        this.save();
+        this.applyBonuses();
+    }
+
+    /**
+     * Prompt the player to choose a specialization at level 3
+     */
+    promptSpecialization(skillId) {
+        const def = SKILL_DEFINITIONS[skillId];
+        if (!def?.specializations) return;
+
+        this._pendingSpec = skillId;
+        this.game.events.emit('skill:specChoice', {
+            skillId,
+            skillName: def.name,
+            options: Object.entries(def.specializations).map(([key, spec]) => ({
+                key,
+                name: spec.name,
+                description: spec.description,
+                bonuses: spec.perLevel.map(p => p.label).join(', '),
+            })),
+        });
+    }
+
+    /**
+     * Apply chosen specialization
+     */
+    chooseSpecialization(skillId, specKey) {
+        const def = SKILL_DEFINITIONS[skillId];
+        if (!def?.specializations?.[specKey]) return;
+        if (!this.skills[skillId]) return;
+
+        this.skills[skillId].spec = specKey;
+        this._pendingSpec = null;
+
+        const spec = def.specializations[specKey];
+        this.game.ui?.showToast(`${def.name}: ${spec.name} specialization chosen!`, 'level-up');
+        this.game.ui?.log(`Specialized in ${spec.name}!`, 'system');
+        this.game.audio?.play('quest-complete');
+
         this.save();
         this.applyBonuses();
     }
 
     /**
      * Get the multiplier for a given stat bonus
+     * Base perLevel bonuses apply for levels 1-5
+     * Specialization bonuses apply for levels 3-5 (up to 3 extra levels)
      */
     getBonus(statName) {
         let total = 0;
         for (const [skillId, skill] of Object.entries(this.skills)) {
             const def = SKILL_DEFINITIONS[skillId];
             if (!def) continue;
+
+            // Base bonuses (all levels)
             for (const perk of def.perLevel) {
                 if (perk.stat === statName) {
                     total += perk.value * skill.level;
+                }
+            }
+
+            // Specialization bonuses (levels 3-5 only)
+            if (skill.spec && skill.level >= 3 && def.specializations?.[skill.spec]) {
+                const specLevels = skill.level - 2; // 1 at lvl3, 2 at lvl4, 3 at lvl5
+                for (const perk of def.specializations[skill.spec].perLevel) {
+                    if (perk.stat === statName) {
+                        total += perk.value * specLevels;
+                    }
                 }
             }
         }
@@ -188,11 +337,20 @@ export class SkillSystem {
             tracking: this.getBonus('trackingBonus'),
             maxSpeed: this.getBonus('maxSpeedBonus'),
             warpSpeed: this.getBonus('warpSpeedBonus'),
+            warpSpool: this.getBonus('warpSpoolBonus'),
+            acceleration: this.getBonus('accelerationBonus'),
             miningYield: this.getBonus('miningYieldBonus'),
+            miningSpeed: this.getBonus('miningSpeedBonus'),
+            refinery: this.getBonus('refineryBonus'),
             shield: this.getBonus('shieldBonus'),
+            shieldResist: this.getBonus('shieldResistBonus'),
+            armor: this.getBonus('armorBonus'),
+            armorResist: this.getBonus('armorResistBonus'),
             capacitor: this.getBonus('capacitorBonus'),
             price: this.getBonus('priceBonus'),
             cargo: this.getBonus('cargoBonus'),
+            range: this.getBonus('rangeBonus'),
+            taxReduction: this.getBonus('taxReduction'),
         };
     }
 
@@ -210,6 +368,9 @@ export class SkillSystem {
         const progress = skill.level >= MAX_LEVEL ? 1 :
             (currentXP - currentLevelXP) / (nextLevelXP - currentLevelXP);
 
+        const specKey = skill.spec;
+        const specDef = specKey && def.specializations?.[specKey];
+
         return {
             ...def,
             id: skillId,
@@ -218,6 +379,10 @@ export class SkillSystem {
             nextXP: nextLevelXP,
             progress: Math.min(1, Math.max(0, progress)),
             maxed: skill.level >= MAX_LEVEL,
+            spec: specKey || null,
+            specName: specDef?.name || null,
+            specDescription: specDef?.description || null,
+            canSpecialize: skill.level >= 3 && !specKey && !!def.specializations,
         };
     }
 

@@ -164,7 +164,7 @@ export class LogisticsSystem {
             // Only repair friendly ships
             if (entity.hostility === 'hostile') continue;
             if (entity.type === 'enemy') continue;
-            if (entity.type === 'asteroid' || entity.type === 'station' ||
+            if (entity.type === 'asteroid' || entity.type === 'station' || entity.type === 'player-station' ||
                 entity.type === 'gate' || entity.type === 'warpgate' || entity.type === 'planet') continue;
 
             // Check if damaged

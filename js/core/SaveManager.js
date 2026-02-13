@@ -286,6 +286,9 @@ export class SaveManager {
 
             // Player-owned stations
             playerStations: (game.playerStations || []).map(pos => pos.serialize()),
+
+            // Dynamic market state
+            marketState: game.getMarketState ? game.getMarketState() : null,
         };
 
         return data;

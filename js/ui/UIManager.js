@@ -2052,7 +2052,7 @@ export class UIManager {
         for (const entity of entities) {
             if (!entity.alive) continue;
             const dist = player.distanceTo(entity);
-            if (entity.type === 'station' && dist < 300) {
+            if ((entity.type === 'station' || entity.type === 'player-station') && dist < 300) {
                 nearStation = entity;
             }
             if (entity.type === 'gate' && entity.destinationSectorId && dist < 100) {
@@ -2463,7 +2463,7 @@ export class UIManager {
      */
     assessThreat(entity, player) {
         // Non-combat entities
-        if (!entity.maxHull || entity.type === 'asteroid' || entity.type === 'station' ||
+        if (!entity.maxHull || entity.type === 'asteroid' || entity.type === 'station' || entity.type === 'player-station' ||
             entity.type === 'gate' || entity.type === 'planet' || entity.type === 'wreck' ||
             entity.type === 'loot' || entity.type === 'drone') {
             return { level: 0, cls: 'threat-none', label: '' };
@@ -3944,6 +3944,23 @@ export class UIManager {
                 bonusText += `<span class="skill-bonus-line">${perk.label.replace(/\+\d+%/, `+${totalVal}%`)}</span>`;
             }
 
+            // Specialization bonuses (levels 3+)
+            let specHtml = '';
+            if (s.specName) {
+                specHtml = `<div class="skill-spec-badge" style="color:${s.color}">${s.specName}</div>`;
+            } else if (s.canSpecialize) {
+                const specEntries = Object.entries(s.specializations || {});
+                specHtml = `<div class="skill-spec-choose">`;
+                specHtml += `<div class="skill-spec-prompt">Choose Specialization:</div>`;
+                for (const [key, spec] of specEntries) {
+                    specHtml += `<button class="skill-spec-btn" data-skill="${s.id}" data-spec="${key}" style="border-color:${s.color}">`;
+                    specHtml += `<strong>${spec.name}</strong><br><small>${spec.description}</small>`;
+                    specHtml += `<br><em>${spec.perLevel.map(p => p.label).join(', ')}</em>`;
+                    specHtml += `</button>`;
+                }
+                specHtml += `</div>`;
+            }
+
             html += `<div class="skill-card" style="border-left: 3px solid ${s.color}">`;
             html += `<div class="skill-card-top">`;
             html += `<span class="skill-icon" style="color:${s.color}">${s.icon}</span>`;
@@ -3960,11 +3977,22 @@ export class UIManager {
             html += `<span class="skill-xp-text">${s.maxed ? 'MAX' : `${s.xp.toLocaleString()} / ${s.nextXP.toLocaleString()} XP`}</span>`;
             html += `<span class="skill-bonuses">${bonusText}</span>`;
             html += `</div>`;
+            html += specHtml;
             html += `</div>`;
         }
 
+        // Add click handlers for spec buttons after render
         html += `</div>`;
         container.innerHTML = html;
+
+        container.querySelectorAll('.skill-spec-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const skillId = btn.dataset.skill;
+                const specKey = btn.dataset.spec;
+                skillSystem.chooseSpecialization(skillId, specKey);
+                this.updateSkillsTab();
+            });
+        });
     }
 
     /**
@@ -5055,7 +5083,7 @@ export class UIManager {
         }
 
         // Station services (if station)
-        if (entity.type === 'station') {
+        if (entity.type === 'station' || entity.type === 'player-station') {
             html += `
                 <div class="viewer-section">
                     <div class="viewer-section-title">Station Services</div>
@@ -6064,6 +6092,7 @@ export class UIManager {
                     size = 2.5;
                     break;
                 case 'station':
+                case 'player-station':
                     color = '#ffffff';
                     size = 4;
                     break;
@@ -6122,7 +6151,7 @@ export class UIManager {
             // Draw blip - distinct shapes by type
             ctx.fillStyle = color;
             const isHostile = entity.hostility === 'hostile' || entity.type === 'enemy' || (entity.type === 'guild' && entity.isPirate);
-            if (entity.type === 'station') {
+            if (entity.type === 'station' || entity.type === 'player-station') {
                 // Diamond for stations
                 ctx.beginPath();
                 ctx.moveTo(sx, sy - size);
@@ -6442,7 +6471,7 @@ export class UIManager {
 
             // Determine hostility class
             let hClass = 'neutral';
-            if (entity.type === 'station' || entity.type === 'gate') hClass = 'structure';
+            if (entity.type === 'station' || entity.type === 'player-station' || entity.type === 'gate') hClass = 'structure';
             else if (entity.hostility === 'hostile' || entity.type === 'enemy') hClass = 'hostile';
             else if (entity.hostility === 'friendly' || entity.type === 'fleet') hClass = 'friendly';
 

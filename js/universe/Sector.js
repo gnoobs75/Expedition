@@ -433,7 +433,7 @@ export class Sector {
      * Get station in this sector
      */
     getStation() {
-        return this.entities.find(e => e.type === 'station');
+        return this.entities.find(e => e.type === 'station' || e.type === 'player-station');
     }
 
     /**

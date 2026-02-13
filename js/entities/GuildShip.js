@@ -811,7 +811,7 @@ export class GuildShip extends Ship {
                 if (!entity.alive || entity === this) continue;
                 if (entity.hostility === 'hostile' || entity.type === 'enemy') continue;
                 if (entity.type === 'asteroid' || entity.type === 'station' ||
-                    entity.type === 'warpgate' || entity.type === 'planet') continue;
+                    entity.type === 'gate' || entity.type === 'warpgate' || entity.type === 'planet') continue;
 
                 const hpPercent = (entity.shield + entity.armor + entity.hull) /
                     (entity.maxShield + entity.maxArmor + entity.maxHull);

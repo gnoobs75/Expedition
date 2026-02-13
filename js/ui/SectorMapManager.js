@@ -575,6 +575,7 @@ export class SectorMapManager {
             case 'station':
                 this.drawStation(ctx, entity, sx, sy, scale, isSelected, isHovered, pulse);
                 break;
+            case 'gate':
             case 'warpgate':
                 this.drawWarpGate(ctx, entity, sx, sy, scale, isSelected, isHovered, pulse);
                 break;
@@ -620,7 +621,7 @@ export class SectorMapManager {
         }
 
         // Label for important entities
-        const showLabel = entity.type === 'station' || entity.type === 'warpgate' ||
+        const showLabel = entity.type === 'station' || entity.type === 'gate' || entity.type === 'warpgate' ||
             isHovered || isSelected || isLocked ||
             (entity.type === 'enemy' && this.localZoom > 0.8);
 
@@ -752,7 +753,7 @@ export class SectorMapManager {
         ctx.stroke();
 
         // Destination label
-        const dest = entity.targetSector || entity.destination || '';
+        const dest = entity.destinationSectorId || '';
         const destSector = UNIVERSE_LAYOUT.sectors.find(s => s.id === dest);
         ctx.fillStyle = '#66aaff';
         ctx.font = '9px monospace';
@@ -962,8 +963,8 @@ export class SectorMapManager {
         } else if (entity.type === 'station') {
             lines.push('Station');
             if (entity.specialty) lines.push(`Specialty: ${entity.specialty}`);
-        } else if (entity.type === 'warpgate') {
-            const dest = entity.targetSector || entity.destination || 'unknown';
+        } else if (entity.type === 'gate' || entity.type === 'warpgate') {
+            const dest = entity.destinationName || entity.destinationSectorId || 'unknown';
             lines.push(`Gate \u2192 ${dest}`);
         } else if (entity.type === 'enemy' || entity.type === 'npc' || entity.type === 'guild' || entity.type === 'fleet') {
             if (entity.role) lines.push(`Role: ${entity.role}`);

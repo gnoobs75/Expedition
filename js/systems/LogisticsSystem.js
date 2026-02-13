@@ -165,7 +165,7 @@ export class LogisticsSystem {
             if (entity.hostility === 'hostile') continue;
             if (entity.type === 'enemy') continue;
             if (entity.type === 'asteroid' || entity.type === 'station' ||
-                entity.type === 'warpgate' || entity.type === 'planet') continue;
+                entity.type === 'gate' || entity.type === 'warpgate' || entity.type === 'planet') continue;
 
             // Check if damaged
             const hpPercent = (entity.shield + entity.armor + entity.hull) /

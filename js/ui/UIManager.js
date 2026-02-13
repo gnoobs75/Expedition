@@ -30,6 +30,10 @@ import { ManufacturingPanelManager } from './ManufacturingPanelManager.js';
 import { FittingTemplateManager } from './FittingTemplateManager.js';
 import { HackingMinigame } from './HackingMinigame.js';
 import { BountyBoardManager } from './BountyBoardManager.js';
+import { MinimapRenderer } from './MinimapRenderer.js';
+import { CombatLogManager } from './CombatLogManager.js';
+import { DScanManager } from './DScanManager.js';
+import { StationUIController } from './StationUIController.js';
 
 export class UIManager {
     constructor(game) {
@@ -107,6 +111,18 @@ export class UIManager {
         // Bounty board manager (station tab)
         this.bountyBoardManager = new BountyBoardManager(game);
 
+        // Minimap renderer
+        this.minimapRenderer = new MinimapRenderer(this.game, this);
+
+        // Combat log manager
+        this.combatLogManager = new CombatLogManager(this.game, this);
+
+        // D-Scan manager
+        this.dscanManager = new DScanManager(this.game, this);
+
+        // Station UI controller
+        this.stationUIController = new StationUIController(this.game, this);
+
         // Ship indicator 3D viewer state
         this.shipViewerScene = null;
         this.shipViewerCamera = null;
@@ -150,16 +166,6 @@ export class UIManager {
         this.maxShipLogEntries = 100;
         this.shipLogFilter = 'all';
 
-        // Combat log (session-only detailed combat events)
-        this.combatLog = [];
-        this.maxCombatLogEntries = 200;
-        this.combatLogFilter = 'all';
-        this.combatLogStats = {
-            totalDealt: 0, totalTaken: 0,
-            hits: 0, misses: 0,
-            kills: 0, deaths: 0,
-        };
-
         // Bounty board state
         this.activeBounties = this.loadBounties();   // {id, targetName, targetShipClass, factionName, reward, sectorHint, status, acceptedAt, expiresAt}
         this.completedBountyIds = new Set(JSON.parse(localStorage.getItem('expedition-completed-bounties') || '[]'));
@@ -179,19 +185,6 @@ export class UIManager {
         // Kill streak tracking
         this.killStreak = 0;
         this.killStreakTimer = null;
-
-        // D-Scan state for cone visualization
-        this.dscanAngle = 60;
-        this.dscanRange = 10000;
-
-        // Minimap scan pulse state
-        this.scanPulse = null; // { startTime, duration, range, results }
-
-        // Station ambient particles
-        this.stationAmbientCanvas = document.getElementById('station-ambient-canvas');
-        this.stationAmbientCtx = null;
-        this.stationAmbientParticles = [];
-        this.stationAmbientRAF = null;
 
         // Tactical overlay state
         this.tacticalEnabled = false;
@@ -448,8 +441,8 @@ export class UIManager {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('[data-clog]').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                this.combatLogFilter = btn.dataset.clog;
-                this.renderCombatLog();
+                this.combatLogManager.combatLogFilter = btn.dataset.clog;
+                this.combatLogManager.render();
             });
         });
 
@@ -666,21 +659,21 @@ export class UIManager {
 
         // D-Scan range/angle sliders with value display
         document.getElementById('dscan-range')?.addEventListener('input', (e) => {
-            this.dscanRange = parseInt(e.target.value);
+            this.dscanManager.dscanRange = parseInt(e.target.value);
             const valEl = document.getElementById('dscan-range-val');
-            if (valEl) valEl.textContent = formatDistance(this.dscanRange);
+            if (valEl) valEl.textContent = formatDistance(this.dscanManager.dscanRange);
         });
 
         document.getElementById('dscan-angle')?.addEventListener('input', (e) => {
-            this.dscanAngle = parseInt(e.target.value);
+            this.dscanManager.dscanAngle = parseInt(e.target.value);
             const valEl = document.getElementById('dscan-angle-val');
-            if (valEl) valEl.textContent = `${this.dscanAngle}\u00B0`;
+            if (valEl) valEl.textContent = `${this.dscanManager.dscanAngle}\u00B0`;
         });
 
         // D-Scan angle presets
         for (const preset of [360, 180, 60, 15]) {
             document.getElementById(`dscan-${preset}`)?.addEventListener('click', () => {
-                this.dscanAngle = preset;
+                this.dscanManager.dscanAngle = preset;
                 const slider = document.getElementById('dscan-angle');
                 if (slider) slider.value = preset;
                 const valEl = document.getElementById('dscan-angle-val');
@@ -839,13 +832,9 @@ export class UIManager {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.minimap-range-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                this.minimapRange = parseInt(btn.dataset.range) || 5000;
+                this.minimapRenderer.minimapRange = parseInt(btn.dataset.range) || 5000;
             });
         });
-        this.minimapRange = 5000;
-        this.minimapExpanded = false;
-        this.minimapCanvas = document.getElementById('minimap-canvas');
-        this.minimapCtx = this.minimapCanvas?.getContext('2d');
 
         // Minimap scroll wheel zoom
         const minimapEl = document.getElementById('minimap');
@@ -853,14 +842,14 @@ export class UIManager {
             minimapEl.addEventListener('wheel', (e) => {
                 e.preventDefault();
                 const ranges = [1000, 2000, 3000, 5000, 8000, 10000, 15000, 25000];
-                let idx = ranges.indexOf(this.minimapRange);
-                if (idx === -1) idx = ranges.findIndex(r => r >= this.minimapRange) || 3;
+                let idx = ranges.indexOf(this.minimapRenderer.minimapRange);
+                if (idx === -1) idx = ranges.findIndex(r => r >= this.minimapRenderer.minimapRange) || 3;
                 idx += e.deltaY > 0 ? 1 : -1;
                 idx = Math.max(0, Math.min(ranges.length - 1, idx));
-                this.minimapRange = ranges[idx];
+                this.minimapRenderer.minimapRange = ranges[idx];
                 // Update range button highlight
                 document.querySelectorAll('.minimap-range-btn').forEach(b => {
-                    b.classList.toggle('active', parseInt(b.dataset.range) === this.minimapRange);
+                    b.classList.toggle('active', parseInt(b.dataset.range) === this.minimapRenderer.minimapRange);
                 });
             }, { passive: false });
         }
@@ -868,7 +857,7 @@ export class UIManager {
         // Minimap expand toggle
         const expandBtn = document.getElementById('minimap-expand-btn');
         if (expandBtn) {
-            expandBtn.addEventListener('click', () => this.toggleMinimapExpand());
+            expandBtn.addEventListener('click', () => this.minimapRenderer.toggleExpand());
         }
 
         // Constrain all panels to viewport after loading saved positions
@@ -895,7 +884,7 @@ export class UIManager {
             this.updateShipIndicator();
             this.updateDroneBar();
             this.updateAutopilotIndicator();
-            this.updateMinimap();
+            this.minimapRenderer.update();
             this.updateTacticalOverlay();
             this.updateGateLabels();
             this.checkProximityWarnings();
@@ -3299,701 +3288,24 @@ export class UIManager {
     /**
      * Show station panel
      */
-    populatePriceTicker(station) {
-        const track = document.getElementById('price-ticker-track');
-        if (!track || !TRADE_GOODS) return;
-
-        const goods = Object.values(TRADE_GOODS);
-        const items = goods.map(good => {
-            const basePrice = good.basePrice || 100;
-            // Simulate price fluctuation
-            const change = (Math.random() - 0.45) * 20;
-            const currentPrice = Math.max(1, Math.floor(basePrice + change));
-            const changePct = ((change / basePrice) * 100).toFixed(1);
-            const arrow = change > 1 ? '&#9650;' : change < -1 ? '&#9660;' : '&#9644;';
-            const cls = change > 1 ? 'up' : change < -1 ? 'down' : 'flat';
-            return `<span class="ticker-item"><span class="ticker-name">${good.name}</span> <span class="ticker-price">${currentPrice}</span> <span class="ticker-change ${cls}">${arrow}${Math.abs(changePct)}%</span></span>`;
-        });
-
-        // Duplicate for seamless scroll
-        track.innerHTML = items.join('') + items.join('');
-    }
-
-    startStationAmbient() {
-        const canvas = this.stationAmbientCanvas;
-        if (!canvas) return;
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        this.stationAmbientCtx = canvas.getContext('2d');
-        this.stationAmbientParticles = [];
-        // Floating dust motes
-        for (let i = 0; i < 60; i++) {
-            this.stationAmbientParticles.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                vx: (Math.random() - 0.5) * 12,
-                vy: -8 - Math.random() * 15,
-                size: 1 + Math.random() * 2.5,
-                alpha: 0.15 + Math.random() * 0.35,
-                color: Math.random() < 0.7 ? 'cyan' : (Math.random() < 0.5 ? 'orange' : 'white'),
-                life: Math.random(),
-                lifeSpeed: 0.002 + Math.random() * 0.004,
-                type: 'dust'
-            });
-        }
-        // Occasional sparks from welding
-        for (let i = 0; i < 8; i++) {
-            this.stationAmbientParticles.push({
-                x: Math.random() * canvas.width,
-                y: canvas.height * 0.2 + Math.random() * canvas.height * 0.3,
-                vx: (Math.random() - 0.5) * 40,
-                vy: 20 + Math.random() * 30,
-                size: 1 + Math.random() * 1.5,
-                alpha: 0.6 + Math.random() * 0.4,
-                color: 'spark',
-                life: Math.random(),
-                lifeSpeed: 0.01 + Math.random() * 0.02,
-                type: 'spark'
-            });
-        }
-        const animate = () => {
-            this.updateStationAmbient();
-            this.stationAmbientRAF = requestAnimationFrame(animate);
-        };
-        this.stationAmbientRAF = requestAnimationFrame(animate);
-    }
-
-    updateStationAmbient() {
-        const ctx = this.stationAmbientCtx;
-        const canvas = this.stationAmbientCanvas;
-        if (!ctx || !canvas) return;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Subtle volumetric light beam from top
-        const grad = ctx.createLinearGradient(canvas.width * 0.4, 0, canvas.width * 0.6, canvas.height * 0.7);
-        grad.addColorStop(0, 'rgba(100, 180, 255, 0.03)');
-        grad.addColorStop(0.5, 'rgba(100, 180, 255, 0.015)');
-        grad.addColorStop(1, 'rgba(100, 180, 255, 0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.moveTo(canvas.width * 0.35, 0);
-        ctx.lineTo(canvas.width * 0.2, canvas.height);
-        ctx.lineTo(canvas.width * 0.8, canvas.height);
-        ctx.lineTo(canvas.width * 0.65, 0);
-        ctx.fill();
-
-        for (const p of this.stationAmbientParticles) {
-            p.x += p.vx * 0.016;
-            p.y += p.vy * 0.016;
-            p.life += p.lifeSpeed;
-            if (p.life > 1) {
-                p.life = 0;
-                p.x = Math.random() * canvas.width;
-                p.y = p.type === 'spark' ? (canvas.height * 0.2 + Math.random() * canvas.height * 0.3) : (canvas.height + 5);
-                p.vx = p.type === 'spark' ? ((Math.random() - 0.5) * 40) : ((Math.random() - 0.5) * 12);
-            }
-            // Wrap horizontally
-            if (p.x < 0) p.x = canvas.width;
-            if (p.x > canvas.width) p.x = 0;
-
-            const fadeAlpha = p.alpha * Math.sin(p.life * Math.PI);
-            if (p.color === 'spark') {
-                ctx.fillStyle = `rgba(255, ${180 + Math.random() * 75}, 50, ${fadeAlpha})`;
-                ctx.shadowColor = 'rgba(255, 150, 0, 0.4)';
-                ctx.shadowBlur = 6;
-            } else if (p.color === 'cyan') {
-                ctx.fillStyle = `rgba(100, 220, 255, ${fadeAlpha * 0.5})`;
-                ctx.shadowColor = '';
-                ctx.shadowBlur = 0;
-            } else if (p.color === 'orange') {
-                ctx.fillStyle = `rgba(255, 180, 80, ${fadeAlpha * 0.4})`;
-                ctx.shadowColor = '';
-                ctx.shadowBlur = 0;
-            } else {
-                ctx.fillStyle = `rgba(200, 200, 220, ${fadeAlpha * 0.4})`;
-                ctx.shadowColor = '';
-                ctx.shadowBlur = 0;
-            }
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.shadowBlur = 0;
-    }
-
-    stopStationAmbient() {
-        if (this.stationAmbientRAF) {
-            cancelAnimationFrame(this.stationAmbientRAF);
-            this.stationAmbientRAF = null;
-        }
-        if (this.stationAmbientCtx && this.stationAmbientCanvas) {
-            this.stationAmbientCtx.clearRect(0, 0, this.stationAmbientCanvas.width, this.stationAmbientCanvas.height);
-        }
-        this.stationAmbientParticles = [];
-    }
-
-    startStationTraffic() {
-        const logEl = document.getElementById('station-traffic-log');
-        if (!logEl) return;
-
-        const shipNames = [
-            'Meridian Star', 'Cobalt Drifter', 'Iron Wake', 'Sable Horizon',
-            'Quantum Rift', 'Dust Runner', 'Voidspear', 'Solar Vagrant',
-            'Crimson Tide', 'Neon Fang', 'Starweaver', 'Eclipse Moth',
-            'Steel Phantom', 'Dark Current', 'Pulse Nova', 'Arc Lightning',
-        ];
-        const shipClasses = ['Frigate', 'Destroyer', 'Cruiser', 'Hauler', 'Battlecruiser', 'Mining Barge'];
-
-        const addEntry = () => {
-            if (!this._stationTrafficActive) return;
-            const isDock = Math.random() < 0.5;
-            const name = shipNames[Math.floor(Math.random() * shipNames.length)];
-            const cls = shipClasses[Math.floor(Math.random() * shipClasses.length)];
-            const entry = document.createElement('span');
-            entry.className = `traffic-entry ${isDock ? 'dock' : 'undock'}`;
-            entry.innerHTML = `<span class="traffic-action">${isDock ? 'ARR' : 'DEP'}</span> <span class="traffic-ship">${name}</span> <span style="opacity:0.4">${cls}</span>`;
-
-            // Keep max 4 entries
-            while (logEl.children.length >= 4) logEl.removeChild(logEl.firstChild);
-            logEl.appendChild(entry);
-
-            // Schedule next
-            this._stationTrafficTimer = setTimeout(addEntry, 3000 + Math.random() * 5000);
-        };
-
-        this._stationTrafficActive = true;
-        addEntry();
-    }
-
-    stopStationTraffic() {
-        this._stationTrafficActive = false;
-        if (this._stationTrafficTimer) clearTimeout(this._stationTrafficTimer);
-        const logEl = document.getElementById('station-traffic-log');
-        if (logEl) logEl.innerHTML = '';
-    }
-
-    showStationPanel(station) {
-        this.elements.stationName.textContent = station.name;
-        this.elements.stationPanel.classList.remove('hidden');
-
-        // Start station ambient particles
-        this.startStationAmbient();
-
-        // Start station traffic log
-        this.startStationTraffic();
-
-        // Populate price ticker
-        this.populatePriceTicker(station);
-
-        // Initialize vendor manager
-        this.vendorManager.show(station);
-
-        // Populate shop (uses vendor manager for market/fitting, legacy for repair)
-        this.updateShopPanel(station);
-
-        // Populate refinery tab
-        this.updateRefineryTab();
-
-        // Initialize cantina (generates pilots when docked)
-        this.cantinaManager.show(station);
-
-        // Station greeting dialogue (random chance)
-        if (Math.random() < 0.3) {
-            const greetings = [
-                { name: 'Docking Officer', title: 'Station Control', portrait: '👨‍✈️', color: '#88aacc',
-                  text: `Welcome to ${station.name}, capsuleer. All services are available. Fly safe.` },
-                { name: 'Hangar Chief', title: 'Maintenance Crew', portrait: '🔧', color: '#ffaa44',
-                  text: `Your ship's looking a bit roughed up, pilot. Hit the repair bay if you need us.` },
-                { name: 'Intel Officer', title: 'Security Division', portrait: '🛡️', color: '#44aaff',
-                  text: `Pirate activity has been increasing in the outer sectors. Watch your six out there.` },
-                { name: 'Trade Broker', title: 'Market Division', portrait: '💰', color: '#44ff88',
-                  text: `Ore prices are holding steady. The refineries are always buying if you've got cargo to offload.` },
-            ];
-            const greeting = greetings[Math.floor(Math.random() * greetings.length)];
-            setTimeout(() => this.dialogueManager?.open({ ...greeting, options: [{ label: 'Understood', action: 'close' }] }), 500);
-        }
-    }
-
-    /**
-     * Hide station panel
-     */
-    hideStationPanel() {
-        this.elements.stationPanel.classList.add('hidden');
-        this.vendorManager.hide();
-        this.cantinaManager.hide();
-        this.stopStationAmbient();
-        this.stopStationTraffic();
-        this.killStreak = 0; // Reset kill streak on dock
-    }
-
-    /**
-     * Play docking animation overlay
-     */
-    playDockingAnimation(stationName, onComplete) {
-        const overlay = document.getElementById('dock-animation');
-        if (!overlay) { onComplete?.(); return; }
-
-        const textEl = document.getElementById('dock-anim-text');
-        const stationEl = document.getElementById('dock-anim-station');
-        if (textEl) textEl.textContent = 'DOCKING';
-        if (stationEl) stationEl.textContent = stationName;
-
-        overlay.classList.remove('hidden', 'undocking', 'fullscreen');
-        overlay.classList.add('active');
-
-        // Cinematic bars slide in, then fullscreen fade
-        setTimeout(() => overlay.classList.add('fullscreen'), 800);
-
-        // Complete after animation
-        setTimeout(() => {
-            overlay.classList.remove('active', 'fullscreen');
-            overlay.classList.add('hidden');
-            onComplete?.();
-        }, 1600);
-    }
-
-    /**
-     * Play undock animation overlay
-     */
-    playUndockAnimation(stationName, onComplete) {
-        const overlay = document.getElementById('dock-animation');
-        if (!overlay) { onComplete?.(); return; }
-
-        const textEl = document.getElementById('dock-anim-text');
-        const stationEl = document.getElementById('dock-anim-station');
-        if (textEl) textEl.textContent = 'UNDOCKING';
-        if (stationEl) stationEl.textContent = stationName;
-
-        overlay.classList.remove('hidden');
-        overlay.classList.add('active', 'fullscreen', 'undocking');
-
-        // Open from fullscreen
-        setTimeout(() => overlay.classList.remove('fullscreen'), 400);
-
-        // Bars retract
-        setTimeout(() => overlay.classList.remove('active'), 1000);
-
-        // Cleanup
-        setTimeout(() => {
-            overlay.classList.remove('undocking');
-            overlay.classList.add('hidden');
-            onComplete?.();
-        }, 1600);
-    }
-
-    /**
-     * Update shop panel content
-     */
-    updateShopPanel(station) {
-        // Ships and Equipment tabs handled by StationVendorManager
-        this.vendorManager.renderShips();
-        this.vendorManager.renderEquipment();
-
-        // Repair cost (still handled here)
-        const repairCost = station.getRepairCost(this.game.player);
-        document.getElementById('repair-options').innerHTML = `
-            <div class="shop-item">
-                <div class="item-info">
-                    <div class="item-name">Full Repair</div>
-                    <div class="item-desc">Restore all shield, armor, and hull</div>
-                </div>
-                <div class="item-price">${formatCredits(repairCost)} ISK</div>
-                <button class="buy-btn" onclick="game.ui.repairShip()">REPAIR</button>
-            </div>
-        `;
-    }
-
-    /**
-     * Update refinery tab with cargo ore contents
-     */
-    updateRefineryTab() {
-        const player = this.game.player;
-        if (!player) return;
-
-        const oreList = document.getElementById('refinery-ore-list');
-        const totalDisplay = document.getElementById('refinery-total');
-        const sellBtn = document.getElementById('sell-all-ore-btn');
-
-        if (!oreList || !totalDisplay) return;
-
-        // Get ore from cargo
-        const cargo = player.cargo || {};
-        const oreTypes = Object.entries(cargo).filter(([type, data]) => data.units > 0);
-
-        if (oreTypes.length === 0) {
-            oreList.innerHTML = '<div style="color: var(--text-dim); padding: 20px; text-align: center;">No ore in cargo hold</div>';
-            totalDisplay.innerHTML = `
-                <span class="label">TOTAL VALUE</span>
-                <span class="value">0 ISK</span>
-            `;
-            if (sellBtn) sellBtn.disabled = true;
-            return;
-        }
-
-        // Build ore list HTML
-        let totalValue = 0;
-        const html = oreTypes.map(([type, data]) => {
-            const config = CONFIG.ASTEROID_TYPES[type] || { name: type, value: 10 };
-            const value = data.units * config.value;
-            totalValue += value;
-
-            return `
-                <div class="refinery-ore-item">
-                    <div class="refinery-ore-info">
-                        <div class="refinery-ore-name">${config.name}</div>
-                        <div class="refinery-ore-amount">${data.units.toLocaleString()} units (${data.volume.toFixed(1)} m³)</div>
-                    </div>
-                    <div class="refinery-ore-value">${formatCredits(value)} ISK</div>
-                </div>
-            `;
-        }).join('');
-
-        oreList.innerHTML = html;
-        totalDisplay.innerHTML = `
-            <span class="label">TOTAL VALUE</span>
-            <span class="value">${formatCredits(totalValue)} ISK</span>
-        `;
-
-        if (sellBtn) sellBtn.disabled = false;
-
-        // Show ingot conversion preview
-        const refineBtn = document.getElementById('refine-all-ore-btn');
-        const ingotPreview = document.getElementById('refinery-ingot-preview');
-        const conversions = CONFIG.REFINERY_CONVERSIONS;
-        if (ingotPreview && conversions) {
-            let hasConversion = false;
-            let previewHtml = '<div class="ingot-preview-title">REFINE PREVIEW</div>';
-            for (const [type, data] of oreTypes) {
-                const conv = conversions[type];
-                if (!conv) continue;
-                const ingotAmount = Math.floor(data.units * conv.rate);
-                if (ingotAmount <= 0) continue;
-                hasConversion = true;
-                previewHtml += `<div class="ingot-preview-row">
-                    <span class="ingot-ore">${data.units} ${type}</span>
-                    <span class="ingot-arrow">\u2192</span>
-                    <span class="ingot-result">${ingotAmount} ${conv.name}</span>
-                </div>`;
-            }
-            ingotPreview.innerHTML = hasConversion ? previewHtml : '';
-            if (refineBtn) refineBtn.disabled = !hasConversion;
-        }
-    }
-
-    /**
-     * Repair ship at station
-     */
-    repairShip() {
-        const station = this.game.dockedAt;
-        if (!station || !this.game.player) return;
-
-        if (station.repairShip(this.game.player)) {
-            this.log('Ship fully repaired', 'system');
-            this.toast('Ship repaired!', 'success');
-            this.game.audio?.play('repair');
-            this.updateShopPanel(station);
-
-            // Repair flash animation on ship indicator
-            const indicator = document.getElementById('ship-indicator');
-            if (indicator) {
-                indicator.classList.add('repair-flash');
-                setTimeout(() => indicator.classList.remove('repair-flash'), 1500);
-            }
-        } else {
-            this.toast('Not enough credits', 'warning');
-        }
-    }
-
-    /**
-     * Sell all ore in cargo hold
-     */
-    sellAllOre() {
-        const player = this.game.player;
-        if (!player || !player.cargo) return;
-
-        let totalValue = 0;
-        let totalUnits = 0;
-
-        // Calculate total value and clear cargo
-        for (const [type, data] of Object.entries(player.cargo)) {
-            if (data.units > 0) {
-                const config = CONFIG.ASTEROID_TYPES[type] || { value: 10 };
-                totalValue += data.units * config.value;
-                totalUnits += data.units;
-            }
-        }
-
-        if (totalValue === 0) {
-            this.log('No ore to sell', 'system');
-            return;
-        }
-
-        // Notify guild system of ore sold BEFORE clearing cargo
-        for (const [type, data] of Object.entries(player.cargo)) {
-            if (data.units > 0) {
-                this.game.guildSystem?.onOreSold(type, data.units);
-            }
-        }
-
-        // Clear cargo
-        player.cargo = {};
-        player.cargoUsed = 0;
-
-        // Add credits
-        this.game.addCredits(totalValue);
-
-        // Award trade XP
-        this.game.skillSystem?.onTrade(totalValue);
-
-        // Log and feedback
-        this.log(`Sold ${totalUnits.toLocaleString()} units of ore for ${formatCredits(totalValue)} ISK`, 'mining');
-        this.toast(`Sold ore for ${formatCredits(totalValue)} ISK`, 'success');
-        this.game.audio?.play('sell');
-        // Floating credit popup
-        this.showCreditPopup(totalValue, window.innerWidth / 2, window.innerHeight / 2, 'gain');
-        // Ship log
-        this.addShipLogEntry(`Sold ore for ${formatCredits(totalValue)} ISK`, 'trade');
-
-        // Update display
-        this.updateRefineryTab();
-    }
-
-    /**
-     * Refine all ore into ingots using REFINERY_CONVERSIONS
-     */
-    refineAllOre() {
-        const player = this.game.player;
-        if (!player || !player.cargo) return;
-
-        const conversions = CONFIG.REFINERY_CONVERSIONS;
-        if (!conversions) {
-            this.toast('Refinery conversions not configured', 'error');
-            return;
-        }
-
-        let totalRefined = 0;
-        const results = [];
-
-        for (const [oreType, data] of Object.entries(player.cargo)) {
-            if (data.units <= 0) continue;
-            const conv = conversions[oreType];
-            if (!conv) continue;
-
-            const ingotAmount = Math.floor(data.units * conv.rate);
-            if (ingotAmount <= 0) continue;
-
-            // Add ingots to materials
-            if (!player.materials) player.materials = {};
-            if (!player.materials[conv.material]) {
-                player.materials[conv.material] = 0;
-            }
-            player.materials[conv.material] += ingotAmount;
-
-            results.push({ ore: oreType, units: data.units, ingot: conv.name, amount: ingotAmount });
-            totalRefined += data.units;
-        }
-
-        if (totalRefined === 0) {
-            this.toast('No refinable ore in cargo', 'warning');
-            return;
-        }
-
-        // Clear refined ore from cargo
-        for (const r of results) {
-            delete player.cargo[r.ore];
-        }
-        // Recalculate cargo used
-        let used = 0;
-        for (const data of Object.values(player.cargo)) {
-            used += data.volume || 0;
-        }
-        player.cargoUsed = used;
-
-        // Log results
-        const summary = results.map(r => `${r.amount} ${r.ingot}`).join(', ');
-        this.log(`Refined ${totalRefined.toLocaleString()} units of ore into ${summary}`, 'mining');
-        this.toast(`Refined ore into ingots!`, 'success');
-        this.game.audio?.play('scan-complete');
-        this.addShipLogEntry(`Refined ore: ${summary}`, 'industry');
-
-        // Emit event for Skippy etc
-        this.game.events?.emit('refinery:complete', { results, totalRefined });
-
-        this.updateRefineryTab();
-    }
-
-    /**
-     * Update insurance tab content
-     */
-    updateInsuranceTab() {
-        const container = document.getElementById('insurance-content');
-        if (!container) return;
-
-        const game = this.game;
-        const player = game.player;
-        const shipId = player?.shipClass || 'frigate';
-        const shipData = SHIP_DATABASE[shipId];
-        const shipName = shipData?.name || 'Unknown Ship';
-        const shipValue = shipData?.price || 5000;
-        const tiers = game.constructor.INSURANCE_TIERS;
-        const current = game.insurance;
-
-        let html = `<div class="insurance-panel">`;
-
-        // Current status
-        html += `<div class="insurance-status">`;
-        html += `<div class="insurance-ship-info">`;
-        html += `<span class="insurance-label">INSURED VESSEL</span>`;
-        html += `<span class="insurance-ship-name">${shipName}</span>`;
-        html += `<span class="insurance-ship-value">Hull Value: ${formatCredits(shipValue)} ISK</span>`;
-        html += `</div>`;
-
-        if (current.active) {
-            const payout = Math.floor(shipValue * current.payoutRate);
-            const matchesShip = current.shipInsured === shipId;
-            html += `<div class="insurance-active-badge${matchesShip ? '' : ' insurance-mismatch'}">`;
-            html += `<span class="insurance-tier-name">${current.tierName} Coverage</span>`;
-            html += `<span class="insurance-payout">Payout: ${formatCredits(payout)} ISK (${Math.round(current.payoutRate * 100)}%)</span>`;
-            if (!matchesShip) {
-                const insuredName = SHIP_DATABASE[current.shipInsured]?.name || current.shipInsured;
-                html += `<span class="insurance-warning">Insured for: ${insuredName} (switch ships to match)</span>`;
-            }
-            html += `</div>`;
-        } else {
-            html += `<div class="insurance-inactive-badge">`;
-            html += `<span>NO ACTIVE COVERAGE</span>`;
-            html += `<span class="insurance-warning-text">Ship loss will not be compensated</span>`;
-            html += `</div>`;
-        }
-        html += `</div>`;
-
-        // Tier cards
-        html += `<div class="insurance-tiers">`;
-        for (const [tierId, tier] of Object.entries(tiers)) {
-            const premium = Math.floor(shipValue * tier.premiumRate);
-            const payout = Math.floor(shipValue * tier.payoutRate);
-            const isActive = current.active && current.tier === tierId && current.shipInsured === shipId;
-            const canAfford = game.credits >= premium;
-            const profit = payout - premium;
-
-            html += `<div class="insurance-tier-card${isActive ? ' active' : ''}">`;
-            html += `<div class="tier-header tier-${tierId}">${tier.name}</div>`;
-            html += `<div class="tier-body">`;
-            html += `<div class="tier-stat"><span>Premium</span><span class="tier-cost">${formatCredits(premium)} ISK</span></div>`;
-            html += `<div class="tier-stat"><span>Payout</span><span class="tier-payout">${formatCredits(payout)} ISK</span></div>`;
-            html += `<div class="tier-stat"><span>Coverage</span><span>${Math.round(tier.payoutRate * 100)}%</span></div>`;
-            html += `<div class="tier-stat"><span>Net Gain</span><span class="${profit > 0 ? 'tier-profit' : 'tier-loss'}">${profit > 0 ? '+' : ''}${formatCredits(profit)} ISK</span></div>`;
-
-            if (isActive) {
-                html += `<button class="buy-btn insurance-btn" disabled>ACTIVE</button>`;
-            } else {
-                html += `<button class="buy-btn insurance-btn${canAfford ? '' : ' disabled'}" ${canAfford ? '' : 'disabled'} data-insurance-tier="${tierId}">PURCHASE</button>`;
-            }
-
-            html += `</div></div>`;
-        }
-        html += `</div>`;
-
-        // Info text
-        html += `<div class="insurance-info">`;
-        html += `<p>Insurance provides a one-time ISK payout when your ship is destroyed. Coverage is consumed on death and must be repurchased.</p>`;
-        html += `<p>Switching ships does not transfer coverage. Insure your current vessel before undocking.</p>`;
-        html += `</div>`;
-
-        html += `</div>`;
-        container.innerHTML = html;
-
-        // Add click handlers
-        container.querySelectorAll('[data-insurance-tier]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const tier = btn.dataset.insuranceTier;
-                if (game.purchaseInsurance(tier)) {
-                    this.updateInsuranceTab();
-                    this.game.audio?.play('quest-accept');
-                }
-            });
-        });
-    }
-
-    /**
-     * Update skills tab content
-     */
-    updateSkillsTab() {
-        const container = document.getElementById('skills-content');
-        if (!container) return;
-
-        const skillSystem = this.game.skillSystem;
-        if (!skillSystem) {
-            container.innerHTML = '<div class="skills-empty">Skills not available</div>';
-            return;
-        }
-
-        const skills = skillSystem.getAllSkills();
-        let html = `<div class="skills-panel">`;
-        html += `<div class="skills-header">PILOT SKILLS</div>`;
-
-        for (const s of skills) {
-            const pctFill = Math.floor(s.progress * 100);
-            const levelDots = Array.from({ length: 5 }, (_, i) =>
-                `<span class="skill-dot ${i < s.level ? 'filled' : ''}" style="${i < s.level ? `background:${s.color}` : ''}"></span>`
-            ).join('');
-
-            let bonusText = '';
-            for (const perk of s.perLevel) {
-                const totalVal = (perk.value * s.level * 100).toFixed(0);
-                bonusText += `<span class="skill-bonus-line">${perk.label.replace(/\+\d+%/, `+${totalVal}%`)}</span>`;
-            }
-
-            // Specialization bonuses (levels 3+)
-            let specHtml = '';
-            if (s.specName) {
-                specHtml = `<div class="skill-spec-badge" style="color:${s.color}">${s.specName}</div>`;
-            } else if (s.canSpecialize) {
-                const specEntries = Object.entries(s.specializations || {});
-                specHtml = `<div class="skill-spec-choose">`;
-                specHtml += `<div class="skill-spec-prompt">Choose Specialization:</div>`;
-                for (const [key, spec] of specEntries) {
-                    specHtml += `<button class="skill-spec-btn" data-skill="${s.id}" data-spec="${key}" style="border-color:${s.color}">`;
-                    specHtml += `<strong>${spec.name}</strong><br><small>${spec.description}</small>`;
-                    specHtml += `<br><em>${spec.perLevel.map(p => p.label).join(', ')}</em>`;
-                    specHtml += `</button>`;
-                }
-                specHtml += `</div>`;
-            }
-
-            html += `<div class="skill-card" style="border-left: 3px solid ${s.color}">`;
-            html += `<div class="skill-card-top">`;
-            html += `<span class="skill-icon" style="color:${s.color}">${s.icon}</span>`;
-            html += `<div class="skill-info">`;
-            html += `<div class="skill-name">${s.name} <span class="skill-level">Lv.${s.level}</span></div>`;
-            html += `<div class="skill-desc">${s.description}</div>`;
-            html += `</div>`;
-            html += `<div class="skill-dots">${levelDots}</div>`;
-            html += `</div>`;
-            html += `<div class="skill-xp-bar-outer">`;
-            html += `<div class="skill-xp-bar-inner" style="width:${pctFill}%;background:${s.color}"></div>`;
-            html += `</div>`;
-            html += `<div class="skill-card-bottom">`;
-            html += `<span class="skill-xp-text">${s.maxed ? 'MAX' : `${s.xp.toLocaleString()} / ${s.nextXP.toLocaleString()} XP`}</span>`;
-            html += `<span class="skill-bonuses">${bonusText}</span>`;
-            html += `</div>`;
-            html += specHtml;
-            html += `</div>`;
-        }
-
-        // Add click handlers for spec buttons after render
-        html += `</div>`;
-        container.innerHTML = html;
-
-        container.querySelectorAll('.skill-spec-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const skillId = btn.dataset.skill;
-                const specKey = btn.dataset.spec;
-                skillSystem.chooseSpecialization(skillId, specKey);
-                this.updateSkillsTab();
-            });
-        });
-    }
+    populatePriceTicker(station) { this.stationUIController.populatePriceTicker(station); }
+
+    startStationAmbient() { this.stationUIController.startStationAmbient(); }
+    updateStationAmbient() { this.stationUIController.updateStationAmbient(); }
+    stopStationAmbient() { this.stationUIController.stopStationAmbient(); }
+    startStationTraffic() { this.stationUIController.startStationTraffic(); }
+    stopStationTraffic() { this.stationUIController.stopStationTraffic(); }
+    showStationPanel(station) { this.stationUIController.showStationPanel(station); }
+    hideStationPanel() { this.stationUIController.hideStationPanel(); }
+    playDockingAnimation(stationName, onComplete) { this.stationUIController.playDockingAnimation(stationName, onComplete); }
+    playUndockAnimation(stationName, onComplete) { this.stationUIController.playUndockAnimation(stationName, onComplete); }
+    updateShopPanel(station) { this.stationUIController.updateShopPanel(station); }
+    updateRefineryTab() { this.stationUIController.updateRefineryTab(); }
+    repairShip() { this.stationUIController.repairShip(); }
+    sellAllOre() { this.stationUIController.sellAllOre(); }
+    refineAllOre() { this.stationUIController.refineAllOre(); }
+    updateInsuranceTab() { this.stationUIController.updateInsuranceTab(); }
+    updateSkillsTab() { this.stationUIController.updateSkillsTab(); }
 
     /**
      * Toggle keyboard shortcuts overlay
@@ -4040,9 +3352,7 @@ export class UIManager {
     /**
      * Toggle D-Scan panel
      */
-    toggleDScan() {
-        this.elements.dscanPanel.classList.toggle('hidden');
-    }
+    toggleDScan() { this.dscanManager.toggle(); }
 
     /**
      * Add entry to ship log
@@ -4145,182 +3455,12 @@ export class UIManager {
     }
 
     // =========================================
-    // Combat Log
+    // Combat Log (delegated to CombatLogManager)
     // =========================================
-
-    /**
-     * Add detailed combat log entry
-     */
-    addCombatLogEntry(data) {
-        const entry = {
-            time: Date.now(),
-            type: data.type,         // 'hit', 'miss', 'kill', 'death'
-            direction: 'neutral',    // 'outgoing', 'incoming', 'neutral'
-            sourceName: data.source?.name || 'Unknown',
-            targetName: data.target?.name || 'Unknown',
-            damage: data.damage || 0,
-            damageType: data.damageType || '',
-            weapon: data.weapon || '',
-            hitChance: data.hitChance || 0,
-            bounty: data.bounty || 0,
-        };
-
-        const player = this.game.player;
-        if (data.source === player) entry.direction = 'outgoing';
-        else if (data.target === player) entry.direction = 'incoming';
-
-        // Update stats
-        if (data.type === 'hit') {
-            if (entry.direction === 'outgoing') {
-                this.combatLogStats.totalDealt += data.damage;
-                this.combatLogStats.hits++;
-            } else if (entry.direction === 'incoming') {
-                this.combatLogStats.totalTaken += data.damage;
-            }
-        } else if (data.type === 'miss') {
-            if (entry.direction === 'outgoing') {
-                this.combatLogStats.misses++;
-            }
-        } else if (data.type === 'kill') {
-            this.combatLogStats.kills++;
-        } else if (data.type === 'death') {
-            this.combatLogStats.deaths++;
-        }
-
-        this.combatLog.unshift(entry);
-        if (this.combatLog.length > this.maxCombatLogEntries) {
-            this.combatLog.pop();
-        }
-
-        // Update panel if visible
-        const panel = document.getElementById('combat-log-panel');
-        if (panel && !panel.classList.contains('hidden')) {
-            this.renderCombatLog();
-        }
-    }
-
-    /**
-     * Toggle combat log panel
-     */
-    toggleCombatLog() {
-        const panel = document.getElementById('combat-log-panel');
-        if (!panel) return;
-        panel.classList.toggle('hidden');
-        if (!panel.classList.contains('hidden')) {
-            this.renderCombatLog();
-            this.game.panelDragManager?.onPanelShown('combat-log-panel');
-        }
-    }
-
-    /**
-     * Render combat log panel
-     */
-    renderCombatLog() {
-        const summary = document.getElementById('combat-log-summary');
-        const container = document.getElementById('combat-log-entries');
-        if (!container) return;
-
-        // Summary bar
-        if (summary) {
-            const s = this.combatLogStats;
-            const accuracy = s.hits + s.misses > 0
-                ? Math.round((s.hits / (s.hits + s.misses)) * 100) : 0;
-            summary.innerHTML = `
-                <div class="clog-stat">
-                    <div class="clog-stat-label">DEALT</div>
-                    <div class="clog-stat-value out">${this.formatCompact(s.totalDealt)}</div>
-                </div>
-                <div class="clog-stat">
-                    <div class="clog-stat-label">TAKEN</div>
-                    <div class="clog-stat-value in">${this.formatCompact(s.totalTaken)}</div>
-                </div>
-                <div class="clog-stat">
-                    <div class="clog-stat-label">KILLS</div>
-                    <div class="clog-stat-value kills">${s.kills}</div>
-                </div>
-                <div class="clog-stat">
-                    <div class="clog-stat-label">ACCURACY</div>
-                    <div class="clog-stat-value accuracy">${accuracy}%</div>
-                </div>
-            `;
-        }
-
-        // Filter entries
-        let filtered = this.combatLog;
-        if (this.combatLogFilter === 'outgoing') {
-            filtered = filtered.filter(e => e.direction === 'outgoing');
-        } else if (this.combatLogFilter === 'incoming') {
-            filtered = filtered.filter(e => e.direction === 'incoming');
-        } else if (this.combatLogFilter === 'kills') {
-            filtered = filtered.filter(e => e.type === 'kill' || e.type === 'death');
-        }
-
-        if (filtered.length === 0) {
-            container.innerHTML = '<div class="clog-empty">No combat events recorded</div>';
-            return;
-        }
-
-        let html = '';
-        for (const entry of filtered.slice(0, 80)) {
-            const ago = this.formatTimeAgo(entry.time);
-            const cls = this.getCombatLogEntryClass(entry);
-            const icon = this.getCombatLogIcon(entry);
-            const msg = this.getCombatLogMessage(entry);
-            const dmg = entry.type === 'kill'
-                ? (entry.bounty > 0 ? `+${entry.bounty}` : '')
-                : (entry.damage > 0 ? `-${Math.floor(entry.damage)}` : '');
-
-            html += `<div class="clog-entry ${cls}">`;
-            html += `<span class="clog-time">${ago}</span>`;
-            html += `<span class="clog-icon">${icon}</span>`;
-            html += `<span class="clog-msg">${msg}</span>`;
-            if (dmg) html += `<span class="clog-dmg">${dmg}</span>`;
-            html += `</div>`;
-        }
-
-        container.innerHTML = html;
-    }
-
-    getCombatLogEntryClass(entry) {
-        if (entry.type === 'kill') return 'kill';
-        if (entry.type === 'death') return 'death';
-        if (entry.type === 'miss') return `miss ${entry.direction}`;
-        return `${entry.direction} ${entry.damageType}`;
-    }
-
-    getCombatLogIcon(entry) {
-        if (entry.type === 'kill') return '\u2620';     // skull
-        if (entry.type === 'death') return '\u2620';
-        if (entry.type === 'miss') return '\u25CB';      // circle
-        if (entry.direction === 'outgoing') return '\u25B6'; // right arrow
-        return '\u25C0';  // left arrow
-    }
-
-    getCombatLogMessage(entry) {
-        if (entry.type === 'kill') {
-            return `Destroyed ${entry.targetName}`;
-        }
-        if (entry.type === 'death') {
-            return `Destroyed by ${entry.sourceName}`;
-        }
-        if (entry.type === 'miss') {
-            if (entry.direction === 'outgoing') {
-                return `${entry.weapon} missed ${entry.targetName}`;
-            }
-            return `${entry.sourceName} missed you`;
-        }
-        // hit
-        if (entry.direction === 'outgoing') {
-            return `${entry.weapon} hit ${entry.targetName}`;
-        }
-        return `${entry.sourceName} hit you`;
-    }
-
-    formatCompact(n) {
-        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-        if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-        return Math.floor(n).toString();
-    }
+    addCombatLogEntry(data) { this.combatLogManager.addEntry(data); }
+    toggleCombatLog() { this.combatLogManager.toggle(); }
+    renderCombatLog() { this.combatLogManager.render(); }
+    formatCompact(n) { return this.combatLogManager.formatCompact(n); }
 
     /**
      * Toggle achievements panel
@@ -4464,252 +3604,8 @@ export class UIManager {
         container.innerHTML = html || '<div class="empty-state"><div class="empty-state-icon">\u2606</div><div class="empty-state-title">No Bookmarks</div><div class="empty-state-hint">Right-click in space to save a location</div></div>';
     }
 
-    /**
-     * Perform directional scan
-     */
-    performDScan() {
-        const range = this.dscanRange;
-        const angle = this.dscanAngle;
-
-        const player = this.game.player;
-        if (!player) return;
-
-        // Button flash animation
-        const scanBtn = document.getElementById('dscan-scan');
-        if (scanBtn) {
-            scanBtn.classList.remove('scanning');
-            void scanBtn.offsetWidth; // Force reflow
-            scanBtn.classList.add('scanning');
-        }
-
-        // Play scan sound
-        this.game.audio?.play('scan');
-
-        // Get all entities in range
-        const entities = this.game.currentSector.getEntitiesInRadius(player.x, player.y, range);
-
-        // Filter by directional cone angle
-        const halfAngle = (angle / 2) * (Math.PI / 180);
-        const playerHeading = player.rotation;
-
-        const results = entities.filter(e => {
-            if (e === player) return false;
-            if (!e.alive) return false;
-
-            // 360 degree scan includes everything
-            if (angle >= 360) return true;
-
-            // Calculate angle from player to entity
-            const dx = e.x - player.x;
-            const dy = e.y - player.y;
-            const angleToEntity = Math.atan2(dy, dx);
-
-            // Angular difference (shortest path)
-            let diff = angleToEntity - playerHeading;
-            while (diff > Math.PI) diff -= Math.PI * 2;
-            while (diff < -Math.PI) diff += Math.PI * 2;
-
-            return Math.abs(diff) <= halfAngle;
-        });
-
-        // Sort by distance
-        results.sort((a, b) => player.distanceTo(a) - player.distanceTo(b));
-
-        // Count by type
-        const counts = {};
-        for (const e of results) {
-            const t = e.type === 'npc' ? 'ship' : e.type;
-            counts[t] = (counts[t] || 0) + 1;
-        }
-
-        // Update summary
-        const summaryEl = document.getElementById('dscan-summary');
-        if (summaryEl) {
-            const parts = Object.entries(counts).map(([t, c]) => `${c} ${t}${c > 1 ? 's' : ''}`);
-            summaryEl.textContent = results.length > 0
-                ? `${results.length} results: ${parts.join(', ')}`
-                : 'No objects detected';
-        }
-
-        // Build results table
-        const html = results.map(e => {
-            const dist = formatDistance(player.distanceTo(e));
-            const icon = this.getEntityIcon(e);
-            const type = e.type === 'npc' ? e.role : e.type;
-            const hostClass = e.hostility === 'hostile' ? 'dscan-hostile' :
-                e.hostility === 'friendly' ? 'dscan-friendly' : '';
-
-            return `<tr class="${hostClass}" data-entity-id="${e.id}">
-                <td class="dscan-icon">${icon}</td>
-                <td class="dscan-name">${e.name}</td>
-                <td class="dscan-type">${type}</td>
-                <td class="dscan-dist">${dist}</td>
-            </tr>`;
-        }).join('');
-
-        const resultsEl = document.getElementById('dscan-results');
-        if (resultsEl) {
-            if (html) {
-                resultsEl.innerHTML = html;
-            } else {
-                resultsEl.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">\u{1F4E1}</div><div class="empty-state-title">No Objects Detected</div><div class="empty-state-hint">Try a wider scan angle or range</div></div></td></tr>';
-            }
-        }
-
-        // Make rows clickable to select entities
-        resultsEl?.querySelectorAll('tr[data-entity-id]').forEach(row => {
-            row.addEventListener('click', () => {
-                const entity = this.findEntityById(row.dataset.entityId);
-                if (entity) this.game.selectTarget(entity);
-            });
-        });
-
-        // Trigger minimap scan pulse
-        this.scanPulse = {
-            startTime: performance.now(),
-            duration: 1500,
-            range: range,
-            entityPositions: results.map(e => ({
-                dx: e.x - player.x,
-                dy: e.y - player.y,
-                type: e.type,
-                hostile: e.hostility === 'hostile' || e.type === 'enemy',
-            })),
-            counts,
-        };
-
-        // Spawn visual cone effect
-        this.spawnDScanCone(range, angle, player);
-
-        // Expanding scan probe rings in 3D
-        const effects = this.game.renderer?.effects;
-        if (effects) {
-            for (let i = 0; i < 3; i++) {
-                setTimeout(() => {
-                    effects.spawn('explosion', player.x, player.y, {
-                        count: 16,
-                        color: 0x00ddff,
-                        speed: 200 + i * 100,
-                        size: 2,
-                        life: 0.6,
-                    });
-                }, i * 150);
-            }
-        }
-    }
-
-    /**
-     * Spawn a visual D-Scan cone in the game world
-     */
-    spawnDScanCone(range, angleDeg, player) {
-        if (!this.game.renderer?.effects) return;
-
-        // Use the effects system to create a temporary cone
-        const effects = this.game.renderer.effects;
-        const heading = player.rotation;
-        const halfAngle = (angleDeg / 2) * (Math.PI / 180);
-
-        if (angleDeg >= 360) {
-            // Full circle scan ring
-            const ringGeo = new THREE.RingGeometry(range * 0.98, range, 64);
-            const ringMat = new THREE.MeshBasicMaterial({
-                color: 0x00ffff,
-                transparent: true,
-                opacity: 0.15,
-                side: THREE.DoubleSide,
-                depthWrite: false,
-            });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.position.set(player.x, player.y, 2);
-            effects.group.add(ring);
-
-            // Fade out over 1.5s
-            const startTime = performance.now();
-            const cleanup = () => {
-                const elapsed = (performance.now() - startTime) / 1000;
-                if (elapsed > 1.5) {
-                    effects.group.remove(ring);
-                    ring.geometry.dispose();
-                    ring.material.dispose();
-                    return;
-                }
-                ring.material.opacity = 0.15 * (1 - elapsed / 1.5);
-                ring.position.set(player.x, player.y, 2);
-                requestAnimationFrame(cleanup);
-            };
-            requestAnimationFrame(cleanup);
-        } else {
-            // Directional cone
-            const segments = 32;
-            const shape = new THREE.Shape();
-            shape.moveTo(0, 0);
-
-            for (let i = 0; i <= segments; i++) {
-                const a = heading - halfAngle + (halfAngle * 2 * i / segments);
-                shape.lineTo(Math.cos(a) * range, Math.sin(a) * range);
-            }
-            shape.lineTo(0, 0);
-
-            const coneGeo = new THREE.ShapeGeometry(shape);
-            const coneMat = new THREE.MeshBasicMaterial({
-                color: 0x00ffff,
-                transparent: true,
-                opacity: 0.08,
-                side: THREE.DoubleSide,
-                depthWrite: false,
-            });
-            const cone = new THREE.Mesh(coneGeo, coneMat);
-            cone.position.set(player.x, player.y, 2);
-
-            // Cone edge lines
-            const edgePoints = [
-                new THREE.Vector3(0, 0, 2),
-                new THREE.Vector3(Math.cos(heading - halfAngle) * range, Math.sin(heading - halfAngle) * range, 2),
-            ];
-            const edgePoints2 = [
-                new THREE.Vector3(0, 0, 2),
-                new THREE.Vector3(Math.cos(heading + halfAngle) * range, Math.sin(heading + halfAngle) * range, 2),
-            ];
-            const edgeMat = new THREE.LineBasicMaterial({
-                color: 0x00ffff,
-                transparent: true,
-                opacity: 0.25,
-                depthWrite: false,
-            });
-            const edge1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePoints), edgeMat);
-            const edge2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePoints2), edgeMat.clone());
-            edge1.position.set(player.x, player.y, 0);
-            edge2.position.set(player.x, player.y, 0);
-
-            effects.group.add(cone);
-            effects.group.add(edge1);
-            effects.group.add(edge2);
-
-            // Fade out
-            const startTime = performance.now();
-            const cleanup = () => {
-                const elapsed = (performance.now() - startTime) / 1000;
-                if (elapsed > 1.5) {
-                    effects.group.remove(cone);
-                    effects.group.remove(edge1);
-                    effects.group.remove(edge2);
-                    cone.geometry.dispose();
-                    cone.material.dispose();
-                    edge1.geometry.dispose();
-                    edge1.material.dispose();
-                    edge2.geometry.dispose();
-                    edge2.material.dispose();
-                    return;
-                }
-                const fade = 1 - elapsed / 1.5;
-                cone.material.opacity = 0.08 * fade;
-                edge1.material.opacity = 0.25 * fade;
-                edge2.material.opacity = 0.25 * fade;
-                requestAnimationFrame(cleanup);
-            };
-            requestAnimationFrame(cleanup);
-        }
-    }
+    performDScan() { this.dscanManager.performScan(); }
+    spawnDScanCone(range, angleDeg, player) { this.dscanManager.spawnCone(range, angleDeg, player); }
 
     /**
      * Find entity by ID
@@ -5958,433 +4854,12 @@ export class UIManager {
     }
 
     /**
-     * Render the radar minimap canvas
+     * Render the radar minimap canvas (delegated to MinimapRenderer)
      */
-    updateMinimap() {
-        const ctx = this.minimapCtx;
-        const canvas = this.minimapCanvas;
-        if (!ctx || !canvas) return;
+    updateMinimap() { this.minimapRenderer.update(); }
 
-        const player = this.game.player;
-        if (!player) return;
+    toggleMinimapExpand() { this.minimapRenderer.toggleExpand(); }
 
-        const W = this.minimapExpanded ? 400 : 210;
-        const H = this.minimapExpanded ? 400 : 210;
-        const cx = W / 2;
-        const cy = H / 2;
-        const radarMult = this.game.hazardSystem?.getRadarMultiplier() ?? 1;
-        const range = this.minimapRange * radarMult;
-        const scale = (W / 2 - 10) / range; // pixels per world unit
-
-        // Ensure canvas size matches (HiDPI not needed at this small size)
-        if (canvas.width !== W) canvas.width = W;
-        if (canvas.height !== H) canvas.height = H;
-
-        // Background - tinted by sector hazard
-        ctx.clearRect(0, 0, W, H);
-        const hazard = this.game.hazardSystem?.activeHazard;
-        if (hazard?.type === 'radiation') {
-            ctx.fillStyle = 'rgba(20, 4, 4, 0.9)';
-        } else if (hazard?.type === 'ion-storm') {
-            ctx.fillStyle = 'rgba(8, 4, 20, 0.9)';
-        } else if (hazard?.type === 'nebula-interference') {
-            ctx.fillStyle = 'rgba(4, 12, 10, 0.9)';
-        } else {
-            ctx.fillStyle = 'rgba(0, 8, 20, 0.9)';
-        }
-        ctx.fillRect(0, 0, W, H);
-
-        // Range rings
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.08)';
-        ctx.lineWidth = 0.5;
-        for (let r = 1; r <= 3; r++) {
-            const ringR = (r / 3) * (W / 2 - 10);
-            ctx.beginPath();
-            ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
-            ctx.stroke();
-        }
-
-        // Radar sweep line with fading trail
-        this._radarAngle = ((this._radarAngle || 0) + 0.03) % (Math.PI * 2);
-        const sweepR = W / 2 - 10;
-        // Fading trail (draw gradient arc behind sweep line)
-        if (ctx.createConicGradient) {
-            const trailAngle = 0.5;
-            const gradient = ctx.createConicGradient(this._radarAngle - trailAngle, cx, cy);
-            gradient.addColorStop(0, 'rgba(0, 255, 255, 0)');
-            gradient.addColorStop(trailAngle / (Math.PI * 2), 'rgba(0, 255, 255, 0.06)');
-            gradient.addColorStop(trailAngle / (Math.PI * 2) + 0.001, 'rgba(0, 255, 255, 0)');
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.arc(cx, cy, sweepR, this._radarAngle - trailAngle, this._radarAngle);
-            ctx.closePath();
-            ctx.fill();
-        }
-        // Sweep line
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + Math.cos(this._radarAngle) * sweepR, cy + Math.sin(this._radarAngle) * sweepR);
-        ctx.stroke();
-
-        // Crosshair
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.12)';
-        ctx.beginPath();
-        ctx.moveTo(cx, 5); ctx.lineTo(cx, H - 5);
-        ctx.moveTo(5, cy); ctx.lineTo(W - 5, cy);
-        ctx.stroke();
-
-        // Player heading indicator line
-        const headLen = 20;
-        const hx = cx + Math.cos(player.rotation) * headLen;
-        const hy = cy - Math.sin(player.rotation) * headLen;
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(hx, hy);
-        ctx.stroke();
-
-        // Gather entities
-        const entities = this.game.currentSector?.entities || [];
-        const allEntities = [...entities];
-        if (this.game.player && !allEntities.includes(this.game.player)) {
-            allEntities.push(this.game.player);
-        }
-
-        // Draw entities as dots
-        for (const entity of allEntities) {
-            if (!entity.alive || entity === player) continue;
-
-            const dx = entity.x - player.x;
-            const dy = entity.y - player.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist > range) continue;
-
-            const sx = cx + dx * scale;
-            const sy = cy - dy * scale; // Y inverted
-
-            // Determine color and size by type
-            let color, size;
-            switch (entity.type) {
-                case 'enemy':
-                    color = '#ff4444';
-                    size = 2.5;
-                    break;
-                case 'guild':
-                    if (entity.isPirate) {
-                        color = '#ff4444';
-                        size = 2.5;
-                    } else {
-                        color = entity.factionColor || '#44aaff';
-                        size = 2;
-                    }
-                    break;
-                case 'npc':
-                    color = entity.role === 'security' ? '#44ff88' : '#44aa44';
-                    size = 2;
-                    break;
-                case 'fleet':
-                    color = '#00ffff';
-                    size = 2.5;
-                    break;
-                case 'station':
-                case 'player-station':
-                    color = '#ffffff';
-                    size = 4;
-                    break;
-                case 'asteroid': {
-                    // Color-code by ore type
-                    const oreColors = {
-                        veldspar: 'rgba(160, 160, 160, 0.5)',
-                        scordite: 'rgba(180, 110, 55, 0.6)',
-                        pyroxeres: 'rgba(70, 180, 110, 0.6)',
-                        plagioclase: 'rgba(70, 110, 180, 0.7)',
-                    };
-                    color = oreColors[entity.asteroidType] || 'rgba(160, 140, 100, 0.5)';
-                    // Larger dot for rarer ores
-                    size = entity.asteroidType === 'plagioclase' ? 2 :
-                        entity.asteroidType === 'pyroxeres' ? 1.5 : 1;
-                    // Dim depleted asteroids
-                    if (entity.ore <= 0) {
-                        color = 'rgba(80, 70, 50, 0.3)';
-                        size = 0.8;
-                    }
-                    break;
-                }
-                case 'planet':
-                    color = '#8866cc';
-                    size = 5;
-                    break;
-                case 'gate':
-                case 'warpgate':
-                    color = '#ffaa00';
-                    size = 3.5;
-                    break;
-                case 'drone':
-                    color = '#00dddd';
-                    size = 1.5;
-                    break;
-                case 'wreck':
-                    color = '#887766';
-                    size = 2;
-                    break;
-                case 'anomaly':
-                    if (entity.scanned) {
-                        color = entity.anomalyType === 'wormhole' ? '#8844ff' :
-                            entity.anomalyType === 'combatSite' ? '#ff4422' :
-                            entity.anomalyType === 'dataSite' ? '#44ddff' : '#44ff88';
-                        size = 3;
-                    } else {
-                        color = 'rgba(255, 255, 255, 0.3)';
-                        size = 2;
-                    }
-                    break;
-                default:
-                    color = '#666666';
-                    size = 1.5;
-            }
-
-            // Draw blip - distinct shapes by type
-            ctx.fillStyle = color;
-            const isHostile = entity.hostility === 'hostile' || entity.type === 'enemy' || (entity.type === 'guild' && entity.isPirate);
-            if (entity.type === 'station' || entity.type === 'player-station') {
-                // Diamond for stations
-                ctx.beginPath();
-                ctx.moveTo(sx, sy - size);
-                ctx.lineTo(sx + size, sy);
-                ctx.lineTo(sx, sy + size);
-                ctx.lineTo(sx - size, sy);
-                ctx.closePath();
-                ctx.fill();
-            } else if (entity.type === 'gate' || entity.type === 'warpgate') {
-                // Hollow diamond for gates
-                ctx.lineWidth = 1;
-                ctx.strokeStyle = color;
-                ctx.beginPath();
-                ctx.moveTo(sx, sy - size);
-                ctx.lineTo(sx + size, sy);
-                ctx.lineTo(sx, sy + size);
-                ctx.lineTo(sx - size, sy);
-                ctx.closePath();
-                ctx.stroke();
-            } else if (isHostile) {
-                // Triangle pointing down for hostiles
-                ctx.beginPath();
-                ctx.moveTo(sx, sy + size);
-                ctx.lineTo(sx - size, sy - size);
-                ctx.lineTo(sx + size, sy - size);
-                ctx.closePath();
-                ctx.fill();
-            } else if (entity.type === 'wreck' || entity.type === 'loot') {
-                // X mark for wrecks/loot
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(sx - size, sy - size);
-                ctx.lineTo(sx + size, sy + size);
-                ctx.moveTo(sx + size, sy - size);
-                ctx.lineTo(sx - size, sy + size);
-                ctx.stroke();
-            } else {
-                ctx.beginPath();
-                ctx.arc(sx, sy, size, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            // Selected target highlight
-            if (entity === this.game.selectedTarget) {
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.arc(sx, sy, size + 3, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-
-            // Hostile glow
-            if (entity.hostility === 'hostile' || entity.type === 'enemy') {
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 0.5;
-                ctx.globalAlpha = 0.3 + Math.sin(Date.now() / 300) * 0.2;
-                ctx.beginPath();
-                ctx.arc(sx, sy, size + 2, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.globalAlpha = 1;
-            }
-        }
-
-        // Player marker (center)
-        ctx.fillStyle = '#00ffff';
-        ctx.beginPath();
-        // Small chevron pointing in heading direction
-        const pr = 4;
-        const pa = player.rotation;
-        ctx.moveTo(cx + Math.cos(pa) * pr, cy - Math.sin(pa) * pr);
-        ctx.lineTo(cx + Math.cos(pa + 2.5) * pr * 0.7, cy - Math.sin(pa + 2.5) * pr * 0.7);
-        ctx.lineTo(cx + Math.cos(pa + Math.PI) * pr * 0.3, cy - Math.sin(pa + Math.PI) * pr * 0.3);
-        ctx.lineTo(cx + Math.cos(pa - 2.5) * pr * 0.7, cy - Math.sin(pa - 2.5) * pr * 0.7);
-        ctx.closePath();
-        ctx.fill();
-
-        // D-scan sweep line (when dscan panel is open)
-        const dscanOpen = this.elements.dscanPanel && !this.elements.dscanPanel.classList.contains('hidden');
-        if (dscanOpen) {
-            const sweepAngle = (Date.now() / 5000) * Math.PI * 2; // 5s rotation
-            const sweepLen = W / 2 - 5;
-
-            // Sweep gradient
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate(-sweepAngle);
-            const grad = ctx.createLinearGradient(0, 0, sweepLen, 0);
-            grad.addColorStop(0, 'rgba(0, 255, 128, 0.0)');
-            grad.addColorStop(0.4, 'rgba(0, 255, 128, 0.15)');
-            grad.addColorStop(1, 'rgba(0, 255, 128, 0.4)');
-            ctx.strokeStyle = grad;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(sweepLen, 0);
-            ctx.stroke();
-
-            // Fading trail arc behind sweep
-            ctx.beginPath();
-            ctx.arc(0, 0, sweepLen * 0.8, -0.3, 0);
-            ctx.strokeStyle = 'rgba(0, 255, 128, 0.06)';
-            ctx.lineWidth = 20;
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        // Sector warp destination marker
-        if (player.sectorWarpState === 'spooling' && player.sectorWarpTarget) {
-            const wdx = player.sectorWarpTarget.x - player.x;
-            const wdy = player.sectorWarpTarget.y - player.y;
-            const wsx = cx + wdx * scale;
-            const wsy = cy - wdy * scale;
-            // Pulsing diamond marker
-            const pulse = 0.5 + Math.sin(Date.now() / 200) * 0.5;
-            ctx.strokeStyle = `rgba(68, 136, 255, ${0.4 + pulse * 0.4})`;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(wsx, wsy - 5);
-            ctx.lineTo(wsx + 4, wsy);
-            ctx.lineTo(wsx, wsy + 5);
-            ctx.lineTo(wsx - 4, wsy);
-            ctx.closePath();
-            ctx.stroke();
-            // Line from player to destination
-            ctx.setLineDash([3, 3]);
-            ctx.strokeStyle = `rgba(68, 136, 255, ${0.2 + pulse * 0.2})`;
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(wsx, wsy);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
-
-        // Autopilot route marker
-        if (this.game.autopilot?.warpTarget) {
-            const at = this.game.autopilot.warpTarget;
-            const atdx = at.x - player.x;
-            const atdy = at.y - player.y;
-            const atsx = cx + atdx * scale;
-            const atsy = cy - atdy * scale;
-            ctx.strokeStyle = 'rgba(255, 170, 0, 0.4)';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([2, 4]);
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(atsx, atsy);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
-
-        // Scan pulse animation
-        if (this.scanPulse) {
-            const elapsed = performance.now() - this.scanPulse.startTime;
-            const progress = elapsed / this.scanPulse.duration;
-
-            if (progress > 1.2) {
-                this.scanPulse = null;
-            } else {
-                // Expanding ring
-                const ringProgress = Math.min(progress, 1.0);
-                const maxRingR = (W / 2 - 10) * (this.scanPulse.range / range);
-                const ringR = ringProgress * Math.min(maxRingR, W / 2 - 5);
-                const ringAlpha = Math.max(0, 1 - ringProgress) * 0.5;
-
-                ctx.strokeStyle = `rgba(0, 255, 200, ${ringAlpha})`;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
-                ctx.stroke();
-
-                // Inner glow ring
-                ctx.strokeStyle = `rgba(0, 255, 200, ${ringAlpha * 0.3})`;
-                ctx.lineWidth = 6;
-                ctx.beginPath();
-                ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
-                ctx.stroke();
-
-                // Flash entity blips as the ring passes them
-                const scanScale = (W / 2 - 10) / range;
-                for (const ep of this.scanPulse.entityPositions) {
-                    const edist = Math.sqrt(ep.dx * ep.dx + ep.dy * ep.dy);
-                    const ePixelDist = edist * scanScale;
-                    const diff = Math.abs(ePixelDist - ringR);
-
-                    if (diff < 12) {
-                        const flash = Math.max(0, 1 - diff / 12);
-                        const esx = cx + ep.dx * scanScale;
-                        const esy = cy - ep.dy * scanScale;
-                        const flashColor = ep.hostile ? '255, 80, 80' : '0, 255, 200';
-
-                        ctx.fillStyle = `rgba(${flashColor}, ${flash * 0.7})`;
-                        ctx.beginPath();
-                        ctx.arc(esx, esy, 4 + flash * 3, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                }
-
-                // Scan summary text overlay (appears after ring expands)
-                if (progress > 0.6) {
-                    const textAlpha = Math.min(1, (progress - 0.6) * 3) * Math.max(0, 1.2 - progress) * 3;
-                    const counts = this.scanPulse.counts;
-                    const total = Object.values(counts).reduce((s, c) => s + c, 0);
-
-                    ctx.fillStyle = `rgba(0, 255, 200, ${textAlpha * 0.8})`;
-                    ctx.font = 'bold 10px monospace';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(`${total} CONTACT${total !== 1 ? 'S' : ''}`, cx, cy - 14);
-                    ctx.font = '8px monospace';
-                    ctx.fillStyle = `rgba(0, 255, 200, ${textAlpha * 0.5})`;
-                    const parts = Object.entries(counts).slice(0, 3).map(([t, c]) => `${c} ${t}`);
-                    ctx.fillText(parts.join(' | '), cx, cy - 4);
-                }
-            }
-        }
-
-        // Range label
-        ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
-        ctx.font = '8px monospace';
-        ctx.textAlign = 'right';
-        ctx.fillText(`${(range / 1000).toFixed(0)}km`, W - 4, H - 3);
-    }
-
-    /**
-     * Toggle tactical overlay on/off
-     */
-    toggleMinimapExpand() {
-        this.minimapExpanded = !this.minimapExpanded;
-        const minimap = document.getElementById('minimap');
-        const btn = document.getElementById('minimap-expand-btn');
-        if (minimap) minimap.classList.toggle('minimap-expanded', this.minimapExpanded);
-        if (btn) btn.textContent = this.minimapExpanded ? '▾' : '▴';
-    }
 
     toggleTacticalOverlay() {
         this.tacticalEnabled = !this.tacticalEnabled;

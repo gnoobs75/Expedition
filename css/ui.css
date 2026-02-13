@@ -12031,3 +12031,46 @@ select:focus-visible {
     color: #ccc;
 }
 .flagship-command-status { color: #ffaa00; font-size: 11px; margin-top: 4px; }
+
+/* =============================================
+   REFINERY ACTIONS & INGOT PREVIEW
+   ============================================= */
+.refinery-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+.refinery-actions .buy-btn {
+    flex: 1;
+}
+.refine-btn {
+    background: linear-gradient(180deg, rgba(136, 68, 255, 0.3), rgba(100, 50, 200, 0.2)) !important;
+    border-color: rgba(136, 68, 255, 0.5) !important;
+}
+.refine-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(136, 68, 255, 0.5), rgba(100, 50, 200, 0.35)) !important;
+    box-shadow: 0 0 8px rgba(136, 68, 255, 0.3);
+}
+.refinery-ingot-preview {
+    margin-top: 8px;
+    padding: 6px;
+    border: 1px solid rgba(136, 68, 255, 0.2);
+    border-radius: 3px;
+    background: rgba(136, 68, 255, 0.05);
+}
+.ingot-preview-title {
+    font-size: 9px;
+    color: rgba(136, 68, 255, 0.7);
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+.ingot-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    padding: 2px 0;
+}
+.ingot-ore { color: #99aabb; }
+.ingot-arrow { color: rgba(136, 68, 255, 0.6); }
+.ingot-result { color: #cc88ff; font-weight: bold; }

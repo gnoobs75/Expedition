@@ -1218,13 +1218,25 @@ export class SectorMapManager {
             const toPos = positions[gate.to];
             if (!fromPos || !toPos) continue;
 
-            // Base line
-            ctx.strokeStyle = 'rgba(0, 180, 255, 0.15)';
-            ctx.lineWidth = 2;
+            const isWormhole = gate.wormhole || false;
+
+            // Base line - purple dashed for wormholes, blue solid for normal
+            ctx.save();
+            if (isWormhole) {
+                const whPulse = 0.15 + Math.sin(this.animTime * 2) * 0.1;
+                ctx.strokeStyle = `rgba(136, 68, 255, ${whPulse + 0.1})`;
+                ctx.lineWidth = 3;
+                ctx.setLineDash([8, 6]);
+                ctx.lineDashOffset = -this.animTime * 30;
+            } else {
+                ctx.strokeStyle = 'rgba(0, 180, 255, 0.15)';
+                ctx.lineWidth = 2;
+            }
             ctx.beginPath();
             ctx.moveTo(fromPos.x, fromPos.y);
             ctx.lineTo(toPos.x, toPos.y);
             ctx.stroke();
+            ctx.restore();
 
             // Animated flow dots
             const dx = toPos.x - fromPos.x;
@@ -1233,21 +1245,25 @@ export class SectorMapManager {
             const dotCount = Math.floor(len / 30);
 
             for (let i = 0; i < dotCount; i++) {
-                const t = ((i / dotCount) + this.animTime * 0.15) % 1;
+                const t = ((i / dotCount) + this.animTime * (isWormhole ? 0.25 : 0.15)) % 1;
                 const px = fromPos.x + dx * t;
                 const py = fromPos.y + dy * t;
                 const alpha = Math.sin(t * Math.PI) * 0.4;
 
-                ctx.fillStyle = `rgba(0, 200, 255, ${alpha})`;
+                if (isWormhole) {
+                    ctx.fillStyle = `rgba(170, 100, 255, ${alpha})`;
+                } else {
+                    ctx.fillStyle = `rgba(0, 200, 255, ${alpha})`;
+                }
                 ctx.beginPath();
-                ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+                ctx.arc(px, py, isWormhole ? 2 : 1.5, 0, Math.PI * 2);
                 ctx.fill();
             }
 
             // Trade route indicators (if commerce system exists)
             const fromIsAdj = gate.from === currentSectorId || gate.to === currentSectorId;
             if (fromIsAdj) {
-                ctx.strokeStyle = 'rgba(0, 200, 255, 0.3)';
+                ctx.strokeStyle = isWormhole ? 'rgba(170, 100, 255, 0.35)' : 'rgba(0, 200, 255, 0.3)';
                 ctx.lineWidth = 3;
                 ctx.beginPath();
                 ctx.moveTo(fromPos.x, fromPos.y);
@@ -1305,6 +1321,9 @@ export class SectorMapManager {
 
             this.drawUniverseSector(ctx, sector, pos, isCurrent, isHovered);
         }
+
+        // Region cluster labels
+        this.drawRegionLabels(ctx, sectors, positions);
 
         // Strategic overlays
         this.renderStrategicOverlays(ctx, sectors, positions);
@@ -1395,7 +1414,7 @@ export class SectorMapManager {
     }
 
     renderResourcesOverlay(ctx, sectors, positions) {
-        const richness = { hub: 1, safe: 2, normal: 3, dangerous: 4, deadly: 5 };
+        const richness = { hub: 1, safe: 2, tame: 2, neutral: 3, normal: 3, dangerous: 4, deadly: 5 };
         for (const sector of sectors) {
             const pos = positions[sector.id];
             if (!pos) continue;
@@ -1620,18 +1639,74 @@ export class SectorMapManager {
         }
     }
 
+    drawRegionLabels(ctx, sectors, positions) {
+        // Group sectors by region
+        const regions = {};
+        for (const sector of sectors) {
+            const region = sector.region || 'core';
+            if (!regions[region]) regions[region] = [];
+            const pos = positions[sector.id];
+            if (pos) regions[region].push(pos);
+        }
+
+        ctx.font = '11px monospace';
+        ctx.textAlign = 'center';
+
+        for (const [region, posList] of Object.entries(regions)) {
+            if (posList.length === 0) continue;
+            // Find bounding center of region
+            let cx = 0, cy = 0;
+            for (const p of posList) { cx += p.x; cy += p.y; }
+            cx /= posList.length;
+            cy /= posList.length;
+
+            // Find top of region (min y)
+            let minY = Infinity;
+            for (const p of posList) { if (p.y < minY) minY = p.y; }
+
+            const label = region === 'milkyway' ? 'MILKY WAY' : 'CORE SECTORS';
+            const labelY = minY - 48;
+
+            ctx.fillStyle = region === 'milkyway' ? 'rgba(136, 68, 255, 0.5)' : 'rgba(0, 180, 255, 0.5)';
+            ctx.fillText(label, cx, labelY);
+
+            // Subtle bracket underline
+            const labelW = ctx.measureText(label).width;
+            ctx.strokeStyle = region === 'milkyway' ? 'rgba(136, 68, 255, 0.2)' : 'rgba(0, 180, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(cx - labelW / 2, labelY + 4);
+            ctx.lineTo(cx + labelW / 2, labelY + 4);
+            ctx.stroke();
+        }
+    }
+
     calculateSectorPositions(sectors, w, h) {
         const positions = {};
-        const padding = 90;
+        const padding = 70;
+
+        // Calculate grid bounds dynamically
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (const sector of sectors) {
+            if (sector.x < minX) minX = sector.x;
+            if (sector.x > maxX) maxX = sector.x;
+            if (sector.y < minY) minY = sector.y;
+            if (sector.y > maxY) maxY = sector.y;
+        }
+        const rangeX = maxX - minX || 1;
+        const rangeY = maxY - minY || 1;
+        const centerGridX = (minX + maxX) / 2;
+        const centerGridY = (minY + maxY) / 2;
+
         const centerX = w / 2;
         const centerY = h / 2;
-        const spreadX = (w - padding * 2) / 3;
-        const spreadY = (h - padding * 2) / 3;
+        const spreadX = (w - padding * 2) / rangeX;
+        const spreadY = (h - padding * 2) / rangeY;
 
         for (const sector of sectors) {
             positions[sector.id] = {
-                x: centerX + sector.x * spreadX,
-                y: centerY + sector.y * spreadY,
+                x: centerX + (sector.x - centerGridX) * spreadX,
+                y: centerY + (sector.y - centerGridY) * spreadY,
             };
         }
         return positions;
@@ -1641,6 +1716,8 @@ export class SectorMapManager {
         switch (difficulty) {
             case 'hub': return '#22dd44';
             case 'safe': return '#44ee55';
+            case 'tame': return '#88ddaa';
+            case 'neutral': return '#ddaa44';
             case 'normal': return '#ddcc22';
             case 'dangerous': return '#ee8822';
             case 'deadly': return '#ee2222';
@@ -1652,6 +1729,8 @@ export class SectorMapManager {
         const items = [
             { color: '#22dd44', label: 'Hub' },
             { color: '#44ee55', label: 'Safe' },
+            { color: '#88ddaa', label: 'Tame' },
+            { color: '#ddaa44', label: 'Neutral' },
             { color: '#ddcc22', label: 'Normal' },
             { color: '#ee8822', label: 'Danger' },
             { color: '#ee2222', label: 'Deadly' },
@@ -1661,7 +1740,7 @@ export class SectorMapManager {
         const legendY = h - 55;
 
         ctx.fillStyle = 'rgba(0, 10, 20, 0.6)';
-        ctx.fillRect(legendX - 5, legendY - 5, 280, 45);
+        ctx.fillRect(legendX - 5, legendY - 5, 390, 45);
 
         ctx.font = '9px monospace';
         let x = legendX;

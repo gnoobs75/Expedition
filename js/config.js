@@ -249,23 +249,39 @@ export const CONFIG = {
     SECTOR_DIFFICULTY: {
         hub: { enemyCount: 0, asteroidDensity: 0.1, name: 'Hub Station' },
         safe: { enemyCount: 2, asteroidDensity: 0.3, name: 'Safe Zone' },
+        tame: { enemyCount: 3, asteroidDensity: 0.4, name: 'Tame Territory' },
         normal: { enemyCount: 5, asteroidDensity: 0.5, name: 'Normal Space' },
+        neutral: { enemyCount: 7, asteroidDensity: 0.45, name: 'Neutral Zone' },
         dangerous: { enemyCount: 10, asteroidDensity: 0.4, name: 'Dangerous Zone' },
         deadly: { enemyCount: 15, asteroidDensity: 0.2, name: 'Deadly Zone' },
+    },
+
+    // Ore-to-Ingot refinery conversion rates
+    REFINERY_CONVERSIONS: {
+        veldspar: { material: 'tritanium-ingots', rate: 0.4, name: 'Tritanium Ingots' },
+        scordite: { material: 'pyerite-ingots', rate: 0.35, name: 'Pyerite Ingots' },
+        pyroxeres: { material: 'mexallon-ingots', rate: 0.3, name: 'Mexallon Ingots' },
+        plagioclase: { material: 'isogen-ingots', rate: 0.25, name: 'Isogen Ingots' },
+        omber: { material: 'nocxium-ingots', rate: 0.2, name: 'Nocxium Ingots' },
+        kernite: { material: 'zydrine-ingots', rate: 0.15, name: 'Zydrine Ingots' },
     },
 
     // NPC Ecosystem
     NPC_MINERS: {
         hub: { count: 7, shipClass: 'frigate', droneCount: 2 },
         safe: { count: 5, shipClass: 'frigate', droneCount: 2 },
+        tame: { count: 4, shipClass: 'frigate', droneCount: 2 },
         normal: { count: 3, shipClass: 'frigate', droneCount: 2 },
+        neutral: { count: 2, shipClass: 'frigate', droneCount: 1 },
         dangerous: { count: 1, shipClass: 'frigate', droneCount: 1 },
         deadly: { count: 0, shipClass: 'frigate', droneCount: 0 },
     },
     NPC_SECURITY: {
         hub: { count: 5, shipClass: 'cruiser' },
         safe: { count: 4, shipClass: 'cruiser' },
+        tame: { count: 3, shipClass: 'cruiser' },
         normal: { count: 3, shipClass: 'frigate' },
+        neutral: { count: 2, shipClass: 'frigate' },
         dangerous: { count: 2, shipClass: 'frigate' },
         deadly: { count: 1, shipClass: 'frigate' },
     },
@@ -348,15 +364,24 @@ export const CONFIG = {
 // Sector layout for hub-and-spoke universe
 export const UNIVERSE_LAYOUT = {
     sectors: [
-        { id: 'hub', name: 'Central Hub', x: 0, y: 0, difficulty: 'hub', hasStation: true },
-        { id: 'sector-1', name: 'Mining Fields Alpha', x: -1, y: 0, difficulty: 'safe', hasStation: true },
-        { id: 'sector-2', name: 'Mining Fields Beta', x: 1, y: 0, difficulty: 'safe', hasStation: true },
-        { id: 'sector-3', name: 'Frontier Zone', x: 0, y: -1, difficulty: 'normal', hasStation: true },
-        { id: 'sector-4', name: 'Pirate Territory', x: -1, y: -1, difficulty: 'dangerous', hasStation: true },
-        { id: 'sector-5', name: 'The Abyss', x: 1, y: -1, difficulty: 'deadly', hasStation: true },
-        { id: 'sector-6', name: 'Nebula Expanse', x: 0, y: 1, difficulty: 'normal', hasStation: true },
+        // === CORE SECTORS ===
+        { id: 'hub', name: 'Central Hub', x: 0, y: 0, difficulty: 'hub', hasStation: true, region: 'core' },
+        { id: 'sector-1', name: 'Mining Fields Alpha', x: -1, y: 0, difficulty: 'safe', hasStation: true, region: 'core' },
+        { id: 'sector-2', name: 'Mining Fields Beta', x: 1, y: 0, difficulty: 'safe', hasStation: true, region: 'core' },
+        { id: 'sector-3', name: 'Frontier Zone', x: 0, y: -1, difficulty: 'normal', hasStation: true, region: 'core' },
+        { id: 'sector-4', name: 'Pirate Territory', x: -1, y: -1, difficulty: 'dangerous', hasStation: true, region: 'core' },
+        { id: 'sector-5', name: 'The Abyss', x: 1, y: -1, difficulty: 'deadly', hasStation: true, region: 'core' },
+        { id: 'sector-6', name: 'Nebula Expanse', x: 0, y: 1, difficulty: 'normal', hasStation: true, region: 'core' },
+        // === MILKY WAY REGION ===
+        { id: 'mw-alpha', name: 'Sol Gateway', x: 3, y: 0, difficulty: 'safe', hasStation: true, region: 'milkyway', stationType: 'military-hub' },
+        { id: 'mw-bravo', name: 'Orion Refinery', x: 4, y: -1, difficulty: 'tame', hasStation: true, region: 'milkyway', stationType: 'mining-hub' },
+        { id: 'mw-charlie', name: 'Cygnus Forge', x: 5, y: 0, difficulty: 'tame', hasStation: true, region: 'milkyway', stationType: 'mining-hub' },
+        { id: 'mw-delta', name: 'Vega Outpost', x: 5, y: 1, difficulty: 'neutral', hasStation: true, region: 'milkyway', stationType: 'mercenary-hub' },
+        { id: 'mw-echo', name: 'Sirius Station', x: 4, y: 1, difficulty: 'safe', hasStation: true, region: 'milkyway', stationType: 'military-hub' },
+        { id: 'mw-foxtrot', name: 'Arcturus Landing', x: 3, y: 1, difficulty: 'neutral', hasStation: true, region: 'milkyway', stationType: 'mercenary-hub' },
     ],
     gates: [
+        // === CORE GATES ===
         { from: 'hub', to: 'sector-1' },
         { from: 'hub', to: 'sector-2' },
         { from: 'hub', to: 'sector-3' },
@@ -365,5 +390,14 @@ export const UNIVERSE_LAYOUT = {
         { from: 'sector-2', to: 'sector-5' },
         { from: 'sector-3', to: 'sector-4' },
         { from: 'sector-3', to: 'sector-5' },
+        // === WORMHOLE GATE (Core -> Milky Way) ===
+        { from: 'hub', to: 'mw-alpha', wormhole: true },
+        // === MILKY WAY RING ===
+        { from: 'mw-alpha', to: 'mw-bravo' },
+        { from: 'mw-bravo', to: 'mw-charlie' },
+        { from: 'mw-charlie', to: 'mw-delta' },
+        { from: 'mw-delta', to: 'mw-echo' },
+        { from: 'mw-echo', to: 'mw-foxtrot' },
+        { from: 'mw-foxtrot', to: 'mw-alpha' },
     ],
 };

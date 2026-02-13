@@ -283,6 +283,9 @@ export class SaveManager {
                 hangar: (game.fleetSystem.flagship.hangar || []).map(s => s.fleetId),
             } : null,
             sectorEvents: game.sectorEventSystem?.saveState() || null,
+
+            // Player-owned stations
+            playerStations: (game.playerStations || []).map(pos => pos.serialize()),
         };
 
         return data;

@@ -659,6 +659,11 @@ export class UIManager {
             }
         });
 
+        // Refine all ore button
+        document.getElementById('refine-all-ore-btn')?.addEventListener('click', () => {
+            this.refineAllOre();
+        });
+
         // D-Scan range/angle sliders with value display
         document.getElementById('dscan-range')?.addEventListener('input', (e) => {
             this.dscanRange = parseInt(e.target.value);
@@ -2845,8 +2850,8 @@ export class UIManager {
                 items.push(`<div class="menu-item" data-action="warp">Warp To</div>`);
             }
 
-            // Dock (only for stations)
-            if (entity.type === 'station') {
+            // Dock (only for stations and player stations)
+            if (entity.type === 'station' || entity.type === 'player-station') {
                 const canDock = entity.canDock?.(this.game.player);
                 const dockClass = canDock ? '' : ' disabled';
                 items.push(`<div class="menu-item${dockClass}" data-action="dock">Dock</div>`);
@@ -2908,6 +2913,20 @@ export class UIManager {
             items.push(`<div class="menu-item" data-action="jettison">Jettison Cargo</div>`);
         }
 
+        // Deploy POS (when player has pos-kit in cargo)
+        if (player) {
+            const hasBasicKit = player.cargo['pos-kit-basic']?.quantity > 0;
+            const hasAdvancedKit = player.cargo['pos-kit-advanced']?.quantity > 0;
+            if (hasBasicKit || hasAdvancedKit) {
+                const existing = this.game.playerStations?.find(p => p.sectorId === this.game.currentSector?.id && p.alive);
+                if (!existing) {
+                    items.push(`<div class="menu-separator"></div>`);
+                    if (hasBasicKit) items.push(`<div class="menu-item" data-action="deploy-pos-basic">Deploy POS (Basic)</div>`);
+                    if (hasAdvancedKit) items.push(`<div class="menu-item" data-action="deploy-pos-advanced">Deploy POS (Advanced)</div>`);
+                }
+            }
+        }
+
         // Bookmark - always available
         items.push(`<div class="menu-separator"></div>`);
         items.push(`<div class="menu-item" data-action="bookmark">Save Location</div>`);
@@ -2962,6 +2981,16 @@ export class UIManager {
             return;
         }
 
+        // Deploy POS
+        if (action === 'deploy-pos-basic') {
+            this.game.deployPlayerStation('pos-kit-basic');
+            return;
+        }
+        if (action === 'deploy-pos-advanced') {
+            this.game.deployPlayerStation('pos-kit-advanced');
+            return;
+        }
+
         // All other actions require a target
         if (!target) return;
 
@@ -3005,7 +3034,7 @@ export class UIManager {
                 }
                 break;
             case 'dock':
-                if (target.type === 'station' && target.canDock(this.game.player)) {
+                if ((target.type === 'station' || target.type === 'player-station') && target.canDock(this.game.player)) {
                     this.game.dockAtStation(target);
                 } else {
                     this.log('Too far to dock', 'system');
@@ -3626,6 +3655,29 @@ export class UIManager {
         `;
 
         if (sellBtn) sellBtn.disabled = false;
+
+        // Show ingot conversion preview
+        const refineBtn = document.getElementById('refine-all-ore-btn');
+        const ingotPreview = document.getElementById('refinery-ingot-preview');
+        const conversions = CONFIG.REFINERY_CONVERSIONS;
+        if (ingotPreview && conversions) {
+            let hasConversion = false;
+            let previewHtml = '<div class="ingot-preview-title">REFINE PREVIEW</div>';
+            for (const [type, data] of oreTypes) {
+                const conv = conversions[type];
+                if (!conv) continue;
+                const ingotAmount = Math.floor(data.units * conv.rate);
+                if (ingotAmount <= 0) continue;
+                hasConversion = true;
+                previewHtml += `<div class="ingot-preview-row">
+                    <span class="ingot-ore">${data.units} ${type}</span>
+                    <span class="ingot-arrow">\u2192</span>
+                    <span class="ingot-result">${ingotAmount} ${conv.name}</span>
+                </div>`;
+            }
+            ingotPreview.innerHTML = hasConversion ? previewHtml : '';
+            if (refineBtn) refineBtn.disabled = !hasConversion;
+        }
     }
 
     /**
@@ -3703,6 +3755,70 @@ export class UIManager {
         this.addShipLogEntry(`Sold ore for ${formatCredits(totalValue)} ISK`, 'trade');
 
         // Update display
+        this.updateRefineryTab();
+    }
+
+    /**
+     * Refine all ore into ingots using REFINERY_CONVERSIONS
+     */
+    refineAllOre() {
+        const player = this.game.player;
+        if (!player || !player.cargo) return;
+
+        const conversions = CONFIG.REFINERY_CONVERSIONS;
+        if (!conversions) {
+            this.toast('Refinery conversions not configured', 'error');
+            return;
+        }
+
+        let totalRefined = 0;
+        const results = [];
+
+        for (const [oreType, data] of Object.entries(player.cargo)) {
+            if (data.units <= 0) continue;
+            const conv = conversions[oreType];
+            if (!conv) continue;
+
+            const ingotAmount = Math.floor(data.units * conv.rate);
+            if (ingotAmount <= 0) continue;
+
+            // Add ingots to materials
+            if (!player.materials) player.materials = {};
+            if (!player.materials[conv.material]) {
+                player.materials[conv.material] = 0;
+            }
+            player.materials[conv.material] += ingotAmount;
+
+            results.push({ ore: oreType, units: data.units, ingot: conv.name, amount: ingotAmount });
+            totalRefined += data.units;
+        }
+
+        if (totalRefined === 0) {
+            this.toast('No refinable ore in cargo', 'warning');
+            return;
+        }
+
+        // Clear refined ore from cargo
+        for (const r of results) {
+            delete player.cargo[r.ore];
+        }
+        // Recalculate cargo used
+        let used = 0;
+        for (const data of Object.values(player.cargo)) {
+            used += data.volume || 0;
+        }
+        player.cargoUsed = used;
+
+        // Log results
+        const summary = results.map(r => `${r.amount} ${r.ingot}`).join(', ');
+        this.log(`Refined ${totalRefined.toLocaleString()} units of ore into ${summary}`, 'mining');
+        this.toast(`Refined ore into ingots!`, 'success');
+        this.game.audio?.play('scan-complete');
+        this.addShipLogEntry(`Refined ore: ${summary}`, 'industry');
+
+        // Emit event for Skippy etc
+        this.game.events?.emit('refinery:complete', { results, totalRefined });
+
         this.updateRefineryTab();
     }
 

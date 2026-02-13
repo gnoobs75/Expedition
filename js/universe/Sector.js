@@ -195,6 +195,13 @@ export class Sector {
             const destId = connectedSectors[i];
             const destSector = UNIVERSE_LAYOUT.sectors.find(s => s.id === destId);
 
+            // Check if this is a wormhole gate
+            const gateConfig = UNIVERSE_LAYOUT.gates.find(g =>
+                (g.from === this.id && g.to === destId) ||
+                (g.to === this.id && g.from === destId)
+            );
+            const isWormhole = gateConfig?.wormhole || false;
+
             // Position gate based on relative direction to destination
             let angle;
             if (destSector) {
@@ -213,7 +220,8 @@ export class Sector {
                 y: centerY + Math.sin(angle) * dist,
                 destinationSectorId: destId,
                 destinationName: destSector?.name || destId,
-                name: `Gate to ${destSector?.name || destId}`,
+                name: isWormhole ? `Wormhole to ${destSector?.name || destId}` : `Gate to ${destSector?.name || destId}`,
+                isWormhole,
             });
 
             this.entities.push(gate);

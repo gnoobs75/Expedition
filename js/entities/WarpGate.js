@@ -21,15 +21,19 @@ export class WarpGate extends Entity {
         this.destinationSectorId = options.destinationSectorId || null;
         this.destinationName = options.destinationName || 'Unknown';
 
+        // Wormhole gates have distinct visuals
+        this.isWormhole = options.isWormhole || false;
+
         // Gate properties
         this.activationRange = 150;
         this.warpMinRange = 100; // Minimum distance to warp to
 
         // Animation
         this.pulsePhase = Math.random() * Math.PI * 2;
-        this.rotationSpeed = 0.3;
+        this.rotationSpeed = this.isWormhole ? 0.5 : 0.3;
         this.activationLevel = 0; // 0 = idle, 1 = fully activated
         this.wasActivated = false;
+        this.wobbleTime = 0;
     }
 
     /**
@@ -120,6 +124,11 @@ export class WarpGate extends Entity {
         const outerRing = new THREE.Mesh(outerRingGeometry, outerRingMaterial);
         group.add(outerRing);
 
+        // Color scheme: purple for wormholes, blue for normal gates
+        const energyColor = this.isWormhole ? 0x8844ff : 0x4488ff;
+        const portalColor = this.isWormhole ? 0x4422aa : 0x2244aa;
+        const glowColor = this.isWormhole ? 0xaa66ff : 0x88aaff;
+
         // Inner energy ring
         const innerRingGeometry = new THREE.RingGeometry(
             this.radius * 0.7,
@@ -127,7 +136,7 @@ export class WarpGate extends Entity {
             32
         );
         const innerRingMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4488ff,
+            color: energyColor,
             transparent: true,
             opacity: 0.7,
         });
@@ -138,7 +147,7 @@ export class WarpGate extends Entity {
         // Gate portal (swirling center)
         const portalGeometry = new THREE.CircleGeometry(this.radius * 0.65, 32);
         const portalMaterial = new THREE.MeshBasicMaterial({
-            color: 0x2244aa,
+            color: portalColor,
             transparent: true,
             opacity: 0.5,
         });
@@ -149,7 +158,7 @@ export class WarpGate extends Entity {
         // Swirl overlay for portal animation
         const swirlGeometry = new THREE.RingGeometry(this.radius * 0.15, this.radius * 0.55, 32, 1, 0, Math.PI * 1.2);
         const swirlMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4488ff,
+            color: energyColor,
             transparent: true,
             opacity: 0.3,
             side: THREE.DoubleSide,
@@ -158,10 +167,24 @@ export class WarpGate extends Entity {
         swirl.position.z = 0.08;
         group.add(swirl);
 
+        // Second counter-rotating swirl for wormholes
+        if (this.isWormhole) {
+            const swirl2Geo = new THREE.RingGeometry(this.radius * 0.25, this.radius * 0.6, 32, 1, 0, Math.PI * 0.8);
+            const swirl2Mat = new THREE.MeshBasicMaterial({
+                color: 0xcc88ff,
+                transparent: true,
+                opacity: 0.2,
+                side: THREE.DoubleSide,
+            });
+            this.swirl2 = new THREE.Mesh(swirl2Geo, swirl2Mat);
+            this.swirl2.position.z = 0.09;
+            group.add(this.swirl2);
+        }
+
         // Central glow
         const glowGeometry = new THREE.CircleGeometry(this.radius * 0.3, 16);
         const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0x88aaff,
+            color: glowColor,
             transparent: true,
             opacity: 0.8,
         });
@@ -181,7 +204,7 @@ export class WarpGate extends Entity {
             chevronGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
 
             const chevronMaterial = new THREE.MeshBasicMaterial({
-                color: 0x88aaff,
+                color: glowColor,
                 transparent: true,
                 opacity: 0.8,
             });
@@ -216,25 +239,45 @@ export class WarpGate extends Entity {
             this.mesh.visible = this.visible && this.alive;
 
             const act = this.activationLevel;
+            const isWH = this.isWormhole;
+
+            // Wormhole wobble - unstable spatial distortion
+            if (isWH) {
+                this.wobbleTime += 0.016;
+                const wobbleX = Math.sin(this.wobbleTime * 1.7) * 0.03;
+                const wobbleY = Math.cos(this.wobbleTime * 2.3) * 0.03;
+                this.mesh.scale.set(1 + wobbleX, 1 + wobbleY, 1);
+            }
 
             // Pulse the inner ring - brighter when activated
             if (this.innerRing) {
                 const basePulse = 0.5 + Math.sin(this.pulsePhase) * 0.3;
                 this.innerRing.material.opacity = basePulse + act * 0.4;
-                this.innerRing.material.color.setHex(act > 0.5 ? 0x66bbff : 0x4488ff);
+                if (isWH) {
+                    this.innerRing.material.color.setHex(act > 0.5 ? 0xaa66ff : 0x8844ff);
+                } else {
+                    this.innerRing.material.color.setHex(act > 0.5 ? 0x66bbff : 0x4488ff);
+                }
             }
 
             // Pulse the glow - bigger and brighter when activated
             if (this.glow) {
                 const pulse = 0.6 + Math.sin(this.pulsePhase * 1.5) * 0.3;
                 this.glow.material.opacity = pulse + act * 0.3;
-                this.glow.scale.setScalar(0.9 + Math.sin(this.pulsePhase) * 0.1 + act * 0.4);
+                const glowScale = 0.9 + Math.sin(this.pulsePhase) * 0.1 + act * 0.4;
+                this.glow.scale.setScalar(isWH ? glowScale * (1 + Math.sin(this.wobbleTime * 3.1) * 0.08) : glowScale);
             }
 
             // Rotate the swirl overlay - faster when activated
             if (this.swirl) {
                 this.swirl.rotation.z += 0.02 + act * 0.06;
                 this.swirl.material.opacity = 0.2 + Math.sin(this.pulsePhase * 0.8) * 0.15 + act * 0.3;
+            }
+
+            // Counter-rotating swirl for wormholes
+            if (this.swirl2) {
+                this.swirl2.rotation.z -= 0.015 + act * 0.04;
+                this.swirl2.material.opacity = 0.15 + Math.sin(this.pulsePhase * 1.2 + 1) * 0.1 + act * 0.2;
             }
         }
     }

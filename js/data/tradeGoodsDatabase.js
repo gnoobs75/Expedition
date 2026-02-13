@@ -56,6 +56,48 @@ export const STATION_SPECIALTIES = {
         consumes: ['sensor-arrays', 'navigation-charts', 'quantum-processors', 'bio-cultures'],
         description: 'Research station - harvests nebula resources, needs scientific equipment',
     },
+    'mw-alpha': {
+        name: 'Sol Gateway',
+        specialty: 'military-hub',
+        produces: ['hull-plating', 'weapon-components', 'shield-capacitors', 'encryption-keys'],
+        consumes: ['tritanium-ingots', 'pyerite-ingots', 'heavy-metals', 'industrial-alloys'],
+        description: 'Military manufacturing hub - produces warship components, needs refined metals',
+    },
+    'mw-bravo': {
+        name: 'Orion Refinery',
+        specialty: 'mining-refinery',
+        produces: ['tritanium-ingots', 'pyerite-ingots', 'refined-minerals', 'industrial-alloys'],
+        consumes: ['mining-equipment', 'industrial-coolant', 'drone-parts', 'hull-plating'],
+        description: 'Deep-space mining and refinery complex - processes ore into ingots and alloys',
+    },
+    'mw-charlie': {
+        name: 'Cygnus Forge',
+        specialty: 'mining-refinery',
+        produces: ['mexallon-ingots', 'isogen-ingots', 'crystal-composites', 'nocxium-ingots'],
+        consumes: ['mining-equipment', 'water-purifiers', 'hull-plating', 'industrial-coolant'],
+        description: 'Advanced mineral forge - refines rare ores into high-grade ingots',
+    },
+    'mw-delta': {
+        name: 'Vega Outpost',
+        specialty: 'mercenary-hub',
+        produces: ['contraband-weapons', 'combat-stimulants', 'hacked-firmware', 'stolen-cargo'],
+        consumes: ['weapon-components', 'medical-supplies', 'encryption-keys', 'luxury-food'],
+        description: 'Mercenary outpost - combat contracts and black market trading',
+    },
+    'mw-echo': {
+        name: 'Sirius Station',
+        specialty: 'military-hub',
+        produces: ['weapon-components', 'encryption-keys', 'combat-stimulants', 'shield-capacitors'],
+        consumes: ['mexallon-ingots', 'isogen-ingots', 'quantum-processors', 'heavy-metals'],
+        description: 'Military garrison - produces advanced weapons systems, needs high-grade materials',
+    },
+    'mw-foxtrot': {
+        name: 'Arcturus Landing',
+        specialty: 'mercenary-hub',
+        produces: ['stolen-cargo', 'forged-documents', 'hacked-firmware', 'contraband-weapons'],
+        consumes: ['combat-stimulants', 'medical-supplies', 'luxury-food', 'consumer-electronics'],
+        description: 'Mercenary haven - black market hub for illicit goods and services',
+    },
 };
 
 // Trade goods categories and items
@@ -110,6 +152,54 @@ export const TRADE_GOODS = {
         volume: 0.3,
         icon: '\u26A1',
         description: 'Zero-resistance conductors for power systems',
+    },
+    'tritanium-ingots': {
+        name: 'Tritanium Ingots',
+        category: 'raw-materials',
+        basePrice: 200,
+        volume: 0.3,
+        icon: '\u2B23',
+        description: 'Refined metal ingots from veldspar ore. Essential for hull construction.',
+    },
+    'pyerite-ingots': {
+        name: 'Pyerite Ingots',
+        category: 'raw-materials',
+        basePrice: 400,
+        volume: 0.4,
+        icon: '\u2B23',
+        description: 'Volatile crystalline ingots from scordite. Used in weapons manufacturing.',
+    },
+    'mexallon-ingots': {
+        name: 'Mexallon Ingots',
+        category: 'raw-materials',
+        basePrice: 650,
+        volume: 0.5,
+        icon: '\u2B23',
+        description: 'Dense metallic ingots from pyroxeres. Required for advanced components.',
+    },
+    'isogen-ingots': {
+        name: 'Isogen Ingots',
+        category: 'raw-materials',
+        basePrice: 1000,
+        volume: 0.6,
+        icon: '\u2B23',
+        description: 'Rare isotope ingots from plagioclase. Used in shield technology.',
+    },
+    'nocxium-ingots': {
+        name: 'Nocxium Ingots',
+        category: 'raw-materials',
+        basePrice: 1800,
+        volume: 0.7,
+        icon: '\u2B23',
+        description: 'Ultra-dense ingots from omber ore. Critical for capital ship components.',
+    },
+    'zydrine-ingots': {
+        name: 'Zydrine Ingots',
+        category: 'raw-materials',
+        basePrice: 3500,
+        volume: 0.8,
+        icon: '\u2B23',
+        description: 'Exceedingly rare crystalline ingots from kernite. The most valuable refined material.',
     },
 
     // =============================================
@@ -390,6 +480,26 @@ export const TRADE_GOODS = {
         volume: 0.1,
         icon: '\u2620',
         description: 'Convincing forgeries of official documents',
+    },
+
+    // =============================================
+    // INDUSTRIAL - POS KITS
+    // =============================================
+    'pos-kit-basic': {
+        name: 'POS Assembly Kit (Basic)',
+        category: 'industrial',
+        basePrice: 500000,
+        volume: 20000,
+        icon: '\u2B21',
+        description: 'Compact station assembly kit. Requires capital hauler for transport. Deploys to Basic POS.',
+    },
+    'pos-kit-advanced': {
+        name: 'POS Assembly Kit (Advanced)',
+        category: 'industrial',
+        basePrice: 1500000,
+        volume: 25000,
+        icon: '\u2B22',
+        description: 'Premium station assembly kit with enhanced hull and turret hardpoints. Capital hauler required.',
     },
 };
 

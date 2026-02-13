@@ -35,6 +35,8 @@ import { AnomalySystem } from '../systems/AnomalySystem.js';
 import { SectorEventSystem } from '../systems/SectorEventSystem.js';
 import { BountySystem } from '../systems/BountySystem.js';
 import { IntelSystem } from '../systems/IntelSystem.js';
+import { PlayerStationDefenseSystem } from '../systems/PlayerStationDefenseSystem.js';
+import { PlayerStation } from '../entities/PlayerStation.js';
 import { AdminDashboardManager } from '../ui/AdminDashboardManager.js';
 import { EncyclopediaManager } from '../ui/EncyclopediaManager.js';
 import { SkippyManager } from '../ui/SkippyManager.js';
@@ -71,6 +73,9 @@ export class Game {
 
         // Player faction
         this.faction = { name: 'Unnamed Faction', color: '#00ccff', treasury: 0 };
+
+        // Player-owned stations (POS)
+        this.playerStations = [];
 
         // Insurance state
         this.insurance = this.loadInsurance();
@@ -183,6 +188,7 @@ export class Game {
         this.sectorEventSystem = new SectorEventSystem(this);
         this.bountySystem = new BountySystem(this);
         this.intelSystem = new IntelSystem(this);
+        this.posDefenseSystem = new PlayerStationDefenseSystem(this);
 
         // Create UI manager (last, needs other systems)
         this.ui = new UIManager(this);
@@ -550,11 +556,62 @@ export class Game {
         // End any active engagement recording on sector change
         this.engagementRecorder?.forceEnd();
 
+        // Add player-owned stations in this sector
+        for (const pos of this.playerStations) {
+            if (pos.sectorId === sectorId && pos.alive) {
+                sector.entities.push(pos);
+            }
+        }
+
         // Cinematic zoom on sector arrival
         this.camera?.sectorArrivalZoom();
 
         // Fire event
         this.events.emit('sector:change', sectorId);
+    }
+
+    /**
+     * Deploy a Player Owned Station (POS) in the current sector
+     */
+    deployPlayerStation(posKitType) {
+        if (!this.player || !this.currentSector) return false;
+
+        // Check player has the kit in cargo
+        const kitId = posKitType || 'pos-kit-basic';
+        const hasKit = this.player.cargo[kitId]?.quantity > 0;
+        if (!hasKit) {
+            this.ui?.toast('No POS assembly kit in cargo', 'error');
+            return false;
+        }
+
+        // Check no existing POS in this sector
+        const existing = this.playerStations.find(p => p.sectorId === this.currentSector.id && p.alive);
+        if (existing) {
+            this.ui?.toast('A station already exists in this sector', 'error');
+            return false;
+        }
+
+        // Remove kit from cargo
+        this.player.cargo[kitId].quantity -= 1;
+        if (this.player.cargo[kitId].quantity <= 0) delete this.player.cargo[kitId];
+
+        // Create POS near player position
+        const station = new PlayerStation(this, {
+            x: this.player.x + 500,
+            y: this.player.y,
+            name: `${this.faction.name} Station`,
+            owner: { name: this.faction.name, color: this.faction.color },
+            sectorId: this.currentSector.id,
+        });
+
+        this.playerStations.push(station);
+        this.currentSector.entities.push(station);
+
+        this.events.emit('pos:deployed', { station, sectorId: this.currentSector.id });
+        this.ui?.toast(`POS deployed in ${this.currentSector.name}!`, 'success');
+        this.ui?.log(`Deployed ${station.name} at current position`, 'system');
+
+        return true;
     }
 
     /**
@@ -836,6 +893,7 @@ export class Game {
         this.sectorEventSystem?.update(dt);
         this.bountySystem?.update(dt);
         this.intelSystem?.update(dt);
+        this.posDefenseSystem?.update(dt);
 
         // Auto-loot tractor beam
         this.updateTractorBeams(dt);
@@ -1286,6 +1344,31 @@ export class Game {
         if (data.intelData) this.intelSystem?.loadState(data.intelData);
         if (data.fleet?.activeDoctrine) this.fleetSystem?.setDoctrine(data.fleet.activeDoctrine);
         if (data.sectorEvents) this.sectorEventSystem?.loadState(data.sectorEvents);
+
+        // Restore player stations (POS)
+        if (data.playerStations && Array.isArray(data.playerStations)) {
+            this.playerStations = [];
+            for (const posData of data.playerStations) {
+                const station = new PlayerStation(this, {
+                    x: posData.x || 0,
+                    y: posData.y || 0,
+                    name: posData.name || 'Player Station',
+                    owner: posData.owner || this.faction,
+                    sectorId: posData.sectorId,
+                    upgradeLevel: posData.upgradeLevel,
+                });
+                station.hull = posData.hull ?? station.maxHull;
+                station.shieldHP = posData.shieldHP ?? station.maxShieldHP;
+                station.storage = posData.storage || { ore: {}, tradeGoods: {}, materials: {} };
+                // Restore turrets
+                if (posData.turrets) {
+                    for (const t of posData.turrets) {
+                        station.addTurret(t.type);
+                    }
+                }
+                this.playerStations.push(station);
+            }
+        }
 
         // Bookmarks
         this.bookmarks = this.loadBookmarks();

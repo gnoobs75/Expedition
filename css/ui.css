@@ -16,17 +16,20 @@
     --font-body: 'Rajdhani', 'Segoe UI', sans-serif;
 
     /* Type Scale */
-    --text-2xs: 10px;
-    --text-xs: 11px;
-    --text-sm: 12px;
-    --text-base: 13px;
-    --text-md: 14px;
-    --text-lg: 16px;
+    --text-2xs: 11px;
+    --text-xs: 12px;
+    --text-sm: 13px;
+    --text-base: 14px;
+    --text-md: 15px;
+    --text-lg: 17px;
     --text-xl: 18px;
     --text-2xl: 20px;
     --text-3xl: 24px;
     --text-4xl: 32px;
     --text-hero: 48px;
+
+    /* UI Scale */
+    --ui-scale: 1;
 
     /* Spacing Scale (4px base grid) */
     --space-1: 4px;
@@ -55,16 +58,16 @@
     --glow-blue: rgba(0, 136, 255, 0.5);
 
     /* Panel Styling */
-    --panel-bg: linear-gradient(135deg, rgba(0, 20, 40, 0.95) 0%, rgba(0, 10, 30, 0.98) 100%);
-    --panel-bg-solid: rgba(0, 15, 35, 0.95);
+    --panel-bg: linear-gradient(135deg, rgba(8, 18, 38, 0.94) 0%, rgba(4, 12, 32, 0.97) 100%);
+    --panel-bg-solid: rgba(8, 18, 38, 0.95);
     --panel-border: rgba(0, 255, 255, 0.4);
     --panel-border-bright: rgba(0, 255, 255, 0.7);
     --panel-inner-glow: rgba(0, 255, 255, 0.08);
 
     /* Text Colors */
-    --text-primary: #00ffff;
-    --text-secondary: #88dddd;
-    --text-dim: #446666;
+    --text-primary: #eaf2fa;
+    --text-secondary: #9db0c4;
+    --text-dim: #708498;
     --text-bright: #ffffff;
 
     /* Status Colors */
@@ -102,7 +105,7 @@ body {
     overflow: hidden;
     background: #000;
     font-family: var(--font-body);
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text-primary);
     user-select: none;
 }
@@ -177,14 +180,14 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     display: flex;
     justify-content: space-between;
     gap: 10px;
-    font-size: 10px;
+    font-size: 11px;
     margin-bottom: 2px;
 }
 
 .global-tooltip-label { color: var(--text-dim); }
 .global-tooltip-value { color: var(--text-primary); }
 .global-tooltip-hint {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     margin-top: 4px;
     font-style: italic;
@@ -331,7 +334,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     position: absolute;
     top: 2px;
     right: 3px;
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.35);
     z-index: 10;
     pointer-events: none;
@@ -356,7 +359,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     bottom: 3px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.8);
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
     z-index: 15;
@@ -426,7 +429,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .empty-state-hint {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     line-height: 1.4;
     opacity: 0.7;
@@ -528,6 +531,15 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
    Panel Base Styles - Premium Glass Effect
    ============================================= */
 
+/* UI Scale - applied to panels, modals, and bottom bar */
+.panel,
+.modal-content,
+#bottom-bar,
+#ship-indicator,
+#module-rack {
+    zoom: var(--ui-scale, 1);
+}
+
 .panel {
     background: var(--panel-bg);
     border: 1px solid var(--panel-border);
@@ -577,10 +589,11 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     align-items: center;
     padding: 8px 12px;
     border-bottom: 1px solid var(--panel-border);
-    background: linear-gradient(180deg, rgba(0, 255, 255, 0.1) 0%, rgba(0, 255, 255, 0.02) 100%);
+    background: linear-gradient(180deg, rgba(0, 255, 255, 0.12) 0%, rgba(0, 255, 255, 0.03) 100%);
     position: relative;
     cursor: grab;
     user-select: none;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 /* Header Scan Line Effect */
@@ -710,7 +723,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .status-group label {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -1005,7 +1018,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .danger-label {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     letter-spacing: 1px;
     color: rgba(150, 150, 150, 0.5);
@@ -1154,7 +1167,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     position: absolute;
     right: 3px;
     top: -1px;
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(200, 220, 240, 0.6);
     pointer-events: none;
     line-height: 8px;
@@ -1191,7 +1204,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .scanner-label {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     color: rgba(100, 180, 220, 0.6);
     letter-spacing: 0.5px;
@@ -1217,7 +1230,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .ewar-badge {
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 6px;
     border-radius: 3px;
     letter-spacing: 0.5px;
@@ -1255,7 +1268,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     align-items: center;
     gap: 4px;
     padding: 1px 4px;
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(150, 200, 230, 0.7);
 }
 
@@ -1290,7 +1303,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .threat-header {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 100, 100, 0.7);
     letter-spacing: 1px;
     padding: 2px 0;
@@ -1301,7 +1314,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     justify-content: space-between;
     align-items: center;
     padding: 1px 4px;
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(200, 180, 180, 0.8);
     border-left: 2px solid rgba(255, 68, 68, 0.4);
     margin: 1px 0;
@@ -1352,7 +1365,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .ov-tip-row {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(180, 200, 220, 0.8);
     line-height: 1.5;
 }
@@ -1438,7 +1451,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     position: sticky;
     top: 0;
     text-transform: uppercase;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
 }
 
@@ -1537,7 +1550,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .power-label {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.5);
     letter-spacing: 0.5px;
 }
@@ -1575,7 +1588,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .power-value {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.6);
     font-family: var(--font-mono);
 }
@@ -1624,7 +1637,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .section-label {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -1779,7 +1792,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     left: 50%;
     top: -12px;
     transform: translateX(-50%);
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.5);
     letter-spacing: 1px;
     white-space: nowrap;
@@ -1846,7 +1859,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 .log-message .timestamp {
     color: var(--text-dim);
     margin-right: 10px;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-mono);
 }
 
@@ -1918,7 +1931,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .log-killmail {
-    font-size: 10px;
+    font-size: 11px;
     margin-top: 3px;
     padding: 4px 6px;
     background: rgba(0, 0, 0, 0.3);
@@ -2022,7 +2035,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .submenu-arrow {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     margin-right: 8px;
     transition: color var(--transition-fast);
@@ -2358,7 +2371,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 .traffic-log {
     display: flex;
     gap: 15px;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.5px;
     color: rgba(150, 170, 190, 0.6);
     white-space: nowrap;
@@ -2409,7 +2422,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .ticker-item {
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.5px;
     color: rgba(180, 200, 220, 0.7);
     display: inline-flex;
@@ -2680,7 +2693,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .dscan-label {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     color: rgba(100, 180, 220, 0.6);
     letter-spacing: 1px;
@@ -2748,7 +2761,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(100, 180, 220, 0.3);
     color: rgba(150, 200, 230, 0.7);
-    font-size: 10px;
+    font-size: 11px;
     cursor: pointer;
     border-radius: 3px;
     transition: all var(--transition-fast);
@@ -2761,7 +2774,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .dscan-summary {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(100, 180, 220, 0.5);
     padding: 4px 0;
     text-align: center;
@@ -2780,7 +2793,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .dscan-table thead th {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     color: rgba(100, 180, 220, 0.5);
     text-align: left;
@@ -2818,7 +2831,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 
 .dscan-type {
     color: var(--text-dim);
-    font-size: 10px;
+    font-size: 11px;
     text-transform: uppercase;
 }
 
@@ -2826,7 +2839,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     color: var(--text-secondary);
     text-align: right;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
 }
 
 tr.dscan-hostile .dscan-name { color: #ff6666; }
@@ -3363,7 +3376,7 @@ select:focus-visible {
 }
 
 .viewer-type {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -3375,7 +3388,7 @@ select:focus-visible {
 }
 
 .viewer-section-title {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -3432,7 +3445,7 @@ select:focus-visible {
 
 .viewer-bar-label {
     width: 60px;
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -3473,7 +3486,7 @@ select:focus-visible {
     background: linear-gradient(180deg, rgba(255, 68, 68, 0.3) 0%, rgba(255, 68, 68, 0.1) 100%);
     border: 1px solid var(--hostile-color);
     color: var(--hostile-color);
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 2px;
     padding: 4px 10px;
     border-radius: 3px;
@@ -3538,7 +3551,7 @@ select:focus-visible {
 }
 
 #cargo-display .label {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     color: var(--text-dim);
     letter-spacing: 2px;
@@ -3575,7 +3588,7 @@ select:focus-visible {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-secondary);
     text-shadow: 0 0 3px black;
     white-space: nowrap;
@@ -3602,7 +3615,7 @@ select:focus-visible {
 }
 
 #locked-targets-container .panel-title {
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .locked-targets-content {
@@ -3717,7 +3730,7 @@ select:focus-visible {
     bottom: -18px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-secondary);
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -3731,7 +3744,7 @@ select:focus-visible {
     top: -14px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     white-space: nowrap;
 }
@@ -3754,7 +3767,7 @@ select:focus-visible {
 }
 
 #ship-indicator .panel-title {
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .ship-indicator-content {
@@ -3779,7 +3792,7 @@ select:focus-visible {
 }
 
 .ship-indicator-name {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--primary-cyan);
     text-shadow: 0 0 5px var(--glow-cyan);
     white-space: nowrap;
@@ -3788,7 +3801,7 @@ select:focus-visible {
 }
 
 .ship-indicator-class {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-secondary);
     text-transform: uppercase;
 }
@@ -3809,7 +3822,7 @@ select:focus-visible {
     position: absolute;
     right: 2px;
     top: -1px;
-    font-size: 10px;
+    font-size: 11px;
     line-height: 10px;
     color: rgba(255, 255, 255, 0.7);
     text-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
@@ -3838,11 +3851,11 @@ select:focus-visible {
 }
 
 #drone-bar .panel-title {
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .drone-count {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-secondary);
 }
 
@@ -3889,7 +3902,7 @@ select:focus-visible {
 }
 
 .drone-status {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     text-align: center;
 }
@@ -3913,7 +3926,7 @@ select:focus-visible {
 }
 
 #performance-monitor .panel-title {
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .perf-content {
@@ -3933,7 +3946,7 @@ select:focus-visible {
 }
 
 .perf-label {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     letter-spacing: 1px;
     margin-bottom: 2px;
@@ -3952,12 +3965,12 @@ select:focus-visible {
 }
 
 .perf-unit {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-secondary);
 }
 
 .perf-detail {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
 }
 
@@ -4098,7 +4111,7 @@ select:focus-visible {
 .module-tooltip-stat {
     display: flex;
     justify-content: space-between;
-    font-size: 10px;
+    font-size: 11px;
     margin-bottom: 4px;
 }
 
@@ -4153,7 +4166,7 @@ select:focus-visible {
 #overview-table td.col-ang {
     width: 50px;
     color: var(--text-dim);
-    font-size: 10px;
+    font-size: 11px;
 }
 
 /* Overview sortable column headers */
@@ -4176,7 +4189,7 @@ select:focus-visible {
     right: 3px;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 10px;
+    font-size: 11px;
     opacity: 0.3;
 }
 
@@ -4260,7 +4273,7 @@ select:focus-visible {
 }
 
 .refinery-ore-amount {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
 }
 
@@ -4318,13 +4331,26 @@ select:focus-visible {
 
 .ship-menu-modal .modal-body {
     padding: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+.ship-menu-modal .tab-content.active {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .ship-stats-layout {
     display: flex;
-    gap: 25px;
-    padding: 25px;
-    height: 100%;
+    gap: 16px;
+    padding: 16px;
+    flex: 1;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .ship-viewer-container {
@@ -4384,7 +4410,7 @@ select:focus-visible {
 }
 
 .stat-section h4 {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -4424,7 +4450,7 @@ select:focus-visible {
 }
 
 .modules-section h4 {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -4454,7 +4480,7 @@ select:focus-visible {
 }
 
 .module-slot-label {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     color: var(--text-dim);
     text-transform: uppercase;
@@ -4468,7 +4494,7 @@ select:focus-visible {
 }
 
 .module-stat {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-mono);
     color: var(--text-secondary);
 }
@@ -4553,7 +4579,7 @@ select:focus-visible {
 }
 
 .inventory-item-amount {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
 }
 
@@ -4693,7 +4719,7 @@ select:focus-visible {
 }
 
 .drone-item-status {
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1px;
     color: var(--text-dim);
 }
@@ -4722,7 +4748,7 @@ select:focus-visible {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-primary);
     white-space: nowrap;
 }
@@ -4733,7 +4759,7 @@ select:focus-visible {
     border: 1px solid var(--panel-border);
     border-radius: 4px;
     color: var(--text-secondary);
-    font-size: 10px;
+    font-size: 11px;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -4964,7 +4990,7 @@ select:focus-visible {
 
 .filter-count {
     color: var(--text-dim, #666);
-    font-size: 10px;
+    font-size: 11px;
     margin-left: auto;
 }
 
@@ -5033,12 +5059,12 @@ select:focus-visible {
 }
 
 .trade-in-info {
-    font-size: 10px;
+    font-size: 11px;
     color: #44ff88;
 }
 
 .current-label {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.6);
     padding: 2px 6px;
     border: 1px solid rgba(0, 255, 255, 0.3);
@@ -5052,7 +5078,7 @@ select:focus-visible {
     padding: 4px 10px;
     border-radius: 3px;
     cursor: pointer;
-    font-size: 10px;
+    font-size: 11px;
     font-family: inherit;
     white-space: nowrap;
     transition: all 0.15s;
@@ -5116,7 +5142,7 @@ select:focus-visible {
 }
 
 .detail-role {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim, #666);
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -5136,7 +5162,7 @@ select:focus-visible {
 }
 
 .detail-stat-group h4 {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.6);
     margin: 0 0 4px;
     letter-spacing: 1px;
@@ -5162,7 +5188,7 @@ select:focus-visible {
 }
 
 .detail-bonuses h4 {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.6);
     margin: 0 0 4px;
     letter-spacing: 1px;
@@ -5246,7 +5272,7 @@ select:focus-visible {
 }
 
 .fitting-section-label {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     color: rgba(0, 255, 255, 0.6);
     letter-spacing: 1px;
@@ -5332,7 +5358,7 @@ select:focus-visible {
 }
 
 .fitting-stat-group h4 {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     color: rgba(0, 255, 255, 0.5);
     margin: 0 0 3px;
@@ -5359,7 +5385,7 @@ select:focus-visible {
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 2px;
     cursor: pointer;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-body);
     transition: all 0.15s;
 }
@@ -5385,7 +5411,7 @@ select:focus-visible {
 }
 
 .inv-slot {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     color: var(--text-dim, #666);
     padding: 1px 4px;
@@ -5435,7 +5461,7 @@ select:focus-visible {
     position: absolute;
     top: 6px;
     left: 8px;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 2px;
     color: rgba(0, 255, 255, 0.5);
     z-index: 1;
@@ -5444,7 +5470,7 @@ select:focus-visible {
 }
 
 .viewport-hint {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.3);
     letter-spacing: 0.5px;
     margin-left: 8px;
@@ -5491,7 +5517,7 @@ select:focus-visible {
 }
 
 .editor-control-group label {
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1px;
     color: var(--text-secondary);
     text-transform: uppercase;
@@ -5533,7 +5559,7 @@ select:focus-visible {
     border-radius: 2px;
     color: var(--text-secondary);
     padding: 4px 8px;
-    font-size: 10px;
+    font-size: 11px;
     font-family: inherit;
     cursor: pointer;
     text-align: left;
@@ -5604,7 +5630,7 @@ select:focus-visible {
 }
 
 .editor-status {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     text-align: center;
     min-height: 14px;
@@ -5639,7 +5665,7 @@ select:focus-visible {
     color: var(--text-dim);
     font-weight: normal;
     text-transform: uppercase;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     letter-spacing: 0.5px;
     padding: 4px 6px;
@@ -5713,7 +5739,7 @@ select:focus-visible {
 }
 
 .fleet-state {
-    font-size: 10px;
+    font-size: 11px;
     text-transform: capitalize;
 }
 
@@ -5770,7 +5796,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.25);
     color: var(--text-primary);
     padding: 4px 6px;
-    font-size: 10px;
+    font-size: 11px;
     cursor: pointer;
     border-radius: 3px;
     text-transform: uppercase;
@@ -5802,7 +5828,7 @@ select:focus-visible {
 }
 
 .fleet-hint {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     opacity: 0.6;
     margin-top: 6px;
@@ -5823,7 +5849,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.15);
     color: var(--text-dim);
     padding: 3px 4px;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     cursor: pointer;
     border-radius: 2px;
@@ -5853,7 +5879,7 @@ select:focus-visible {
     display: flex;
     gap: 8px;
     padding: 3px 4px;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-mono);
     color: var(--text-dim);
     border-bottom: 1px solid rgba(0, 255, 255, 0.08);
@@ -5877,7 +5903,7 @@ select:focus-visible {
 /* Fleet Distance Column */
 .fleet-dist {
     color: var(--text-dim);
-    font-size: 10px;
+    font-size: 11px;
     text-align: right;
     width: 50px;
 }
@@ -5899,7 +5925,7 @@ select:focus-visible {
 }
 
 .fleet-detail-info {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-secondary);
     margin-bottom: 4px;
 }
@@ -5907,7 +5933,7 @@ select:focus-visible {
 .fleet-detail-label {
     color: var(--text-dim);
     text-transform: uppercase;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     letter-spacing: 0.5px;
 }
@@ -5920,7 +5946,7 @@ select:focus-visible {
 .fleet-detail-hp {
     display: flex;
     gap: 10px;
-    font-size: 10px;
+    font-size: 11px;
     margin-bottom: 4px;
 }
 
@@ -5935,7 +5961,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.2);
     color: var(--text-primary);
     padding: 2px 6px;
-    font-size: 10px;
+    font-size: 11px;
     cursor: pointer;
     border-radius: 2px;
     text-transform: uppercase;
@@ -6013,7 +6039,7 @@ select:focus-visible {
 
 .pilot-salary {
     color: var(--text-dim);
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .pilot-skills {
@@ -6027,14 +6053,14 @@ select:focus-visible {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .skill-label {
     color: var(--text-dim);
     width: 60px;
     text-transform: uppercase;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.5px;
 }
 
@@ -6068,7 +6094,7 @@ select:focus-visible {
     color: var(--text-secondary);
     width: 24px;
     text-align: right;
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .pilot-traits {
@@ -6079,7 +6105,7 @@ select:focus-visible {
 }
 
 .pilot-trait {
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 6px;
     border: 1px solid;
     border-radius: 10px;
@@ -6088,7 +6114,7 @@ select:focus-visible {
 }
 
 .pilot-status {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     margin-bottom: 6px;
 }
@@ -6104,7 +6130,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.25);
     color: var(--text-primary);
     padding: 4px 10px;
-    font-size: 10px;
+    font-size: 11px;
     cursor: pointer;
     border-radius: 3px;
     text-transform: uppercase;
@@ -6155,7 +6181,7 @@ select:focus-visible {
 
 .cantina-assign-title {
     padding: 4px 10px;
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -6187,7 +6213,7 @@ select:focus-visible {
     color: rgba(0, 170, 255, 0.5);
     cursor: pointer;
     padding: 1px 5px;
-    font-size: 10px;
+    font-size: 11px;
     border-radius: 2px;
     line-height: 14px;
 }
@@ -6268,7 +6294,7 @@ select:focus-visible {
     border-radius: 50%;
     border: 1px solid rgba(0, 170, 255, 0.4);
     color: rgba(0, 170, 255, 0.6);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: bold;
     cursor: help;
     margin-left: 4px;
@@ -6332,13 +6358,13 @@ select:focus-visible {
     border: 1px solid rgba(0, 170, 255, 0.3);
     border-radius: 2px;
     color: #00ccff;
-    font-size: 10px;
+    font-size: 11px;
     font-family: monospace;
 }
 
 .help-popover .help-key-desc {
     color: #88aacc;
-    font-size: 10px;
+    font-size: 11px;
     margin-left: 4px;
 }
 
@@ -6550,7 +6576,7 @@ select:focus-visible {
 
 .dialogue-speaker-title {
     color: #88aacc;
-    font-size: 10px;
+    font-size: 11px;
     text-align: center;
     white-space: nowrap;
 }
@@ -6677,7 +6703,7 @@ select:focus-visible {
 
 .guild-agent-title {
     color: #88aacc;
-    font-size: 10px;
+    font-size: 11px;
     margin-top: 2px;
 }
 
@@ -6697,7 +6723,7 @@ select:focus-visible {
 
 .guild-rank-label {
     color: #88aacc;
-    font-size: 10px;
+    font-size: 11px;
     text-transform: uppercase;
 }
 
@@ -6731,14 +6757,14 @@ select:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: 11px;
     color: #ffffff;
     text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
 }
 
 .guild-next-rank {
     margin-top: 4px;
-    font-size: 10px;
+    font-size: 11px;
     color: #88aacc;
 }
 
@@ -6748,7 +6774,7 @@ select:focus-visible {
 
 .guild-section-title {
     color: #00ccff;
-    font-size: 10px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1px;
     padding-bottom: 4px;
@@ -6799,7 +6825,7 @@ select:focus-visible {
 }
 
 .quest-status {
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 6px;
     border-radius: 2px;
     text-transform: uppercase;
@@ -6813,7 +6839,7 @@ select:focus-visible {
 }
 
 .quest-badge.repeatable {
-    font-size: 10px;
+    font-size: 11px;
     padding: 1px 5px;
     background: rgba(0, 255, 136, 0.15);
     color: #44ff88;
@@ -6836,7 +6862,7 @@ select:focus-visible {
 
 .quest-obj-text {
     color: #aabbcc;
-    font-size: 10px;
+    font-size: 11px;
     margin-bottom: 2px;
 }
 
@@ -6865,7 +6891,7 @@ select:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: 11px;
     color: #ffffff;
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
 }
@@ -6880,12 +6906,12 @@ select:focus-visible {
 
 .quest-reward-label {
     color: #667788;
-    font-size: 10px;
+    font-size: 11px;
     text-transform: uppercase;
 }
 
 .quest-reward {
-    font-size: 10px;
+    font-size: 11px;
     padding: 1px 5px;
     background: rgba(255, 204, 0, 0.1);
     color: #ffcc44;
@@ -6908,7 +6934,7 @@ select:focus-visible {
 
 .quest-btn {
     padding: 4px 12px;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     border-radius: 2px;
     cursor: pointer;
@@ -6959,7 +6985,7 @@ select:focus-visible {
 
 .quest-tracker-empty {
     color: #667788;
-    font-size: 10px;
+    font-size: 11px;
     text-align: center;
     padding: 12px 6px;
     line-height: 1.5;
@@ -6967,7 +6993,7 @@ select:focus-visible {
 
 .quest-tracker-hint {
     color: #556677;
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .qt-quest {
@@ -6992,7 +7018,7 @@ select:focus-visible {
 
 .qt-quest-title {
     color: #ccddee;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: bold;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -7032,7 +7058,7 @@ select:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: 11px;
     color: #ffffff;
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
 }
@@ -7088,7 +7114,7 @@ select:focus-visible {
 
 .specialty-label {
     color: #ffaa44;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     margin-right: 8px;
 }
@@ -7111,7 +7137,7 @@ select:focus-visible {
     color: #668;
     padding: 3px 8px;
     cursor: pointer;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     transition: all 0.2s;
 }
@@ -7134,7 +7160,7 @@ select:focus-visible {
     padding: 4px 8px;
     background: rgba(20, 30, 40, 0.8);
     border-bottom: 1px solid #44aaff33;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     color: #668;
     text-transform: uppercase;
@@ -7176,7 +7202,7 @@ select:focus-visible {
 
 .trade-profit-hint {
     color: #44ff88;
-    font-size: 10px;
+    font-size: 11px;
     margin-left: 6px;
     opacity: 0.8;
 }
@@ -7193,7 +7219,7 @@ select:focus-visible {
     color: #44aaff;
     padding: 2px 8px;
     cursor: pointer;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     transition: all 0.2s;
 }
@@ -7229,14 +7255,14 @@ select:focus-visible {
 
 .trade-cargo-title {
     color: #ffaa44;
-    font-size: 10px;
+    font-size: 11px;
     text-transform: uppercase;
     margin-bottom: 4px;
 }
 
 .trade-cargo-empty {
     color: #557;
-    font-size: 10px;
+    font-size: 11px;
     font-style: italic;
 }
 
@@ -7244,7 +7270,7 @@ select:focus-visible {
     display: flex;
     justify-content: space-between;
     padding: 2px 0;
-    font-size: 10px;
+    font-size: 11px;
     color: #88aacc;
 }
 
@@ -7256,7 +7282,7 @@ select:focus-visible {
     background: rgba(20, 40, 60, 0.3);
     border-left: 2px solid #ffaa44;
     margin: 4px 0;
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .quest-route {
@@ -7428,7 +7454,7 @@ select:focus-visible {
 }
 
 .admin-stat-label {
-    font-size: 10px;
+    font-size: 11px;
     color: #556677;
     letter-spacing: 1.5px;
     margin-bottom: 4px;
@@ -7486,7 +7512,7 @@ select:focus-visible {
     text-align: left;
     background: rgba(8, 16, 28, 0.98);
     color: #668899;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1px;
     text-transform: uppercase;
     border-bottom: 1px solid rgba(0, 255, 255, 0.1);
@@ -7504,12 +7530,12 @@ select:focus-visible {
 
 .admin-sortable.sort-asc::after {
     content: ' \u25B2';
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .admin-sortable.sort-desc::after {
     content: ' \u25BC';
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .admin-table td {
@@ -7562,7 +7588,7 @@ select:focus-visible {
 /* Materialized badge */
 .admin-mat-badge {
     display: inline-block;
-    font-size: 10px;
+    font-size: 11px;
     padding: 1px 4px;
     background: rgba(0, 255, 100, 0.15);
     border: 1px solid rgba(0, 255, 100, 0.3);
@@ -7593,7 +7619,7 @@ select:focus-visible {
 }
 
 .admin-cargo-text {
-    font-size: 10px;
+    font-size: 11px;
     color: #778899;
 }
 
@@ -7627,7 +7653,7 @@ select:focus-visible {
 }
 
 .admin-raid-log-title {
-    font-size: 10px;
+    font-size: 11px;
     color: #cc2244;
     letter-spacing: 1.5px;
     margin-bottom: 6px;
@@ -7664,7 +7690,7 @@ select:focus-visible {
 }
 
 .admin-raid-time {
-    font-size: 10px;
+    font-size: 11px;
     color: #556677;
     flex-shrink: 0;
 }
@@ -7818,7 +7844,7 @@ select:focus-visible {
 }
 
 .minimap-header .panel-title {
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .minimap-range-btns {
@@ -7830,7 +7856,7 @@ select:focus-visible {
     background: rgba(0, 255, 255, 0.08);
     border: 1px solid rgba(0, 255, 255, 0.15);
     color: rgba(0, 255, 255, 0.5);
-    font-size: 10px;
+    font-size: 11px;
     padding: 1px 4px;
     cursor: pointer;
     font-family: var(--font-display);
@@ -7869,7 +7895,7 @@ select:focus-visible {
 }
 
 #minimap-expand-btn {
-    font-size: 10px !important;
+    font-size: 11px !important;
     padding: 1px 4px !important;
 }
 
@@ -7898,7 +7924,7 @@ select:focus-visible {
 }
 
 .insurance-label {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: rgba(0, 255, 255, 0.5);
@@ -7947,7 +7973,7 @@ select:focus-visible {
 }
 
 .insurance-warning {
-    font-size: 10px;
+    font-size: 11px;
     color: #ffaa44;
 }
 
@@ -7966,7 +7992,7 @@ select:focus-visible {
 }
 
 .insurance-warning-text {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 100, 70, 0.6);
     font-weight: normal;
 }
@@ -8035,7 +8061,7 @@ select:focus-visible {
 .insurance-btn {
     width: 100%;
     padding: 6px;
-    font-size: 10px;
+    font-size: 11px;
     margin-top: 4px;
 }
 
@@ -8044,7 +8070,7 @@ select:focus-visible {
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(100, 120, 160, 0.1);
     border-radius: 4px;
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(200, 210, 230, 0.4);
     line-height: 1.5;
 }
@@ -8073,7 +8099,7 @@ select:focus-visible {
 }
 
 .velocity-speed-label {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.7);
     font-family: var(--font-mono);
     white-space: nowrap;
@@ -8092,7 +8118,7 @@ select:focus-visible {
 .ewar-badge {
     display: inline-block;
     padding: 1px 6px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 1px;
     border-radius: 2px;
@@ -8198,7 +8224,7 @@ select:focus-visible {
 }
 
 .stat-section-title {
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: rgba(0, 255, 255, 0.5);
@@ -8276,7 +8302,7 @@ select:focus-visible {
 }
 
 .skill-desc {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(200, 210, 230, 0.4);
     margin-top: 2px;
 }
@@ -8323,7 +8349,7 @@ select:focus-visible {
 }
 
 .skill-xp-text {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(200, 210, 230, 0.4);
 }
 
@@ -8333,12 +8359,12 @@ select:focus-visible {
 }
 
 .skill-bonus-line {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(100, 200, 150, 0.7);
 }
 
 .skill-spec-badge {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: bold;
     padding: 2px 6px;
     margin-top: 4px;
@@ -8354,7 +8380,7 @@ select:focus-visible {
 }
 
 .skill-spec-prompt {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 220, 100, 0.8);
     margin-bottom: 4px;
 }
@@ -8417,7 +8443,7 @@ select:focus-visible {
 }
 
 .achievement-category-title {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: bold;
     letter-spacing: 2px;
     color: rgba(200, 210, 230, 0.4);
@@ -8467,7 +8493,7 @@ select:focus-visible {
 }
 
 .achievement-desc {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(200, 210, 230, 0.5);
 }
 
@@ -8500,7 +8526,7 @@ select:focus-visible {
 }
 
 #ship-log-filters .log-filter-btn {
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 6px;
 }
 
@@ -8541,7 +8567,7 @@ select:focus-visible {
 }
 
 .ship-log-time {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(200, 210, 230, 0.3);
     flex-shrink: 0;
 }
@@ -8572,7 +8598,7 @@ select:focus-visible {
     gap: 4px;
     padding: 6px;
     border-bottom: 1px solid rgba(200, 210, 230, 0.1);
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .clog-stat {
@@ -8584,7 +8610,7 @@ select:focus-visible {
 
 .clog-stat-label {
     color: rgba(200, 210, 230, 0.4);
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1px;
     text-transform: uppercase;
 }
@@ -8608,7 +8634,7 @@ select:focus-visible {
 }
 
 .clog-filter-btn {
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 6px;
     background: rgba(100, 120, 150, 0.15);
     border: 1px solid rgba(100, 120, 150, 0.2);
@@ -8640,7 +8666,7 @@ select:focus-visible {
     align-items: center;
     gap: 4px;
     padding: 2px 6px;
-    font-size: 10px;
+    font-size: 11px;
     border-bottom: 1px solid rgba(200, 210, 230, 0.03);
     line-height: 1.4;
 }
@@ -8651,7 +8677,7 @@ select:focus-visible {
 
 .clog-time {
     color: rgba(200, 210, 230, 0.25);
-    font-size: 10px;
+    font-size: 11px;
     flex-shrink: 0;
     width: 36px;
 }
@@ -8660,7 +8686,7 @@ select:focus-visible {
     width: 14px;
     text-align: center;
     flex-shrink: 0;
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .clog-msg {
@@ -8926,7 +8952,7 @@ select:focus-visible {
 }
 
 .kill-notif-class {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-dim);
     letter-spacing: 3px;
     margin-top: 2px;
@@ -8975,7 +9001,7 @@ select:focus-visible {
 .tac-label {
     position: absolute;
     transform: translate(-50%, -100%);
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1px;
     white-space: nowrap;
     padding: 1px 4px;
@@ -8996,7 +9022,7 @@ select:focus-visible {
 .tac-label .tac-dist {
     color: rgba(255, 255, 255, 0.4);
     margin-left: 4px;
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .tac-bracket {
@@ -9174,7 +9200,7 @@ select:focus-visible {
 }
 
 .route-jumps {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 200, 50, 0.6);
     letter-spacing: 0.5px;
 }
@@ -9332,7 +9358,7 @@ select:focus-visible {
 }
 
 .bounty-stat {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.5);
     letter-spacing: 1px;
 }
@@ -9344,7 +9370,7 @@ select:focus-visible {
 }
 
 .bounty-section-label {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.4);
     letter-spacing: 2px;
     padding: 6px 4px 4px;
@@ -9385,7 +9411,7 @@ select:focus-visible {
 }
 
 .bounty-danger-tag {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: bold;
     letter-spacing: 2px;
     padding: 2px 8px;
@@ -9417,7 +9443,7 @@ select:focus-visible {
 }
 
 .bounty-status-tag {
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1px;
     padding: 1px 6px;
     border-radius: 2px;
@@ -9451,12 +9477,12 @@ select:focus-visible {
 }
 
 .bounty-detail {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.5);
 }
 
 .bounty-kills {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 80, 40, 0.8);
     margin-top: 3px;
 }
@@ -9481,7 +9507,7 @@ select:focus-visible {
 }
 
 .bounty-label {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.3);
     letter-spacing: 1px;
 }
@@ -9511,7 +9537,7 @@ select:focus-visible {
     background: linear-gradient(180deg, rgba(200, 60, 20, 0.3), rgba(160, 40, 10, 0.4)) !important;
     border-color: rgba(255, 100, 50, 0.4) !important;
     color: #ff8844 !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
     padding: 4px 16px !important;
     letter-spacing: 1px;
 }
@@ -9526,12 +9552,12 @@ select:focus-visible {
     background: rgba(80, 40, 30, 0.3) !important;
     border-color: rgba(150, 80, 50, 0.3) !important;
     color: rgba(255, 150, 100, 0.6) !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
     padding: 3px 10px !important;
 }
 
 .bounty-timer {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 170, 0, 0.6);
     letter-spacing: 1px;
 }
@@ -9557,7 +9583,7 @@ select:focus-visible {
 }
 
 .bounty-info p {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.3);
     margin: 2px 0;
     line-height: 1.4;
@@ -9694,7 +9720,7 @@ select:focus-visible {
     background: none;
     border: 1px solid rgba(0, 255, 255, 0.2);
     color: rgba(0, 255, 255, 0.6);
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-display);
     cursor: pointer;
     padding: 4px 10px;
@@ -9741,7 +9767,7 @@ select:focus-visible {
     border-bottom-color: #00ffff;
     text-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
 }
-.enc-tab-count { font-size: 10px; opacity: 0.6; }
+.enc-tab-count { font-size: 11px; opacity: 0.6; }
 
 /* Toolbar */
 .enc-toolbar {
@@ -9927,7 +9953,7 @@ select:focus-visible {
 }
 .enc-badge-role {
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 6px;
     border-radius: 2px;
     text-transform: uppercase;
@@ -9937,7 +9963,7 @@ select:focus-visible {
 }
 .enc-badge-size {
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 6px;
     border-radius: 2px;
     background: rgba(255, 255, 255, 0.1);
@@ -9947,7 +9973,7 @@ select:focus-visible {
 }
 .enc-badge-guild {
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 6px;
     border-radius: 2px;
     background: rgba(255, 170, 0, 0.3);
@@ -9971,17 +9997,17 @@ select:focus-visible {
     display: flex;
     gap: 8px;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.4);
     flex-wrap: wrap;
 }
 .enc-card-guild {
-    font-size: 10px;
+    font-size: 11px;
     color: #ffaa44;
     margin-top: 4px;
 }
 .enc-card-sub {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.3);
     filter: brightness(3);
 }
@@ -10130,7 +10156,7 @@ select:focus-visible {
     gap: 6px;
 }
 .enc-slot-label {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.4);
     min-width: 55px;
 }
@@ -10145,7 +10171,7 @@ select:focus-visible {
 /* Bonus tags */
 .enc-bonus {
     display: inline-block;
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 8px;
     margin: 2px 4px 2px 0;
     background: rgba(0, 255, 255, 0.08);
@@ -10171,7 +10197,7 @@ select:focus-visible {
     color: rgba(255, 255, 255, 0.4);
     font-weight: normal;
     text-transform: uppercase;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1px;
 }
 .enc-cost-table td { font-family: var(--font-mono); color: rgba(255, 255, 255, 0.6); }
@@ -10208,7 +10234,7 @@ select:focus-visible {
     box-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
 }
 .enc-size-label {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.3);
     padding: 2px 0;
 }
@@ -10336,7 +10362,7 @@ select:focus-visible {
 }
 .enc-cmp-label {
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.4);
     text-align: center;
     min-width: 70px;
@@ -10375,7 +10401,7 @@ select:focus-visible {
 .enc-faction-desc { font-size: 11px; color: rgba(255, 255, 255, 0.4); margin-top: 4px; line-height: 1.4; }
 .enc-faction-hostile {
     display: inline-block;
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 8px;
     margin-top: 4px;
     background: rgba(255, 0, 0, 0.2);
@@ -10385,7 +10411,7 @@ select:focus-visible {
     letter-spacing: 1px;
 }
 .enc-badge-hostile {
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 8px;
     background: rgba(255, 0, 0, 0.2);
     border: 1px solid rgba(255, 0, 0, 0.3);
@@ -10404,14 +10430,14 @@ select:focus-visible {
     padding: 3px 0;
     color: rgba(255, 255, 255, 0.6);
 }
-.enc-fleet-role { color: rgba(255, 255, 255, 0.4); min-width: 60px; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; }
+.enc-fleet-role { color: rgba(255, 255, 255, 0.4); min-width: 60px; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
 .enc-fleet-ship { color: rgba(255, 255, 255, 0.7); flex: 1; }
 .enc-fleet-count { color: rgba(0, 255, 255, 0.6); }
 
 /* Sector tags */
 .enc-sector-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .enc-sector-tag {
-    font-size: 10px;
+    font-size: 11px;
     padding: 3px 8px;
     background: rgba(0, 255, 255, 0.06);
     border: 1px solid rgba(0, 255, 255, 0.12);
@@ -10442,7 +10468,7 @@ select:focus-visible {
 .enc-sector-name { font-family: var(--font-display); font-size: 15px; color: #ddd; font-weight: bold; }
 .enc-badge-diff {
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: 11px;
     padding: 2px 8px;
     border-radius: 2px;
     color: #000;
@@ -10458,12 +10484,12 @@ select:focus-visible {
     margin-bottom: 4px;
 }
 .enc-sector-desc { font-size: 11px; color: rgba(255, 255, 255, 0.4); line-height: 1.4; }
-.enc-sector-connections { font-size: 10px; color: rgba(255, 255, 255, 0.3); margin-top: 6px; }
+.enc-sector-connections { font-size: 11px; color: rgba(255, 255, 255, 0.3); margin-top: 6px; }
 
 /* Trade good detail */
 .enc-trade-icon { font-size: 32px; }
 .enc-produces-tag {
-    font-size: 10px;
+    font-size: 11px;
     padding: 1px 6px;
     background: rgba(68, 255, 136, 0.2);
     border: 1px solid rgba(68, 255, 136, 0.3);
@@ -10471,7 +10497,7 @@ select:focus-visible {
     color: #44ff88;
 }
 .enc-consumes-tag {
-    font-size: 10px;
+    font-size: 11px;
     padding: 1px 6px;
     background: rgba(255, 136, 68, 0.2);
     border: 1px solid rgba(255, 136, 68, 0.3);
@@ -10505,7 +10531,7 @@ select:focus-visible {
     color: rgba(255, 255, 255, 0.4);
     font-weight: normal;
     text-transform: uppercase;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1px;
 }
 .enc-price-table td { font-family: var(--font-mono); color: rgba(255, 255, 255, 0.6); }
@@ -10702,7 +10728,7 @@ select:focus-visible {
 }
 
 .combat-info-label {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.5);
     letter-spacing: 0.5px;
     text-transform: uppercase;
@@ -10826,7 +10852,7 @@ select:focus-visible {
 }
 
 #skippy-panel .panel-title {
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1.5px;
 }
 
@@ -10905,7 +10931,7 @@ select:focus-visible {
 .skippy-history {
     max-height: 60px;
     overflow-y: auto;
-    font-size: 10px;
+    font-size: 11px;
     color: #556677;
     padding: 0 4px;
 }
@@ -11015,7 +11041,7 @@ select:focus-visible {
     bottom: -8px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-secondary, #88cccc);
     text-align: center;
     white-space: nowrap;
@@ -11082,7 +11108,7 @@ select:focus-visible {
 
 .splash-version {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.25);
     letter-spacing: 2px;
     margin-top: 8px;
@@ -11221,7 +11247,7 @@ select:focus-visible {
 
 .slot-detail {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.5);
     letter-spacing: 0.5px;
 }
@@ -11232,7 +11258,7 @@ select:focus-visible {
 
 .slot-timestamp {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.35);
 }
 
@@ -11250,7 +11276,7 @@ select:focus-visible {
 
 .slot-action-btn {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1px;
     color: var(--primary-cyan, #00ffff);
     background: rgba(0, 255, 255, 0.06);
@@ -11374,7 +11400,7 @@ select:focus-visible {
 
 .faction-label {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(0, 255, 255, 0.5);
     letter-spacing: 2px;
 }
@@ -11464,7 +11490,7 @@ select:focus-visible {
 /* Fleet "Buy for Fleet" button in station */
 .buy-fleet-btn {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: #ffaa00;
     background: rgba(255, 170, 0, 0.1);
     border: 1px solid rgba(255, 170, 0, 0.3);
@@ -11487,7 +11513,7 @@ select:focus-visible {
 /* Faction Treasury HUD */
 .faction-treasury-display {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: #ffaa00;
     display: flex;
     align-items: center;
@@ -11500,7 +11526,7 @@ select:focus-visible {
 
 .stardate-display {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: #88bbff;
     display: flex;
     align-items: center;
@@ -11509,7 +11535,7 @@ select:focus-visible {
 
 .stardate-label {
     color: #557799;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: bold;
 }
 
@@ -11531,7 +11557,7 @@ select:focus-visible {
     border: none;
     color: #557788;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: bold;
     cursor: pointer;
     letter-spacing: 1px;
@@ -11566,7 +11592,7 @@ select:focus-visible {
 }
 
 .aar-hint {
-    font-size: 10px;
+    font-size: 11px;
     color: #334455;
     margin-top: 6px;
 }
@@ -11580,7 +11606,7 @@ select:focus-visible {
 }
 
 .aar-count {
-    font-size: 10px;
+    font-size: 11px;
     color: #557788;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -11590,7 +11616,7 @@ select:focus-visible {
     background: transparent;
     border: 1px solid rgba(255, 68, 68, 0.3);
     color: #ff4444;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-mono);
     padding: 2px 6px;
     cursor: pointer;
@@ -11625,19 +11651,19 @@ select:focus-visible {
 
 .aar-stardate {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: #88bbff;
 }
 
 .aar-outcome {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 .aar-card-body {
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .aar-sector {
@@ -11668,7 +11694,7 @@ select:focus-visible {
     background: transparent;
     border: 1px solid rgba(0, 255, 255, 0.15);
     color: var(--primary-cyan, #00ffff);
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-mono);
     padding: 3px 8px;
     cursor: pointer;
@@ -11703,14 +11729,14 @@ select:focus-visible {
 
 .aar-detail-stardate {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: #88bbff;
 }
 
 .aar-detail-meta {
     display: flex;
     justify-content: space-between;
-    font-size: 10px;
+    font-size: 11px;
     color: #667788;
 }
 
@@ -11730,14 +11756,14 @@ select:focus-visible {
 }
 
 .aar-faction-name {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: bold;
     margin-bottom: 4px;
 }
 
 .aar-faction-stats,
 .aar-faction-damage {
-    font-size: 10px;
+    font-size: 11px;
     color: #667788;
     display: flex;
     gap: 8px;
@@ -11753,7 +11779,7 @@ select:focus-visible {
 }
 
 .aar-section-title {
-    font-size: 10px;
+    font-size: 11px;
     color: #557788;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -11767,7 +11793,7 @@ select:focus-visible {
     justify-content: space-between;
     align-items: center;
     padding: 3px 4px;
-    font-size: 10px;
+    font-size: 11px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
@@ -11793,7 +11819,7 @@ select:focus-visible {
 .aar-destroyed-badge {
     color: #ff4444;
     font-weight: bold;
-    font-size: 10px;
+    font-size: 11px;
     text-transform: uppercase;
 }
 
@@ -11812,7 +11838,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.1);
     color: #88aacc;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     padding: 5px 8px;
     cursor: pointer;
     width: 100%;
@@ -11831,7 +11857,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.05);
     border-top: none;
     padding: 4px;
-    font-size: 10px;
+    font-size: 11px;
     font-family: var(--font-mono);
 }
 
@@ -11863,7 +11889,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.2);
     color: var(--primary-cyan, #00ffff);
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     padding: 6px 12px;
     cursor: pointer;
     width: 100%;
@@ -11913,7 +11939,7 @@ select:focus-visible {
 
 .tactical-replay-title {
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: 11px;
     color: var(--primary-cyan, #00ffff);
     font-weight: bold;
     letter-spacing: 2px;
@@ -11921,7 +11947,7 @@ select:focus-visible {
 
 .tactical-replay-stardate {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: #88bbff;
 }
 
@@ -11993,7 +12019,7 @@ select:focus-visible {
 
 .replay-time {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: #667788;
     white-space: nowrap;
     min-width: 80px;
@@ -12002,7 +12028,7 @@ select:focus-visible {
 
 .replay-speed-btn {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     min-width: 28px;
 }
 
@@ -12018,7 +12044,7 @@ select:focus-visible {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 10px;
+    font-size: 11px;
     color: #667788;
 }
 
@@ -12077,7 +12103,7 @@ select:focus-visible {
     gap: 4px;
     color: #88dddd;
     font-family: "Courier New", monospace;
-    font-size: 10px;
+    font-size: 11px;
     cursor: pointer;
     padding: 2px 6px;
     border: 1px solid rgba(0, 255, 255, 0.2);
@@ -12128,7 +12154,7 @@ select:focus-visible {
     margin-bottom: 6px;
 }
 .bounty-tier-badge {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: bold;
     border: 1px solid;
     border-radius: 3px;
@@ -12230,7 +12256,7 @@ select:focus-visible {
     background: rgba(136, 68, 255, 0.05);
 }
 .ingot-preview-title {
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(136, 68, 255, 0.7);
     letter-spacing: 1px;
     margin-bottom: 4px;

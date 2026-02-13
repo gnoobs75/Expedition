@@ -464,6 +464,8 @@ class ShipMeshFactory {
             police: this.addPoliceDetails,
             military: this.addMilitaryDetails,
             pirate: this.addPirateDetails,
+            surveyor: this.addSurveyorDetails,
+            logistics: this.addLogisticsDetails,
         };
     }
 
@@ -1206,6 +1208,215 @@ class ShipMeshFactory {
 
         // Stolen antenna (slightly bent)
         this.addAntenna(group, -s * 0.35, -s * 0.3 * a, s * 0.2, palette, rng);
+    }
+
+    addSurveyorDetails(group, sizeConfig, rng, detailLevel, palette, speedFactor = 1.0) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const sc = SUBSYSTEM_COLORS.sensor;
+
+        // Large forward sensor array (the defining feature of surveyors)
+        const mainDishSize = s * 0.18;
+        this.addSensorDish(group, s * 0.35, 0, mainDishSize, palette);
+
+        // Secondary sensor arrays (flanking)
+        this.addSensorDish(group, s * 0.1, s * 0.32 * a, s * 0.1, palette);
+        this.addSensorDish(group, s * 0.1, -s * 0.32 * a, s * 0.1, palette);
+
+        // Probe launcher bay (rear-dorsal)
+        if (sizeConfig.complexity >= 1.5) {
+            const bayGeo = new THREE.PlaneGeometry(s * 0.15, s * 0.1);
+            const bayMat = new THREE.MeshBasicMaterial({
+                color: sc.dish, transparent: true, opacity: 0.5,
+            });
+            const bay = new THREE.Mesh(bayGeo, bayMat);
+            bay.position.set(-s * 0.2, 0, 0.04);
+            bay.renderOrder = 3;
+            group.add(bay);
+
+            // Probe tube indicators
+            for (let i = -1; i <= 1; i++) {
+                const tGeo = new THREE.CircleGeometry(s * 0.015, 5);
+                const tMat = new THREE.MeshBasicMaterial({
+                    color: sc.receiver, transparent: true, opacity: 0.65,
+                });
+                const tube = new THREE.Mesh(tGeo, tMat);
+                tube.position.set(-s * 0.2, i * s * 0.03, 0.05);
+                tube.renderOrder = 4;
+                group.add(tube);
+            }
+        }
+
+        // Extended antenna arrays (multiple thin sensor antennae)
+        const antennaCount = Math.floor(sizeConfig.complexity) + 2;
+        for (let i = 0; i < antennaCount; i++) {
+            const side = i % 2 === 0 ? 1 : -1;
+            const offset = Math.floor(i / 2) * s * 0.12;
+            this.addAntenna(group, -s * 0.15 - offset, side * s * (0.35 + offset * 0.3) * a, s * 0.3 * a, palette, rng);
+        }
+
+        // Scan line emitter strips (glowing green lines along hull)
+        for (let i = 0; i < 2; i++) {
+            const side = i === 0 ? 1 : -1;
+            const stripGeo = new THREE.PlaneGeometry(s * 0.6, s * 0.01);
+            const stripMat = new THREE.MeshBasicMaterial({
+                color: sc.scan, transparent: true, opacity: 0.35,
+            });
+            const strip = new THREE.Mesh(stripGeo, stripMat);
+            strip.position.set(s * 0.05, side * s * 0.18 * a, 0.06);
+            strip.renderOrder = 5;
+            group.add(strip);
+        }
+
+        // Small weapon mount (surveyors have few weapons)
+        this.addTurretMount(group, s * 0.2, 0, s * 0.05, palette.accent, detailLevel);
+
+        // Drone bay (scouts rely on drones)
+        this.addDroneBay(group, -s * 0.35, 0, s * 0.1, palette);
+
+        // Fast engines (surveyors are quick)
+        this.addEngineNacelles(group, s, [
+            { x: -s * 0.58, y: s * 0.15 * a },
+            { x: -s * 0.58, y: -s * 0.15 * a },
+        ], palette, detailLevel, speedFactor);
+
+        if (sizeConfig.complexity >= 2) {
+            this.addSmallThruster(group, -s * 0.5, s * 0.3 * a, palette);
+            this.addSmallThruster(group, -s * 0.5, -s * 0.3 * a, palette);
+        }
+
+        // Cockpit (forward, prominent sensor-linked)
+        this.addCockpit(group, s * 0.5, 0, s * 0.1, palette.accent, detailLevel);
+    }
+
+    addLogisticsDetails(group, sizeConfig, rng, detailLevel, palette, speedFactor = 1.0) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const shc = SUBSYSTEM_COLORS.shield;
+
+        // Remote repair projector arms (the defining feature - extending outward)
+        for (let side = -1; side <= 1; side += 2) {
+            // Repair arm structure
+            const armGeo = new THREE.PlaneGeometry(s * 0.03, s * 0.45 * a);
+            const armMat = new THREE.MeshBasicMaterial({
+                color: palette.secondary, transparent: true, opacity: 0.6,
+            });
+            const arm = new THREE.Mesh(armGeo, armMat);
+            arm.position.set(s * 0.05, side * s * 0.35 * a, 0.04);
+            arm.renderOrder = 3;
+            group.add(arm);
+
+            // Repair emitter at arm tip
+            const emitGeo = new THREE.CircleGeometry(s * 0.06, 8);
+            const emitMat = new THREE.MeshBasicMaterial({
+                color: shc.glow, transparent: true, opacity: 0.7,
+            });
+            const emitter = new THREE.Mesh(emitGeo, emitMat);
+            emitter.position.set(s * 0.05, side * s * 0.55 * a, 0.05);
+            emitter.renderOrder = 4;
+            group.add(emitter);
+
+            // Emitter ring
+            const ringGeo = new THREE.RingGeometry(s * 0.06, s * 0.08, 8);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: shc.pulse, transparent: true, opacity: 0.3,
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.position.set(s * 0.05, side * s * 0.55 * a, 0.052);
+            ring.renderOrder = 4;
+            group.add(ring);
+
+            // Emitter glow halo
+            const haloGeo = new THREE.CircleGeometry(s * 0.1, 10);
+            const haloMat = new THREE.MeshBasicMaterial({
+                color: shc.glow, transparent: true, opacity: 0.1,
+            });
+            const halo = new THREE.Mesh(haloGeo, haloMat);
+            halo.position.set(s * 0.05, side * s * 0.55 * a, 0.048);
+            halo.renderOrder = 3;
+            group.add(halo);
+        }
+
+        // Additional repair emitters for larger ships
+        if (sizeConfig.complexity >= 2) {
+            for (let side = -1; side <= 1; side += 2) {
+                const emitGeo = new THREE.CircleGeometry(s * 0.05, 8);
+                const emitMat = new THREE.MeshBasicMaterial({
+                    color: shc.pulse, transparent: true, opacity: 0.6,
+                });
+                const emitter = new THREE.Mesh(emitGeo, emitMat);
+                emitter.position.set(-s * 0.15, side * s * 0.42 * a, 0.05);
+                emitter.renderOrder = 4;
+                group.add(emitter);
+            }
+        }
+
+        // Capacitor transfer links (energy conduits visible on hull)
+        const pc = SUBSYSTEM_COLORS.power;
+        for (let i = 0; i < 2; i++) {
+            const side = i === 0 ? 1 : -1;
+            const conduitPts = [
+                new THREE.Vector3(-s * 0.3, side * s * 0.08 * a, 0.045),
+                new THREE.Vector3(-s * 0.1, side * s * 0.15 * a, 0.045),
+                new THREE.Vector3(s * 0.05, side * s * 0.35 * a, 0.045),
+            ];
+            const conduitGeo = new THREE.BufferGeometry().setFromPoints(conduitPts);
+            const conduitMat = new THREE.LineBasicMaterial({
+                color: pc.glow, transparent: true, opacity: 0.35,
+            });
+            const conduit = new THREE.Line(conduitGeo, conduitMat);
+            conduit.renderOrder = 3;
+            group.add(conduit);
+
+            // Energy nodes along conduit
+            for (const pt of conduitPts) {
+                const nodeGeo = new THREE.CircleGeometry(s * 0.012, 6);
+                const nodeMat = new THREE.MeshBasicMaterial({
+                    color: pc.pulse, transparent: true, opacity: 0.4,
+                });
+                const node = new THREE.Mesh(nodeGeo, nodeMat);
+                node.position.set(pt.x, pt.y, 0.048);
+                node.renderOrder = 3;
+                group.add(node);
+            }
+        }
+
+        // Shield generator (logistics ships have strong personal defenses)
+        const sgGeo = new THREE.CircleGeometry(s * 0.07, 8);
+        const sgMat = new THREE.MeshBasicMaterial({
+            color: shc.emitter, transparent: true, opacity: 0.5,
+        });
+        const sg = new THREE.Mesh(sgGeo, sgMat);
+        sg.position.set(-s * 0.2, 0, 0.05);
+        sg.renderOrder = 4;
+        group.add(sg);
+
+        const sgRingGeo = new THREE.RingGeometry(s * 0.07, s * 0.09, 10);
+        const sgRingMat = new THREE.MeshBasicMaterial({
+            color: shc.glow, transparent: true, opacity: 0.25,
+        });
+        const sgRing = new THREE.Mesh(sgRingGeo, sgRingMat);
+        sgRing.position.set(-s * 0.2, 0, 0.052);
+        sgRing.renderOrder = 4;
+        group.add(sgRing);
+
+        // Small defensive turret
+        this.addTurretMount(group, s * 0.2, 0, s * 0.05, palette.accent, detailLevel);
+
+        // Drone bay
+        this.addDroneBay(group, -s * 0.35, 0, s * 0.1, palette);
+
+        // Engines (moderate - logistics aren't fast but need to keep up)
+        this.addEngineNacelles(group, s, [
+            { x: -s * 0.52, y: s * 0.15 * a },
+            { x: -s * 0.52, y: -s * 0.15 * a },
+        ], palette, detailLevel, speedFactor);
+
+        // Cockpit
+        this.addCockpit(group, s * 0.28, 0, s * 0.1, palette.accent, detailLevel);
+
+        // Comm antenna
+        this.addAntenna(group, -s * 0.35, s * 0.22 * a, s * 0.2, palette, rng);
     }
 
     // =============================================
@@ -2279,14 +2490,17 @@ class ShipMeshFactory {
      */
     async generateShipMeshAsync(config) {
         const { shipId, role, size, detailLevel = 'low' } = config;
+        const sizeConfig = SIZE_CONFIGS[size] || SIZE_CONFIGS.frigate;
         const targetSize = detailLevel === 'high' ? 50 : 30;
 
         // Try GLB first
         const glbMesh = await this.loadModel(shipId, targetSize);
         if (glbMesh) return glbMesh;
 
-        // Fallback to procedural
-        return this.generateShipMesh(config);
+        // Fallback to procedural + add preview turret hardpoints
+        const mesh = this.generateShipMesh(config);
+        this.addPreviewTurrets(mesh, sizeConfig, shipId, role);
+        return mesh;
     }
 
     // =============================================
@@ -2631,6 +2845,337 @@ class ShipMeshFactory {
 
     // =============================================
     // UTILITY FUNCTIONS
+    // =============================================
+
+    // =============================================
+    // PREVIEW TURRET HARDPOINTS
+    // =============================================
+
+    /**
+     * Determine the default turret weapon type for a ship role.
+     * Preview meshes don't have fitted modules, so we pick representative weapons.
+     */
+    _roleTurretTypes(role) {
+        switch (role) {
+            case 'mining':     return 'mining';
+            case 'salvager':   return 'salvage';
+            case 'harvester':  return 'harvest';
+            case 'surveyor':   return 'utility';
+            case 'logistics':  return 'utility';
+            case 'hauler':     return 'laser';
+            case 'mercenary':  return 'laser';
+            case 'pirate':     return 'laser';
+            case 'police':     return 'laser';
+            case 'military':   return 'missile';
+            default:           return 'laser';
+        }
+    }
+
+    /**
+     * Add weapon turret hardpoints to a preview mesh.
+     * Uses SHIP_DATABASE to determine weapon count, and role for weapon type.
+     */
+    addPreviewTurrets(group, sizeConfig, shipId, role) {
+        // Look up ship in database for weapon count
+        const shipData = SHIP_DATABASE[shipId];
+        const weaponCount = shipData?.weaponSlots || 0;
+        if (weaponCount <= 0) return;
+
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const turretSize = Math.max(s * 0.025, 1.0);
+        const primaryType = this._roleTurretTypes(role);
+
+        for (let i = 0; i < Math.min(weaponCount, 8); i++) {
+            // Distribute turrets from front to mid along hull
+            const t = weaponCount === 1 ? 0.3 : (0.55 - (i / (weaponCount - 1)) * 0.7);
+            const localX = s * t;
+            // Alternate port/starboard, increasing lateral spread
+            const localY = (i % 2 === 0 ? 1 : -1) * s * 0.2 * a * (1 + Math.floor(i / 2) * 0.3);
+
+            // Military ships get mixed turrets (missiles + lasers)
+            let type = primaryType;
+            if (role === 'military' && i >= Math.ceil(weaponCount / 2)) type = 'laser';
+            if (role === 'pirate' && weaponCount > 2 && i === weaponCount - 1) type = 'missile';
+
+            const turret = this._buildPreviewTurret(type, turretSize);
+            turret.position.set(localX, localY, Math.min(s * 0.04, 4) + 0.5);
+            group.add(turret);
+        }
+    }
+
+    /**
+     * Build a turret mesh by weapon type for preview display.
+     */
+    _buildPreviewTurret(type, ts) {
+        switch (type) {
+            case 'missile':  return this._buildPreviewMissileTurret(ts);
+            case 'mining':   return this._buildPreviewMiningTurret(ts);
+            case 'salvage':  return this._buildPreviewSalvageTurret(ts);
+            case 'harvest':  return this._buildPreviewHarvestTurret(ts);
+            case 'utility':  return this._buildPreviewUtilityTurret(ts);
+            default:         return this._buildPreviewLaserTurret(ts);
+        }
+    }
+
+    /**
+     * Laser turret: rotating base + twin energy emitter barrels + blue-white tip glow
+     */
+    _buildPreviewLaserTurret(ts) {
+        const g = new THREE.Group();
+
+        // Rotating base
+        const baseGeo = new THREE.CylinderGeometry(ts * 0.9, ts * 1.1, ts * 0.5, 8);
+        baseGeo.rotateX(Math.PI / 2);
+        g.add(new THREE.Mesh(baseGeo, new THREE.MeshStandardMaterial({
+            color: 0x445566, emissive: 0x112233, emissiveIntensity: 0.1,
+            roughness: 0.35, metalness: 0.65,
+        })));
+
+        // Twin barrel housing
+        const housingGeo = new THREE.BoxGeometry(ts * 1.8, ts * 0.7, ts * 0.5);
+        housingGeo.translate(ts * 0.8, 0, 0);
+        g.add(new THREE.Mesh(housingGeo, new THREE.MeshStandardMaterial({
+            color: 0x556677, emissive: 0x223344, emissiveIntensity: 0.08,
+            roughness: 0.3, metalness: 0.7,
+        })));
+
+        // Twin emitter barrels
+        for (let b = -1; b <= 1; b += 2) {
+            const barrelGeo = new THREE.CylinderGeometry(ts * 0.1, ts * 0.12, ts * 2.5, 6);
+            barrelGeo.rotateZ(Math.PI / 2);
+            barrelGeo.translate(ts * 1.8, b * ts * 0.18, 0);
+            g.add(new THREE.Mesh(barrelGeo, new THREE.MeshStandardMaterial({
+                color: 0x8899aa, emissive: 0x334466, emissiveIntensity: 0.1,
+                roughness: 0.2, metalness: 0.8,
+            })));
+        }
+
+        // EM blue-white emitter tip
+        const tipGeo = new THREE.SphereGeometry(ts * 0.18, 6, 4);
+        tipGeo.translate(ts * 3.0, 0, 0);
+        g.add(new THREE.Mesh(tipGeo, new THREE.MeshStandardMaterial({
+            color: 0x4488ff, emissive: 0x4488ff, emissiveIntensity: 0.15,
+            transparent: true, opacity: 0.8, roughness: 0.1, metalness: 0.2,
+        })));
+
+        g.userData.weaponType = 'laser';
+        return g;
+    }
+
+    /**
+     * Missile turret: box launcher rack with tube openings + orange warhead glow
+     */
+    _buildPreviewMissileTurret(ts) {
+        const g = new THREE.Group();
+
+        // Mounting platform
+        const baseGeo = new THREE.BoxGeometry(ts * 1.2, ts * 1.0, ts * 0.4);
+        baseGeo.translate(0, 0, ts * 0.1);
+        g.add(new THREE.Mesh(baseGeo, new THREE.MeshStandardMaterial({
+            color: 0x554433, emissive: 0x221100, emissiveIntensity: 0.08,
+            roughness: 0.5, metalness: 0.5,
+        })));
+
+        // Launcher rack body
+        const rackGeo = new THREE.BoxGeometry(ts * 2.2, ts * 0.9, ts * 0.7);
+        rackGeo.translate(ts * 0.9, 0, ts * 0.15);
+        g.add(new THREE.Mesh(rackGeo, new THREE.MeshStandardMaterial({
+            color: 0x665544, emissive: 0x332211, emissiveIntensity: 0.06,
+            roughness: 0.6, metalness: 0.4,
+        })));
+
+        // 2x2 missile tube grid
+        for (let row = -1; row <= 1; row += 2) {
+            for (let col = -1; col <= 1; col += 2) {
+                const tubeGeo = new THREE.CylinderGeometry(ts * 0.12, ts * 0.14, ts * 0.6, 6);
+                tubeGeo.rotateZ(Math.PI / 2);
+                tubeGeo.translate(ts * 2.0, row * ts * 0.2, col * ts * 0.15 + ts * 0.15);
+                g.add(new THREE.Mesh(tubeGeo, new THREE.MeshStandardMaterial({
+                    color: 0x332211, emissive: 0x110000, emissiveIntensity: 0.05,
+                    roughness: 0.7, metalness: 0.3,
+                })));
+            }
+        }
+
+        // Orange warhead indicator
+        const wGeo = new THREE.SphereGeometry(ts * 0.15, 4, 3);
+        wGeo.translate(ts * 2.3, 0, ts * 0.15);
+        g.add(new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({
+            color: 0xff6622, emissive: 0xff4400, emissiveIntensity: 0.2,
+            transparent: true, opacity: 0.75, roughness: 0.2, metalness: 0.1,
+        })));
+
+        g.userData.weaponType = 'missile';
+        return g;
+    }
+
+    /**
+     * Mining turret: heavy industrial base + articulated arm + green emitter
+     */
+    _buildPreviewMiningTurret(ts) {
+        const g = new THREE.Group();
+
+        // Industrial base
+        const baseGeo = new THREE.CylinderGeometry(ts * 1.0, ts * 1.3, ts * 0.6, 6);
+        baseGeo.rotateX(Math.PI / 2);
+        g.add(new THREE.Mesh(baseGeo, new THREE.MeshStandardMaterial({
+            color: 0x5a6a30, emissive: 0x223311, emissiveIntensity: 0.08,
+            roughness: 0.5, metalness: 0.4,
+        })));
+
+        // Articulated arm
+        const armGeo = new THREE.BoxGeometry(ts * 2.0, ts * 0.4, ts * 0.4);
+        armGeo.translate(ts * 0.8, 0, ts * 0.1);
+        g.add(new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({
+            color: 0x667744, emissive: 0x334422, emissiveIntensity: 0.06,
+            roughness: 0.45, metalness: 0.55,
+        })));
+
+        // Emitter housing (wider cone end)
+        const emitGeo = new THREE.CylinderGeometry(ts * 0.35, ts * 0.2, ts * 0.8, 6);
+        emitGeo.rotateZ(Math.PI / 2);
+        emitGeo.translate(ts * 2.2, 0, ts * 0.1);
+        g.add(new THREE.Mesh(emitGeo, new THREE.MeshStandardMaterial({
+            color: 0x88aa44, emissive: 0x44aa22, emissiveIntensity: 0.12,
+            roughness: 0.3, metalness: 0.5,
+        })));
+
+        // Green emitter glow
+        const tipGeo = new THREE.SphereGeometry(ts * 0.22, 6, 4);
+        tipGeo.translate(ts * 2.7, 0, ts * 0.1);
+        g.add(new THREE.Mesh(tipGeo, new THREE.MeshStandardMaterial({
+            color: 0x44ff66, emissive: 0x22ff44, emissiveIntensity: 0.25,
+            transparent: true, opacity: 0.85, roughness: 0.1, metalness: 0.1,
+        })));
+
+        g.userData.weaponType = 'mining';
+        return g;
+    }
+
+    /**
+     * Salvage turret: tractor beam with purple glow dish
+     */
+    _buildPreviewSalvageTurret(ts) {
+        const g = new THREE.Group();
+
+        // Compact base
+        const baseGeo = new THREE.CylinderGeometry(ts * 0.7, ts * 0.9, ts * 0.4, 6);
+        baseGeo.rotateX(Math.PI / 2);
+        g.add(new THREE.Mesh(baseGeo, new THREE.MeshStandardMaterial({
+            color: 0x6a5540, emissive: 0x332a18, emissiveIntensity: 0.08,
+            roughness: 0.5, metalness: 0.5,
+        })));
+
+        // Emitter arm
+        const armGeo = new THREE.BoxGeometry(ts * 1.8, ts * 0.3, ts * 0.35);
+        armGeo.translate(ts * 0.7, 0, 0);
+        g.add(new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({
+            color: 0x7a6550, emissive: 0x443322, emissiveIntensity: 0.06,
+            roughness: 0.4, metalness: 0.6,
+        })));
+
+        // Tractor dish
+        const dishGeo = new THREE.ConeGeometry(ts * 0.3, ts * 0.5, 8);
+        dishGeo.rotateZ(-Math.PI / 2);
+        dishGeo.translate(ts * 2.0, 0, 0);
+        g.add(new THREE.Mesh(dishGeo, new THREE.MeshStandardMaterial({
+            color: 0x8866aa, emissive: 0x6644aa, emissiveIntensity: 0.15,
+            roughness: 0.3, metalness: 0.4,
+        })));
+
+        // Purple emitter glow
+        const tipGeo = new THREE.SphereGeometry(ts * 0.18, 6, 4);
+        tipGeo.translate(ts * 2.3, 0, 0);
+        g.add(new THREE.Mesh(tipGeo, new THREE.MeshStandardMaterial({
+            color: 0xaa66ff, emissive: 0x8844ee, emissiveIntensity: 0.3,
+            transparent: true, opacity: 0.85, roughness: 0.1, metalness: 0.1,
+        })));
+
+        g.userData.weaponType = 'salvage';
+        return g;
+    }
+
+    /**
+     * Harvest turret: scoop intake with teal glow
+     */
+    _buildPreviewHarvestTurret(ts) {
+        const g = new THREE.Group();
+
+        // Base mount
+        const baseGeo = new THREE.CylinderGeometry(ts * 0.8, ts * 1.0, ts * 0.5, 6);
+        baseGeo.rotateX(Math.PI / 2);
+        g.add(new THREE.Mesh(baseGeo, new THREE.MeshStandardMaterial({
+            color: 0x306650, emissive: 0x1a3322, emissiveIntensity: 0.08,
+            roughness: 0.45, metalness: 0.45,
+        })));
+
+        // Scoop arm
+        const armGeo = new THREE.BoxGeometry(ts * 1.6, ts * 0.5, ts * 0.35);
+        armGeo.translate(ts * 0.6, 0, 0);
+        g.add(new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({
+            color: 0x44aa77, emissive: 0x226644, emissiveIntensity: 0.06,
+            roughness: 0.4, metalness: 0.5,
+        })));
+
+        // Scoop cone intake
+        const scoopGeo = new THREE.ConeGeometry(ts * 0.35, ts * 0.7, 8);
+        scoopGeo.rotateZ(-Math.PI / 2);
+        scoopGeo.translate(ts * 1.8, 0, 0);
+        g.add(new THREE.Mesh(scoopGeo, new THREE.MeshStandardMaterial({
+            color: 0x55eeaa, emissive: 0x33cc88, emissiveIntensity: 0.12,
+            roughness: 0.3, metalness: 0.4,
+        })));
+
+        // Teal intake glow
+        const tipGeo = new THREE.SphereGeometry(ts * 0.2, 6, 4);
+        tipGeo.translate(ts * 2.2, 0, 0);
+        g.add(new THREE.Mesh(tipGeo, new THREE.MeshStandardMaterial({
+            color: 0x44ffcc, emissive: 0x33eebb, emissiveIntensity: 0.25,
+            transparent: true, opacity: 0.85, roughness: 0.1, metalness: 0.1,
+        })));
+
+        g.userData.weaponType = 'harvest';
+        return g;
+    }
+
+    /**
+     * Utility turret: simple single barrel with white indicator
+     */
+    _buildPreviewUtilityTurret(ts) {
+        const g = new THREE.Group();
+
+        // Small base
+        const baseGeo = new THREE.CylinderGeometry(ts * 0.6, ts * 0.8, ts * 0.4, 6);
+        baseGeo.rotateX(Math.PI / 2);
+        g.add(new THREE.Mesh(baseGeo, new THREE.MeshStandardMaterial({
+            color: 0x556677, emissive: 0x223344, emissiveIntensity: 0.08,
+            roughness: 0.4, metalness: 0.6,
+        })));
+
+        // Single barrel
+        const barrelGeo = new THREE.CylinderGeometry(ts * 0.12, ts * 0.15, ts * 2.0, 6);
+        barrelGeo.rotateZ(Math.PI / 2);
+        barrelGeo.translate(ts * 1.2, 0, 0);
+        g.add(new THREE.Mesh(barrelGeo, new THREE.MeshStandardMaterial({
+            color: 0x778899, emissive: 0x334455, emissiveIntensity: 0.08,
+            roughness: 0.3, metalness: 0.7,
+        })));
+
+        // White tip indicator
+        const tipGeo = new THREE.SphereGeometry(ts * 0.14, 4, 3);
+        tipGeo.translate(ts * 2.2, 0, 0);
+        g.add(new THREE.Mesh(tipGeo, new THREE.MeshStandardMaterial({
+            color: 0xaabbcc, emissive: 0x5588aa, emissiveIntensity: 0.15,
+            transparent: true, opacity: 0.7, roughness: 0.2, metalness: 0.3,
+        })));
+
+        g.userData.weaponType = 'utility';
+        return g;
+    }
+
+    // =============================================
+    // UTILITY METHODS
     // =============================================
 
     hashString(str) {

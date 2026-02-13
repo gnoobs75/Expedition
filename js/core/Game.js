@@ -207,8 +207,8 @@ export class Game {
         // Apply skill bonuses to player
         this.skillSystem.applyBonuses();
 
-        // Start in hub sector
-        this.changeSector('hub');
+        // Start in tutorial sector for new games
+        this.changeSector('tutorial');
 
         // Position player at station (far from central planet)
         const station = this.currentSector.getStation();
@@ -371,9 +371,18 @@ export class Game {
             }
         });
 
-        // Visual feedback on enemy kill (credits already handled in EnemyShip.destroy)
+        // Visual feedback on enemy kill - only for player or fleet kills
         this.events.on('entity:destroyed', (entity) => {
             if (entity.bounty && entity.bounty > 0 && this.player?.alive) {
+                // Check if player or player's fleet was the killer
+                const killer = entity.lastDamageSource;
+                const isPlayerKill = killer === this.player;
+                const isFleetKill = killer?.type === 'fleet' || killer?.isFleet;
+                if (!isPlayerKill && !isFleetKill) {
+                    // Not our kill - skip stats/camera/audio
+                    return;
+                }
+
                 this.audio?.play('target-destroyed');
                 // Show floating credit popup at entity screen position
                 if (this.input) {
@@ -383,14 +392,16 @@ export class Game {
                 // Kill mail log entry
                 this.ui?.logKillMail(entity);
 
-                // Cinematic kill camera - brief slowdown + zoom
-                this.timeScale = 0.3;
-                const savedZoom = this.camera.zoom;
-                this.camera.zoom = Math.min(savedZoom * 1.15, savedZoom + 50);
-                setTimeout(() => {
-                    this.timeScale = 1.0;
-                    this.camera.zoom = savedZoom;
-                }, 400);
+                // Cinematic kill camera - brief slowdown + zoom (only for player direct kills)
+                if (isPlayerKill) {
+                    this.timeScale = 0.3;
+                    const savedZoom = this.camera.zoom;
+                    this.camera.zoom = Math.min(savedZoom * 1.15, savedZoom + 50);
+                    setTimeout(() => {
+                        this.timeScale = 1.0;
+                        this.camera.zoom = savedZoom;
+                    }, 400);
+                }
 
                 // Track kill statistics
                 this.stats.kills++;

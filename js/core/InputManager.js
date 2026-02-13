@@ -580,6 +580,10 @@ export class InputManager {
                 this.game.ui?.toggleCombatLog();
                 break;
 
+            case 'toggleSkippy':
+                this.game.ui?.toggleSkippy();
+                break;
+
             case 'toggleSensorSweep': {
                 const enabled = this.game.renderer?.toggleSensorSweep();
                 this.game.ui?.showToast(enabled ? 'Sensor sweep active' : 'Sensor sweep disabled', 'system');

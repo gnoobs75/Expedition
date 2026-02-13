@@ -86,6 +86,9 @@ export class SectorEventSystem {
             );
             if (existing) return false;
 
+            // No events in tutorial sector
+            if (s.difficulty === 'tutorial') return false;
+
             // Pirate capital and radiation storm shouldn't hit the hub
             if (s.id === 'hub' && (eventType === 'pirate_capital' || eventType === 'radiation_storm')) {
                 return false;

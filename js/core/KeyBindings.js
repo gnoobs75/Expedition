@@ -53,6 +53,7 @@ export const DEFAULT_BINDINGS = {
     'toggleShipLog': { key: 'KeyL', description: 'Toggle Ship Log', category: 'UI' },
     'toggleTactical': { key: 'KeyX', description: 'Toggle Tactical Overlay', category: 'UI' },
     'toggleCombatLog': { key: 'KeyY', description: 'Toggle Combat Log', category: 'UI' },
+    'toggleSkippy': { key: 'Backslash', description: 'Toggle Skippy', category: 'UI' },
     'toggleSensorSweep': { key: 'Semicolon', description: 'Toggle Sensor Sweep', category: 'UI' },
     'toggleWeaponRange': { key: 'Period', description: 'Toggle Weapon Range', category: 'UI' },
     'quickSave': { key: 'F5', description: 'Quick Save (Slot 1)', category: 'System' },

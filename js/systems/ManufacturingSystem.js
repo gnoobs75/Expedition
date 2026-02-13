@@ -386,6 +386,7 @@ export class ManufacturingSystem {
 
         // Map difficulty to max tier available
         const tierMap = {
+            tutorial: 1,
             hub: 1,
             safe: 1,
             normal: 2,

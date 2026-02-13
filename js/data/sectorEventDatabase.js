@@ -6,7 +6,7 @@
 export const SECTOR_EVENTS = {
     'pirate_capital': {
         name: 'Pirate Capital Invasion',
-        duration: [300, 600],
+        duration: [600, 900],
         spawnConfig: {
             dreadnought: 1,
             escorts: 4,
@@ -19,7 +19,7 @@ export const SECTOR_EVENTS = {
     },
     'wormhole': {
         name: 'Wormhole Opening',
-        duration: [180, 420],
+        duration: [420, 720],
         spawnConfig: {
             anomalyType: 'wormhole'
         },
@@ -29,7 +29,7 @@ export const SECTOR_EVENTS = {
     },
     'trade_embargo': {
         name: 'Trade Embargo',
-        duration: [300, 600],
+        duration: [600, 900],
         priceModifier: 1.8,
         affectedGoods: 'all',
         description: 'A faction dispute has triggered a trade embargo. Commodity prices have surged across all local markets.',
@@ -38,7 +38,7 @@ export const SECTOR_EVENTS = {
     },
     'radiation_storm': {
         name: 'Radiation Storm',
-        duration: [120, 300],
+        duration: [300, 600],
         hazardType: 'radiation',
         hazardIntensity: 0.8,
         description: 'A massive radiation storm is sweeping through the sector. Shield systems are being disrupted and hull integrity is at risk.',
@@ -47,7 +47,7 @@ export const SECTOR_EVENTS = {
     },
     'mining_rush': {
         name: 'Mining Rush',
-        duration: [300, 480],
+        duration: [600, 900],
         spawnConfig: {
             richAsteroids: 8,
             attractMiners: true
@@ -59,8 +59,8 @@ export const SECTOR_EVENTS = {
 };
 
 export const EVENT_CONFIG = {
-    maxConcurrent: 3,
-    evaluateInterval: 45,
-    minDuration: 120,
-    maxDuration: 600
+    maxConcurrent: 1,
+    evaluateInterval: 300,  // 5 minutes between evaluation checks
+    minDuration: 300,
+    maxDuration: 900
 };

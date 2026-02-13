@@ -247,6 +247,7 @@ export const CONFIG = {
 
     // Sector Difficulty
     SECTOR_DIFFICULTY: {
+        tutorial: { enemyCount: 0, asteroidDensity: 0.6, name: 'Training Grounds' },
         hub: { enemyCount: 0, asteroidDensity: 0.1, name: 'Hub Station' },
         safe: { enemyCount: 2, asteroidDensity: 0.3, name: 'Safe Zone' },
         tame: { enemyCount: 3, asteroidDensity: 0.4, name: 'Tame Territory' },
@@ -268,6 +269,7 @@ export const CONFIG = {
 
     // NPC Ecosystem
     NPC_MINERS: {
+        tutorial: { count: 3, shipClass: 'frigate', droneCount: 2 },
         hub: { count: 7, shipClass: 'frigate', droneCount: 2 },
         safe: { count: 5, shipClass: 'frigate', droneCount: 2 },
         tame: { count: 4, shipClass: 'frigate', droneCount: 2 },
@@ -277,6 +279,7 @@ export const CONFIG = {
         deadly: { count: 0, shipClass: 'frigate', droneCount: 0 },
     },
     NPC_SECURITY: {
+        tutorial: { count: 2, shipClass: 'cruiser' },
         hub: { count: 5, shipClass: 'cruiser' },
         safe: { count: 4, shipClass: 'cruiser' },
         tame: { count: 3, shipClass: 'cruiser' },
@@ -286,6 +289,7 @@ export const CONFIG = {
         deadly: { count: 1, shipClass: 'frigate' },
     },
     NPC_PIRATE_RAIDS: {
+        tutorial: { chance: 0, interval: 999, maxPirates: 0 },
         hub: { chance: 0, interval: 999, maxPirates: 0 },
         safe: { chance: 0.25, interval: 120, maxPirates: 2 },
         normal: { chance: 0.45, interval: 90, maxPirates: 3 },
@@ -365,6 +369,7 @@ export const CONFIG = {
 export const UNIVERSE_LAYOUT = {
     sectors: [
         // === CORE SECTORS ===
+        { id: 'tutorial', name: 'Training Grounds', x: 0, y: 2, difficulty: 'tutorial', hasStation: true, region: 'core' },
         { id: 'hub', name: 'Central Hub', x: 0, y: 0, difficulty: 'hub', hasStation: true, region: 'core' },
         { id: 'sector-1', name: 'Mining Fields Alpha', x: -1, y: 0, difficulty: 'safe', hasStation: true, region: 'core' },
         { id: 'sector-2', name: 'Mining Fields Beta', x: 1, y: 0, difficulty: 'safe', hasStation: true, region: 'core' },
@@ -382,6 +387,7 @@ export const UNIVERSE_LAYOUT = {
     ],
     gates: [
         // === CORE GATES ===
+        { from: 'tutorial', to: 'hub' },
         { from: 'hub', to: 'sector-1' },
         { from: 'hub', to: 'sector-2' },
         { from: 'hub', to: 'sector-3' },

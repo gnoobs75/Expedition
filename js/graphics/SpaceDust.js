@@ -8,6 +8,7 @@ import { CONFIG } from '../config.js';
 
 // Sector color themes for ambient tinting
 const SECTOR_THEMES = {
+    'tutorial': { dust: 0x44ccaa, ray: 0x88ffdd, hue: 0.42 },  // Training - teal green
     'hub':      { dust: 0x4488cc, ray: 0x88ccff, hue: 0.58 },
     'sector-1': { dust: 0xcc8844, ray: 0xffaa66, hue: 0.08 },  // Mining - warm amber
     'sector-2': { dust: 0x44cc66, ray: 0x88ff99, hue: 0.35 },  // Agriculture - green

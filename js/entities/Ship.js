@@ -1316,13 +1316,329 @@ export class Ship extends Entity {
     }
 
     /**
+     * Determine weapon category for a high slot index
+     */
+    _getSlotWeaponCategory(slotIndex) {
+        const moduleId = this.modules?.high?.[slotIndex];
+        if (!moduleId) return 'laser'; // default visual
+        const config = getModuleConfig(moduleId);
+        if (!config) return 'laser';
+        return config.category || 'laser';
+    }
+
+    /**
+     * Check if any high-slot weapon modules are currently active
+     */
+    _hasActiveWeapon() {
+        for (const activeKey of this.activeModules) {
+            // activeModules stores keys like "high-1", "mid-2" etc
+            if (typeof activeKey === 'string' && activeKey.startsWith('high')) return true;
+            // Some systems store module IDs directly
+            const config = getModuleConfig(activeKey);
+            if (config && (config.slot === 'weapon' || config.slot === 'high')) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Build a laser turret mesh (rotating base + twin energy emitter barrels)
+     */
+    _buildLaserTurret(turretSize) {
+        const group = new THREE.Group();
+
+        // Rotating base - rounded, tech-looking
+        const baseGeo = new THREE.CylinderGeometry(turretSize * 0.9, turretSize * 1.1, turretSize * 0.5, 8);
+        baseGeo.rotateX(Math.PI / 2);
+        const baseMat = new THREE.MeshStandardMaterial({
+            color: 0x445566, emissive: 0x112233, emissiveIntensity: 0.1,
+            roughness: 0.35, metalness: 0.65,
+        });
+        group.add(new THREE.Mesh(baseGeo, baseMat));
+
+        // Twin barrel housing
+        const housingGeo = new THREE.BoxGeometry(turretSize * 1.8, turretSize * 0.7, turretSize * 0.5);
+        housingGeo.translate(turretSize * 0.8, 0, 0);
+        const housingMat = new THREE.MeshStandardMaterial({
+            color: 0x556677, emissive: 0x223344, emissiveIntensity: 0.08,
+            roughness: 0.3, metalness: 0.7,
+        });
+        group.add(new THREE.Mesh(housingGeo, housingMat));
+
+        // Twin emitter barrels - sleek cylinders
+        for (let b = -1; b <= 1; b += 2) {
+            const barrelGeo = new THREE.CylinderGeometry(turretSize * 0.1, turretSize * 0.12, turretSize * 2.5, 6);
+            barrelGeo.rotateZ(Math.PI / 2);
+            barrelGeo.translate(turretSize * 1.8, b * turretSize * 0.18, 0);
+            const barrelMat = new THREE.MeshStandardMaterial({
+                color: 0x8899aa, emissive: 0x334466, emissiveIntensity: 0.1,
+                roughness: 0.2, metalness: 0.8,
+            });
+            group.add(new THREE.Mesh(barrelGeo, barrelMat));
+        }
+
+        // Emitter tip glow (EM blue-white)
+        const tipGeo = new THREE.SphereGeometry(turretSize * 0.18, 6, 4);
+        tipGeo.translate(turretSize * 3.0, 0, 0);
+        const tipMat = new THREE.MeshStandardMaterial({
+            color: 0x4488ff, emissive: 0x4488ff, emissiveIntensity: 0.15,
+            transparent: true, opacity: 0.8, roughness: 0.1, metalness: 0.2,
+        });
+        const tip = new THREE.Mesh(tipGeo, tipMat);
+        tip.name = 'emitter_tip';
+        group.add(tip);
+
+        group.userData.weaponType = 'laser';
+        return group;
+    }
+
+    /**
+     * Build a missile launcher turret (box rack with tube openings)
+     */
+    _buildMissileTurret(turretSize) {
+        const group = new THREE.Group();
+
+        // Mounting platform
+        const baseGeo = new THREE.BoxGeometry(turretSize * 1.2, turretSize * 1.0, turretSize * 0.4);
+        baseGeo.translate(0, 0, turretSize * 0.1);
+        const baseMat = new THREE.MeshStandardMaterial({
+            color: 0x554433, emissive: 0x221100, emissiveIntensity: 0.08,
+            roughness: 0.5, metalness: 0.5,
+        });
+        group.add(new THREE.Mesh(baseGeo, baseMat));
+
+        // Launcher rack body
+        const rackGeo = new THREE.BoxGeometry(turretSize * 2.2, turretSize * 0.9, turretSize * 0.7);
+        rackGeo.translate(turretSize * 0.9, 0, turretSize * 0.15);
+        const rackMat = new THREE.MeshStandardMaterial({
+            color: 0x665544, emissive: 0x332211, emissiveIntensity: 0.06,
+            roughness: 0.6, metalness: 0.4,
+        });
+        group.add(new THREE.Mesh(rackGeo, rackMat));
+
+        // Missile tube openings (2x2 grid)
+        for (let row = -1; row <= 1; row += 2) {
+            for (let col = -1; col <= 1; col += 2) {
+                const tubeGeo = new THREE.CylinderGeometry(turretSize * 0.12, turretSize * 0.14, turretSize * 0.6, 6);
+                tubeGeo.rotateZ(Math.PI / 2);
+                tubeGeo.translate(turretSize * 2.0, row * turretSize * 0.2, col * turretSize * 0.15 + turretSize * 0.15);
+                const tubeMat = new THREE.MeshStandardMaterial({
+                    color: 0x332211, emissive: 0x110000, emissiveIntensity: 0.05,
+                    roughness: 0.7, metalness: 0.3,
+                });
+                group.add(new THREE.Mesh(tubeGeo, tubeMat));
+            }
+        }
+
+        // Warhead glow indicator (orange-red)
+        const wGeo = new THREE.SphereGeometry(turretSize * 0.15, 4, 3);
+        wGeo.translate(turretSize * 2.3, 0, turretSize * 0.15);
+        const wMat = new THREE.MeshStandardMaterial({
+            color: 0xff6622, emissive: 0xff4400, emissiveIntensity: 0.2,
+            transparent: true, opacity: 0.75, roughness: 0.2, metalness: 0.1,
+        });
+        const warhead = new THREE.Mesh(wGeo, wMat);
+        warhead.name = 'emitter_tip';
+        group.add(warhead);
+
+        group.userData.weaponType = 'missile';
+        return group;
+    }
+
+    /**
+     * Build a mining laser turret (industrial drill with green emitter)
+     */
+    _buildMiningTurret(turretSize) {
+        const group = new THREE.Group();
+
+        // Heavy industrial base
+        const baseGeo = new THREE.CylinderGeometry(turretSize * 1.0, turretSize * 1.3, turretSize * 0.6, 6);
+        baseGeo.rotateX(Math.PI / 2);
+        const baseMat = new THREE.MeshStandardMaterial({
+            color: 0x5a6a30, emissive: 0x223311, emissiveIntensity: 0.08,
+            roughness: 0.5, metalness: 0.4,
+        });
+        group.add(new THREE.Mesh(baseGeo, baseMat));
+
+        // Articulated arm
+        const armGeo = new THREE.BoxGeometry(turretSize * 2.0, turretSize * 0.4, turretSize * 0.4);
+        armGeo.translate(turretSize * 0.8, 0, turretSize * 0.1);
+        const armMat = new THREE.MeshStandardMaterial({
+            color: 0x667744, emissive: 0x334422, emissiveIntensity: 0.06,
+            roughness: 0.45, metalness: 0.55,
+        });
+        group.add(new THREE.Mesh(armGeo, armMat));
+
+        // Emitter housing (wider end piece)
+        const emitGeo = new THREE.CylinderGeometry(turretSize * 0.35, turretSize * 0.2, turretSize * 0.8, 6);
+        emitGeo.rotateZ(Math.PI / 2);
+        emitGeo.translate(turretSize * 2.2, 0, turretSize * 0.1);
+        const emitMat = new THREE.MeshStandardMaterial({
+            color: 0x88aa44, emissive: 0x44aa22, emissiveIntensity: 0.12,
+            roughness: 0.3, metalness: 0.5,
+        });
+        group.add(new THREE.Mesh(emitGeo, emitMat));
+
+        // Green mining laser emitter glow
+        const tipGeo = new THREE.SphereGeometry(turretSize * 0.22, 6, 4);
+        tipGeo.translate(turretSize * 2.7, 0, turretSize * 0.1);
+        const tipMat = new THREE.MeshStandardMaterial({
+            color: 0x44ff66, emissive: 0x22ff44, emissiveIntensity: 0.25,
+            transparent: true, opacity: 0.85, roughness: 0.1, metalness: 0.1,
+        });
+        const tip = new THREE.Mesh(tipGeo, tipMat);
+        tip.name = 'emitter_tip';
+        group.add(tip);
+
+        group.userData.weaponType = 'mining';
+        return group;
+    }
+
+    /**
+     * Build a salvager turret (tractor beam emitter with purple glow)
+     */
+    _buildSalvageTurret(turretSize) {
+        const group = new THREE.Group();
+
+        // Compact base
+        const baseGeo = new THREE.CylinderGeometry(turretSize * 0.7, turretSize * 0.9, turretSize * 0.4, 6);
+        baseGeo.rotateX(Math.PI / 2);
+        const baseMat = new THREE.MeshStandardMaterial({
+            color: 0x6a5540, emissive: 0x332a18, emissiveIntensity: 0.08,
+            roughness: 0.5, metalness: 0.5,
+        });
+        group.add(new THREE.Mesh(baseGeo, baseMat));
+
+        // Emitter arm
+        const armGeo = new THREE.BoxGeometry(turretSize * 1.8, turretSize * 0.3, turretSize * 0.35);
+        armGeo.translate(turretSize * 0.7, 0, 0);
+        const armMat = new THREE.MeshStandardMaterial({
+            color: 0x7a6550, emissive: 0x443322, emissiveIntensity: 0.06,
+            roughness: 0.4, metalness: 0.6,
+        });
+        group.add(new THREE.Mesh(armGeo, armMat));
+
+        // Tractor emitter dish
+        const dishGeo = new THREE.CylinderGeometry(turretSize * 0.4, turretSize * 0.15, turretSize * 0.3, 8);
+        dishGeo.rotateZ(Math.PI / 2);
+        dishGeo.translate(turretSize * 1.8, 0, 0);
+        const dishMat = new THREE.MeshStandardMaterial({
+            color: 0x8844cc, emissive: 0x6622aa, emissiveIntensity: 0.15,
+            roughness: 0.3, metalness: 0.4,
+        });
+        group.add(new THREE.Mesh(dishGeo, dishMat));
+
+        // Purple emitter glow
+        const tipGeo = new THREE.SphereGeometry(turretSize * 0.2, 6, 4);
+        tipGeo.translate(turretSize * 2.1, 0, 0);
+        const tipMat = new THREE.MeshStandardMaterial({
+            color: 0xaa44ff, emissive: 0x8833ee, emissiveIntensity: 0.3,
+            transparent: true, opacity: 0.8, roughness: 0.1, metalness: 0.1,
+        });
+        const tip = new THREE.Mesh(tipGeo, tipMat);
+        tip.name = 'emitter_tip';
+        group.add(tip);
+
+        group.userData.weaponType = 'salvage';
+        return group;
+    }
+
+    /**
+     * Build a harvester turret (gas scoop with teal glow)
+     */
+    _buildHarvestTurret(turretSize) {
+        const group = new THREE.Group();
+
+        // Base mount
+        const baseGeo = new THREE.CylinderGeometry(turretSize * 0.8, turretSize * 1.0, turretSize * 0.5, 6);
+        baseGeo.rotateX(Math.PI / 2);
+        const baseMat = new THREE.MeshStandardMaterial({
+            color: 0x306650, emissive: 0x1a3322, emissiveIntensity: 0.08,
+            roughness: 0.45, metalness: 0.5,
+        });
+        group.add(new THREE.Mesh(baseGeo, baseMat));
+
+        // Scoop arm
+        const armGeo = new THREE.BoxGeometry(turretSize * 1.6, turretSize * 0.35, turretSize * 0.35);
+        armGeo.translate(turretSize * 0.6, 0, 0);
+        const armMat = new THREE.MeshStandardMaterial({
+            color: 0x44aa77, emissive: 0x226644, emissiveIntensity: 0.06,
+            roughness: 0.4, metalness: 0.55,
+        });
+        group.add(new THREE.Mesh(armGeo, armMat));
+
+        // Scoop intake (cone shape)
+        const scoopGeo = new THREE.CylinderGeometry(turretSize * 0.45, turretSize * 0.15, turretSize * 0.7, 8);
+        scoopGeo.rotateZ(Math.PI / 2);
+        scoopGeo.translate(turretSize * 1.8, 0, 0);
+        const scoopMat = new THREE.MeshStandardMaterial({
+            color: 0x55cc88, emissive: 0x33aa66, emissiveIntensity: 0.12,
+            roughness: 0.3, metalness: 0.4,
+        });
+        group.add(new THREE.Mesh(scoopGeo, scoopMat));
+
+        // Teal intake glow
+        const tipGeo = new THREE.SphereGeometry(turretSize * 0.2, 6, 4);
+        tipGeo.translate(turretSize * 2.2, 0, 0);
+        const tipMat = new THREE.MeshStandardMaterial({
+            color: 0x44ffcc, emissive: 0x33eebb, emissiveIntensity: 0.25,
+            transparent: true, opacity: 0.85, roughness: 0.1, metalness: 0.1,
+        });
+        const tip = new THREE.Mesh(tipGeo, tipMat);
+        tip.name = 'emitter_tip';
+        group.add(tip);
+
+        group.userData.weaponType = 'harvest';
+        return group;
+    }
+
+    /**
+     * Build a utility turret (generic for probe launchers, support modules etc)
+     */
+    _buildUtilityTurret(turretSize) {
+        const group = new THREE.Group();
+
+        // Small base
+        const baseGeo = new THREE.CylinderGeometry(turretSize * 0.6, turretSize * 0.8, turretSize * 0.4, 6);
+        baseGeo.rotateX(Math.PI / 2);
+        const baseMat = new THREE.MeshStandardMaterial({
+            color: 0x556677, emissive: 0x223344, emissiveIntensity: 0.08,
+            roughness: 0.4, metalness: 0.6,
+        });
+        group.add(new THREE.Mesh(baseGeo, baseMat));
+
+        // Single barrel
+        const barrelGeo = new THREE.CylinderGeometry(turretSize * 0.12, turretSize * 0.15, turretSize * 2.0, 6);
+        barrelGeo.rotateZ(Math.PI / 2);
+        barrelGeo.translate(turretSize * 1.2, 0, 0);
+        const barrelMat = new THREE.MeshStandardMaterial({
+            color: 0x778899, emissive: 0x334455, emissiveIntensity: 0.08,
+            roughness: 0.3, metalness: 0.7,
+        });
+        group.add(new THREE.Mesh(barrelGeo, barrelMat));
+
+        // White tip indicator
+        const tipGeo = new THREE.SphereGeometry(turretSize * 0.14, 4, 3);
+        tipGeo.translate(turretSize * 2.2, 0, 0);
+        const tipMat = new THREE.MeshStandardMaterial({
+            color: 0xaabbcc, emissive: 0x5588aa, emissiveIntensity: 0.15,
+            transparent: true, opacity: 0.7, roughness: 0.2, metalness: 0.3,
+        });
+        const tip = new THREE.Mesh(tipGeo, tipMat);
+        tip.name = 'emitter_tip';
+        group.add(tip);
+
+        group.userData.weaponType = 'utility';
+        return group;
+    }
+
+    /**
      * Add turret hardpoint meshes to the ship mesh.
+     * Creates weapon-type-specific turret models based on fitted equipment.
      * Call after createMesh() to mount weapon turrets.
      */
     addTurretHardpoints() {
         if (!this.mesh) return;
 
-        // Count weapon slots with actual weapons fitted
         const weaponCount = this.highSlots;
         if (weaponCount <= 0) return;
 
@@ -1330,54 +1646,43 @@ export class Ship extends Entity {
         const r = this.radius;
         const turretSize = Math.max(1.5, Math.min(r * 0.08, 4));
 
-        // Distribute turrets along hull centerline, spread from front to mid
-        for (let i = 0; i < Math.min(weaponCount, 6); i++) {
-            // Position along ship's forward axis (local x)
+        // Distribute turrets along hull, spread from front to mid
+        for (let i = 0; i < Math.min(weaponCount, 8); i++) {
             const t = weaponCount === 1 ? 0.3 : (0.6 - (i / (weaponCount - 1)) * 0.8);
             const localX = r * t;
-            // Alternate above/below centerline for visual spread
             const localY = (i % 2 === 0 ? 1 : -1) * r * 0.15 * (1 + Math.floor(i / 2) * 0.3);
 
-            const turretGroup = new THREE.Group();
+            // Determine weapon type for this slot
+            const category = this._getSlotWeaponCategory(i);
+
+            let turretGroup;
+            switch (category) {
+                case 'missile':  turretGroup = this._buildMissileTurret(turretSize); break;
+                case 'mining':   turretGroup = this._buildMiningTurret(turretSize); break;
+                case 'salvage':  turretGroup = this._buildSalvageTurret(turretSize); break;
+                case 'harvest':  turretGroup = this._buildHarvestTurret(turretSize); break;
+                case 'utility':
+                case 'support':
+                case 'hangar':
+                case 'command':  turretGroup = this._buildUtilityTurret(turretSize); break;
+                default:         turretGroup = this._buildLaserTurret(turretSize); break;
+            }
+
             turretGroup.position.set(localX, localY, Math.min(r * 0.1, 6) + 1);
-
-            // Base (small cylinder)
-            const baseGeo = new THREE.CylinderGeometry(turretSize * 0.8, turretSize, turretSize * 0.5, 6);
-            baseGeo.rotateX(Math.PI / 2);
-            const baseMat = new THREE.MeshStandardMaterial({
-                color: 0x556677,
-                emissive: 0x223344,
-                emissiveIntensity: 0.1,
-                roughness: 0.4,
-                metalness: 0.6,
-            });
-            turretGroup.add(new THREE.Mesh(baseGeo, baseMat));
-
-            // Barrel (elongated box)
-            const barrelGeo = new THREE.BoxGeometry(turretSize * 2.5, turretSize * 0.3, turretSize * 0.3);
-            barrelGeo.translate(turretSize * 1.2, 0, 0);
-            const barrelMat = new THREE.MeshStandardMaterial({
-                color: 0x778899,
-                emissive: 0x334455,
-                emissiveIntensity: 0.1,
-                roughness: 0.3,
-                metalness: 0.7,
-            });
-            turretGroup.add(new THREE.Mesh(barrelGeo, barrelMat));
-
             this.mesh.add(turretGroup);
             this.turretMeshes.push(turretGroup);
         }
     }
 
     /**
-     * Update turret tracking toward locked target
+     * Update turret tracking toward locked target.
+     * Only activates when high-slot weapons are firing (not afterburners etc).
      */
     updateTurretTracking() {
         if (!this.turretMeshes || this.turretMeshes.length === 0) return;
 
         const target = this.target;
-        const hasActiveWeapon = this.activeModules.size > 0;
+        const hasActiveWeapon = this._hasActiveWeapon();
 
         for (let i = 0; i < this.turretMeshes.length; i++) {
             const turret = this.turretMeshes[i];
@@ -1395,18 +1700,18 @@ export class Ship extends Entity {
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 turret.rotation.z += diff * 0.15;
 
-                // Glow barrel tip when firing
-                const barrel = turret.children[1];
-                if (barrel?.material) {
-                    barrel.material.emissiveIntensity = 0.3;
+                // Glow emitter tip when firing
+                const emitterTip = turret.getObjectByName('emitter_tip');
+                if (emitterTip?.material) {
+                    emitterTip.material.emissiveIntensity = 0.6;
                 }
             } else {
                 // Return to forward-facing (local angle 0)
                 turret.rotation.z *= 0.92;
 
-                const barrel = turret.children[1];
-                if (barrel?.material) {
-                    barrel.material.emissiveIntensity = 0.1;
+                const emitterTip = turret.getObjectByName('emitter_tip');
+                if (emitterTip?.material) {
+                    emitterTip.material.emissiveIntensity = 0.15;
                 }
             }
         }

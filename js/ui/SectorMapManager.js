@@ -1416,7 +1416,7 @@ export class SectorMapManager {
     }
 
     renderResourcesOverlay(ctx, sectors, positions) {
-        const richness = { hub: 1, safe: 2, tame: 2, neutral: 3, normal: 3, dangerous: 4, deadly: 5 };
+        const richness = { tutorial: 1, hub: 1, safe: 2, tame: 2, neutral: 3, normal: 3, dangerous: 4, deadly: 5 };
         for (const sector of sectors) {
             const pos = positions[sector.id];
             if (!pos) continue;
@@ -1716,6 +1716,7 @@ export class SectorMapManager {
 
     getDifficultyColor(difficulty) {
         switch (difficulty) {
+            case 'tutorial': return '#44ffaa';
             case 'hub': return '#22dd44';
             case 'safe': return '#44ee55';
             case 'tame': return '#88ddaa';

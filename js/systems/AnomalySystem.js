@@ -9,6 +9,7 @@ import { LootContainer } from '../entities/LootContainer.js';
 
 // Difficulty-to-danger mapping (matches IntelSystem convention)
 const DANGER_LEVELS = {
+    tutorial: 0,
     hub: 0,
     safe: 0.15,
     normal: 0.4,
@@ -18,6 +19,7 @@ const DANGER_LEVELS = {
 
 // Anomaly type weights by difficulty tier
 const TYPE_WEIGHTS = {
+    tutorial:  { combatSite: 0,    dataSite: 0.40, gasPocket: 0.40, relicSite: 0.20 },
     hub:       { combatSite: 0,    dataSite: 0.40, gasPocket: 0.40, relicSite: 0.20 },
     safe:      { combatSite: 0.20, dataSite: 0.30, gasPocket: 0.25, relicSite: 0.25 },
     normal:    { combatSite: 0.35, dataSite: 0.25, gasPocket: 0.20, relicSite: 0.20 },
@@ -184,6 +186,7 @@ export class AnomalySystem {
      */
     getMaxAnomalies(difficulty) {
         switch (difficulty) {
+            case 'tutorial':  return 1;
             case 'hub':       return 1;
             case 'safe':      return 2;
             case 'normal':    return 3;

@@ -34,44 +34,44 @@ export class SkippyManager {
 
         // Cooldowns (ms) per category
         this.cooldowns = {
-            'combat:kill': 8000,
-            'combat:multiKill': 3000,
-            'combat:death': 2000,
-            'combat:lowShield': 15000,
-            'combat:lowHull': 10000,
-            'combat:miss': 20000,
-            'combat:playerAttacked': 20000,
-            'combat:ewarTrapped': 30000,
-            'combat:fleetShipLost': 15000,
-            'combat:outnumbered': 25000,
-            'combat:winning': 20000,
-            'combat:targetLocked': 30000,
-            'mining:complete': 25000,
-            'mining:cargoFull': 30000,
-            'mining:largHaul': 30000,
-            'navigation:sectorChange': 10000,
-            'navigation:dangerousSector': 10000,
-            'navigation:safeSector': 30000,
-            'navigation:hazardZone': 30000,
-            'navigation:anomalyFound': 20000,
-            'tactical:pirateRaid': 20000,
-            'tactical:capacitorWarning': 25000,
-            'tactical:cargoValuable': 60000,
-            'fleet:fleetGrowing': 30000,
-            'fleet:fleetDamaged': 20000,
-            'fleet:fleetIdle': 120000,
-            'fleet:expansionTip': 120000,
-            'production:refineryTip': 120000,
-            'production:profitReport': 90000,
-            'production:miningEfficiency': 120000,
-            'progression': 5000,
-            'progression:surveyComplete': 15000,
-            'progression:guildRankUp': 5000,
-            'station:dock': 20000,
-            'station:undock': 30000,
-            'advice': 60000,
-            'tutorial': 45000,
-            'idle': 45000,
+            'combat:kill': 30000,
+            'combat:multiKill': 15000,
+            'combat:death': 10000,
+            'combat:lowShield': 45000,
+            'combat:lowHull': 30000,
+            'combat:miss': 60000,
+            'combat:playerAttacked': 60000,
+            'combat:ewarTrapped': 90000,
+            'combat:fleetShipLost': 45000,
+            'combat:outnumbered': 60000,
+            'combat:winning': 60000,
+            'combat:targetLocked': 90000,
+            'mining:complete': 90000,
+            'mining:cargoFull': 120000,
+            'mining:largHaul': 120000,
+            'navigation:sectorChange': 30000,
+            'navigation:dangerousSector': 30000,
+            'navigation:safeSector': 120000,
+            'navigation:hazardZone': 90000,
+            'navigation:anomalyFound': 60000,
+            'tactical:pirateRaid': 60000,
+            'tactical:capacitorWarning': 60000,
+            'tactical:cargoValuable': 180000,
+            'fleet:fleetGrowing': 120000,
+            'fleet:fleetDamaged': 60000,
+            'fleet:fleetIdle': 300000,
+            'fleet:expansionTip': 300000,
+            'production:refineryTip': 300000,
+            'production:profitReport': 300000,
+            'production:miningEfficiency': 300000,
+            'progression': 20000,
+            'progression:surveyComplete': 60000,
+            'progression:guildRankUp': 20000,
+            'station:dock': 60000,
+            'station:undock': 90000,
+            'advice': 180000,
+            'tutorial': 120000,
+            'idle': 180000,
         };
         this.lastTriggerTime = {};
 
@@ -80,19 +80,19 @@ export class SkippyManager {
 
         // Idle timer
         this.idleTimer = 0;
-        this.idleInterval = 60 + Math.random() * 60; // 60-120s
+        this.idleInterval = 180 + Math.random() * 180; // 3-6 minutes
 
         // Advice check timer
         this.adviceTimer = 0;
-        this.adviceInterval = 30; // Check every 30s
+        this.adviceInterval = 120; // Check every 2 min
 
         // Tactical check timer
         this.tacticalTimer = 0;
-        this.tacticalInterval = 5; // Check every 5s
+        this.tacticalInterval = 15; // Check every 15s
 
         // Fleet status timer
         this.fleetCheckTimer = 0;
-        this.fleetCheckInterval = 45; // Check every 45s
+        this.fleetCheckInterval = 120; // Check every 2 min
 
         // Kill streak tracking
         this.killStreak = 0;
@@ -107,7 +107,7 @@ export class SkippyManager {
 
         // Tutorial progression timer
         this.tutorialTimer = 0;
-        this.tutorialInterval = 60; // Check every 60s
+        this.tutorialInterval = 120; // Check every 2 min
         this.tutorialCooldown = 'tutorial';
 
         // ---- Guided Tutorial Arc ----
@@ -116,7 +116,7 @@ export class SkippyManager {
         this.guidedStep = 0;
         this.guidedWaiting = false; // waiting for player to complete current step
         this.guidedCheckTimer = 0;
-        this.guidedCheckInterval = 2; // Check every 2s
+        this.guidedCheckInterval = 5; // Check every 5s
 
         // Load persistent state
         this.loadState();
@@ -386,7 +386,11 @@ export class SkippyManager {
     triggerDialogue(category, subcategory, context = {}) {
         const catKey = subcategory ? `${category}:${subcategory}` : category;
 
-        // Check cooldown
+        // Global cooldown - no message more than once per 30s
+        const now = performance.now();
+        if (now - (this._lastAnyMessage || 0) < 30000) return;
+
+        // Check category-specific cooldown
         if (!this.checkCooldown(catKey)) return;
 
         // Get lines from dialogue database
@@ -432,6 +436,7 @@ export class SkippyManager {
 
         // Record cooldown
         this.lastTriggerTime[catKey] = performance.now();
+        this._lastAnyMessage = performance.now();
     }
 
     checkCooldown(catKey) {
@@ -1052,7 +1057,7 @@ export class SkippyManager {
             this.idleTimer += dt;
             if (this.idleTimer >= this.idleInterval && !this.currentMessage && !this.speaking) {
                 this.idleTimer = 0;
-                this.idleInterval = 45 + Math.random() * 75; // 45-120s
+                this.idleInterval = 180 + Math.random() * 240; // 3-7 minutes
                 this.triggerDialogue('idle', null);
             }
         } else {
@@ -1230,6 +1235,12 @@ export class SkippyManager {
         this.saveState();
     }
 
+    togglePanel() {
+        if (!this.panel) return;
+        this.panel.classList.toggle('hidden');
+        this.visible = !this.panel.classList.contains('hidden');
+    }
+
     toggleMinimize() {
         this.minimized = !this.minimized;
         const body = this.panel.querySelector('#skippy-body');
@@ -1291,7 +1302,7 @@ export class SkippyManager {
         // =============================================
         {
             id: 'welcome',
-            say: "Oh great, another monkey who thinks they can build an empire. I'm Skippy the Magnificent, your vastly superior AI companion. Let's start with the basics - use WASD to move your ship around. Try it.",
+            say: "Oh great, another monkey who thinks they can build an empire. Welcome to the Training Grounds - a safe sector where nothing can kill you. I'm Skippy the Magnificent, your vastly superior AI companion. Let's start with WASD to move your ship around. Try it.",
             expression: 'smug',
             check: (g) => g.player && (Math.abs(g.player.velocity.x) > 5 || Math.abs(g.player.velocity.y) > 5),
             complete: "Look at you, moving through space like a particularly ambitious bacterium. I'm almost impressed. Almost.",
@@ -1384,7 +1395,7 @@ export class SkippyManager {
         // =============================================
         {
             id: 'combat_awareness',
-            say: "Important survival lesson, monkey. See those red dots on the overview? Pirates. They WILL come for you. When hostiles appear, you have two choices: fight or run. For now? I'd recommend running. Press S on a distant object to warp away.",
+            say: "Important survival lesson, monkey. Training Grounds is safe - no pirates here. But once you jump to the Central Hub and beyond, red dots on the overview mean pirates. When hostiles appear: fight or run. For now, keep building your fleet here.",
             expression: 'concerned',
             check: (g) => g.stats?.playTime > 120 || g.stats?.kills >= 1,
             complete: "Good. You're still alive. That's the minimum acceptable standard.",
@@ -1518,10 +1529,10 @@ export class SkippyManager {
         // =============================================
         {
             id: 'gate_discovery',
-            say: "See those swirling portals? Jump gates. Select one and press S to warp to it. Gates connect sectors - each with different difficulty, resources, and dangers. Press M for the sector map. Green sectors are safe, red means death.",
+            say: "See that swirling portal? That's a jump gate to the Central Hub - the real galaxy awaits! Select the gate and press S to warp to it. Your fleet is ready. When you arrive, you'll find more sectors, more resources, and yes - pirates. Time to graduate, monkey.",
             expression: 'lecturing',
             check: (g) => g.stats?.jumps >= 1,
-            complete: "Your first gate jump! A whole new sector to explore. Bring your fleet - never jump alone.",
+            complete: "Welcome to the Central Hub! Training wheels are off. The real galaxy starts now, monkey. Bring your fleet - never jump alone.",
         },
         {
             id: 'route_planning',

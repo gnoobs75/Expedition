@@ -134,6 +134,7 @@ export class UIManager {
         this.setupEventListeners();
         this.initPanelDragManager();
         this.helpSystem.init();
+        this.initUIScale();
         this.initShipIndicatorViewer();
         this.initPowerRouting();
 
@@ -4148,14 +4149,14 @@ export class UIManager {
 
         nameEl.textContent = sector.name || 'Unknown Sector';
         const difficulty = sector.difficulty || 'normal';
-        const diffNames = { hub: 'High Security', safe: 'Secure Space', normal: 'Low Security', dangerous: 'Null Security', deadly: 'Wormhole Space' };
+        const diffNames = { tutorial: 'Training Grounds', hub: 'High Security', safe: 'Secure Space', normal: 'Low Security', dangerous: 'Null Security', deadly: 'Wormhole Space' };
         subtitleEl.textContent = diffNames[difficulty] || difficulty;
         subtitleEl.className = `sector-banner-subtitle ${difficulty}`;
 
         // Update danger level indicator
         const dangerEl = document.getElementById('danger-level');
         if (dangerEl) {
-            const secLevels = { hub: '1.0', safe: '0.8', normal: '0.4', dangerous: '0.1', deadly: '0.0' };
+            const secLevels = { tutorial: '1.0', hub: '1.0', safe: '0.8', normal: '0.4', dangerous: '0.1', deadly: '0.0' };
             dangerEl.textContent = secLevels[difficulty] || '0.5';
             dangerEl.className = `danger-${difficulty}`;
         }
@@ -4796,10 +4797,42 @@ export class UIManager {
     }
 
     /**
+     * Initialize UI scale slider
+     */
+    initUIScale() {
+        const slider = document.getElementById('ui-scale-slider');
+        const label = document.getElementById('ui-scale-value');
+        if (!slider) return;
+
+        const saved = localStorage.getItem('expedition-ui-scale');
+        if (saved) {
+            const val = parseInt(saved);
+            slider.value = val;
+            if (label) label.textContent = val + '%';
+            document.documentElement.style.setProperty('--ui-scale', val / 100);
+        }
+
+        slider.addEventListener('input', () => {
+            const val = parseInt(slider.value);
+            if (label) label.textContent = val + '%';
+            document.documentElement.style.setProperty('--ui-scale', val / 100);
+            localStorage.setItem('expedition-ui-scale', String(val));
+        });
+    }
+
+    /**
+     * Toggle Skippy panel visibility (\ key)
+     */
+    toggleSkippy() {
+        this.game.skippy?.togglePanel();
+    }
+
+    /**
      * Reset panel positions (Z key)
      */
     toggleMoveMode() {
         this.panelDragManager.resetPositions();
+        this.showToast('Panel positions reset', 'system');
     }
 
     /**

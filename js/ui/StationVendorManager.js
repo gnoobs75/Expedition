@@ -335,7 +335,7 @@ export class StationVendorManager {
         shipMeshFactory.generateShipMeshAsync({
             shipId,
             role: config.role || 'mercenary',
-            size: config.size || 'small',
+            size: config.size || 'frigate',
             detailLevel: 'high',
         }).then(mesh => {
             if (!mesh) return;

@@ -47,7 +47,10 @@ export const CONFIG = {
     // Ship Classes (speeds reduced 50% for larger sector feel)
     SHIPS: {
         frigate: {
-            name: 'Frigate',
+            name: 'Starter Frigate',
+            shipClass: 'frigate',
+            role: 'mercenary',
+            size: 'frigate',
             maxSpeed: 125,
             acceleration: 30,
             shield: 100,
@@ -63,7 +66,7 @@ export const CONFIG = {
             droneCapacity: 2,
             droneBandwidth: 20,
             price: 5000,
-            modelPath: 'assets/ships/Miner/Miner.glb',
+            weaponSlots: 3,
         },
         cruiser: {
             name: 'Cruiser',

@@ -1783,7 +1783,7 @@ export class UIManager {
         shipMeshFactory.generateShipMeshAsync({
             shipId: player.shipClass,
             role: shipConfig.role || 'mercenary',
-            size: shipConfig.size || 'small',
+            size: shipConfig.size || 'frigate',
             detailLevel: 'high',
         }).then(mesh => {
             if (!mesh) return;

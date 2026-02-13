@@ -1286,7 +1286,9 @@ export class SkippyManager {
 
     // Define all guided steps
     static GUIDED_STEPS = [
-        // -- Phase 1: First Steps --
+        // =============================================
+        // Phase 1: First Steps - Movement & Mining Basics
+        // =============================================
         {
             id: 'welcome',
             say: "Oh great, another monkey who thinks they can build an empire. I'm Skippy the Magnificent, your vastly superior AI companion. Let's start with the basics - use WASD to move your ship around. Try it.",
@@ -1295,26 +1297,36 @@ export class SkippyManager {
             complete: "Look at you, moving through space like a particularly ambitious bacterium. I'm almost impressed. Almost.",
         },
         {
+            id: 'look_around',
+            say: "Use your mouse wheel to zoom in and out. The overview panel on the right shows everything nearby - asteroids, stations, gates, and hostiles. Red means danger, monkey. Learn to read that list.",
+            expression: 'lecturing',
+            check: (g) => g.player && g.stats?.playTime > 15,
+            complete: "Good. Situational awareness is the difference between a captain and a corpse.",
+        },
+        {
             id: 'find_asteroids',
-            say: "See those rocks floating around? Those are asteroids. Click one to select it. That's how you'll make your fortune - mining space rocks like a proper monkey.",
+            say: "See those rocks floating around? Those are asteroids - your ticket to building something from nothing. Click one to select it. We're going to mine our way to a fleet, monkey.",
             expression: 'lecturing',
             check: (g) => g.selectedTarget?.type === 'asteroid',
             complete: "You selected a rock. Truly the pinnacle of primate achievement.",
         },
         {
             id: 'mine_asteroid',
-            say: "Now lock it with R and activate your mining laser with F1. Watch the pretty beam and try not to drool on the controls.",
+            say: "Now lock it with R and activate your mining laser with F1. Watch the pretty beam and try not to drool on the controls. This is the foundation of everything we're going to build.",
             expression: 'bored',
             check: (g) => g.player?.cargoUsed > 0,
-            complete: "Ore in the hold! You're a natural-born rock collector. Your mother would be so proud.",
+            complete: "Ore in the hold! Every empire starts somewhere, and yours starts with space rocks. How poetic.",
         },
         {
             id: 'fill_cargo',
-            say: "Keep mining until your cargo bay is full. Watch the cargo bar in the bottom right - when it's full, we'll go cash in. I'll wait. It's not like I have anything better to do. Actually, I do, but here we are.",
+            say: "Keep mining until your cargo bay is at least 80% full. Watch the cargo bar in your ship indicator. I'll wait. It's not like I have anything better to do. Actually, I do, but here we are.",
             expression: 'bored',
             check: (g) => g.player && g.player.cargoUsed >= g.player.cargoCapacity * 0.8,
             complete: "Cargo's looking good! Now let's go sell that ore before you somehow lose it.",
         },
+        // =============================================
+        // Phase 2: First Sale & Credits
+        // =============================================
         {
             id: 'dock_station',
             say: "Time to head back to the station. Click the station in the overview or in space, then press S to warp to it. When you're close enough, press Enter to dock. Simple enough even for you.",
@@ -1324,185 +1336,278 @@ export class SkippyManager {
         },
         {
             id: 'sell_ore',
-            say: "Click the REFINERY tab up top. See all that ore? Hit SELL ALL and watch the credits roll in. This is how empires start, monkey - one rock at a time.",
+            say: "Click the REFINERY tab up top. See all that ore? Hit SELL ALL and watch the credits roll in. We need ISK to build your fleet, monkey - lots of it. One rock at a time.",
             expression: 'lecturing',
-            check: (g) => g.dockedAt && g.player?.cargoUsed === 0 && g.credits > 1000,
-            complete: "Ka-ching! Credits in the bank. Now you're starting to think like an industrialist. A very small, hairy industrialist.",
+            check: (g) => g.dockedAt && g.player?.cargoUsed === 0 && g.credits > 500,
+            complete: "Ka-ching! First paycheck. Your faction account has funds now. But we need much more for what I have planned.",
         },
         {
-            id: 'buy_fleet_ship',
-            say: "Now for the fun part. Click the SHIPS tab. See that '+FLEET' button next to the mining frigates? Buy one. Your empire needs ships, Commander. Every great fleet starts with ship number two.",
+            id: 'keep_mining',
+            say: "Undock with Enter and keep mining. We need around 5,000 ISK to buy your first fleet ship - a dedicated mining frigate. The faster you mine, the faster we build. I'll keep track.",
+            expression: 'lecturing',
+            check: (g) => g.credits >= 5000,
+            complete: "5,000 ISK! Now we're talking. Time to start building your fleet, monkey.",
+        },
+        // =============================================
+        // Phase 3: First Fleet Ship - Mining Frigate (Venture)
+        // =============================================
+        {
+            id: 'buy_mining_ship',
+            say: "Dock at the station and click the SHIPS tab. Find the Venture - it's a mining frigate, 5,000 ISK. Hit the '+FLEET' button next to it. This ship will mine while you do other things. Passive income, monkey!",
             expression: 'impressed',
-            check: (g) => g.fleet?.ships?.length >= 1,
-            complete: "Your first fleet ship! You've just doubled your operational capacity. I'd celebrate but I'm a beer can.",
+            check: (g) => g.fleet?.ships?.some(s => s.shipClass === 'venture'),
+            complete: "Your first fleet ship! A Venture mining frigate. Now she needs a captain at the helm.",
         },
         {
-            id: 'hire_captain',
-            say: "That ship needs a captain. Click the CANTINA tab and hire a pilot. Every ship needs a monkey at the helm - err, I mean a skilled professional. Pick whoever you can afford.",
+            id: 'hire_first_captain',
+            say: "That Venture needs a captain. Click the CANTINA tab and hire a pilot - look for one with decent mining skill. They cost about 500 ISK to hire. Not every monkey deserves to fly your ships, so choose wisely.",
             expression: 'lecturing',
             check: (g) => g.fleet?.hiredPilots?.length >= 1,
-            complete: "Pilot hired! They seem... adequate. For a monkey. Now let's put them to work.",
+            complete: "Pilot hired! They seem... adequate. For a monkey. Now let's get them into that Venture.",
         },
         {
-            id: 'assign_pilot',
-            say: "Now assign that pilot to your new ship. In the CANTINA, click ASSIGN next to your hired pilot and pick the fleet ship. Then they can actually DO something useful.",
+            id: 'assign_first_pilot',
+            say: "In the CANTINA, click ASSIGN next to your hired pilot and pick the Venture. A ship without a captain is just an expensive paperweight.",
             expression: 'lecturing',
-            check: (g) => g.fleet?.ships?.[0]?.pilot !== null,
-            complete: "Captain assigned. Your fleet is operational! Now let's put them to work.",
+            check: (g) => g.fleet?.ships?.some(s => s.shipClass === 'venture' && s.pilot !== null),
+            complete: "Captain assigned to the Venture! Now let's put them to work.",
         },
         {
-            id: 'order_mining',
-            say: "Press F to open the Fleet panel. Click your fleet ship, then hit the MINE button. Your minion will start mining automatically. Their ore sells to your faction's treasury at 80% market rate. Passive income, monkey!",
+            id: 'order_venture_mining',
+            say: "Undock, then press F to open the Fleet panel. Select your Venture and hit the MINE button. They'll start mining automatically and sell ore to your faction treasury at 80% market rate. Free money while you work!",
             expression: 'smug',
-            check: (g) => g.fleet?.ships?.some(s => s.aiState === 'mining'),
-            complete: "Your fleet miner is operational! Watch the faction treasury start filling up. You're a proper space mogul now. A tiny one, but still.",
+            check: (g) => g.fleet?.ships?.some(s => s.shipClass === 'venture' && s.aiState === 'mining'),
+            complete: "Your Venture is mining! Watch the faction treasury start filling up. This is how empires are built - one autonomous minion at a time.",
         },
-        // -- Phase 2: Combat Introduction (triggered by hostiles) --
+        // =============================================
+        // Phase 4: Combat Survival Basics
+        // =============================================
         {
-            id: 'combat_intro',
-            say: "Time for some combat basics. When you spot hostiles - red dots on the overview - select one and press R to lock. Then F1 to fire. If things get hairy, press S on a distant object to warp away. Don't die on me, monkey.",
+            id: 'combat_awareness',
+            say: "Important survival lesson, monkey. See those red dots on the overview? Pirates. They WILL come for you. When hostiles appear, you have two choices: fight or run. For now? I'd recommend running. Press S on a distant object to warp away.",
             expression: 'concerned',
+            check: (g) => g.stats?.playTime > 120 || g.stats?.kills >= 1,
+            complete: "Good. You're still alive. That's the minimum acceptable standard.",
+        },
+        {
+            id: 'combat_basics',
+            say: "Okay, combat basics for when running isn't an option. Select a hostile, press R to lock, then F1 to fire your weapons. You have shields, armor, and hull - three layers of not-dying. If shields drop below half, seriously consider warping out.",
+            expression: 'lecturing',
             check: (g) => g.stats?.kills >= 1,
-            complete: "First kill! The monkey has teeth! Check the bounty payout - killing pirates is profitable AND satisfying.",
+            complete: "First kill! Pirates pay bounties when they die. Defending yourself IS profitable, monkey.",
         },
         {
-            id: 'shields_armor',
-            say: "Combat lesson two: You have three layers of defense. Shields recharge automatically. Armor doesn't. Hull is your last prayer. Watch those bars - if shields drop, consider running. If hull is critical, DEFINITELY run.",
-            expression: 'lecturing',
-            check: (g) => g.player && g.player.shield < g.player.maxShield * 0.5,
-            complete: "You've taken some hits. See how shields deplete first? That's your buffer. Dock and repair when you can.",
-        },
-        {
-            id: 'first_kill_celebration',
-            say: "Nice kill streak! Every pirate you destroy pays a bounty and might drop loot. Check for floating wrecks after battle - free stuff! The galaxy provides for those who shoot things.",
-            expression: 'impressed',
-            check: (g) => g.stats?.kills >= 3,
-            complete: null,
-        },
-        // -- Phase 3: Fleet Combat --
-        {
-            id: 'fleet_under_fire',
-            say: "Your fleet ships can fight too. If a miner is under attack, select the threat and use your fleet panel to order ATTACK or ASSIST. Toggle their stance between aggressive and passive based on the situation.",
-            expression: 'concerned',
-            check: (g) => g.fleet?.ships?.some(s => s.aiState === 'attacking' || s.aiState === 'defending'),
-            complete: "Your fleet is fighting alongside you. This is what teamwork looks like. Well, you and a bunch of AI pilots I'm better than.",
-        },
-        {
-            id: 'buy_escort',
-            say: "Your miners are vulnerable. Consider buying a combat ship for your fleet - a destroyer or frigate with guns. Set it to DEFEND and it'll protect your mining operations. Mixed fleets survive longer.",
-            expression: 'lecturing',
-            check: (g) => g.fleet?.ships?.length >= 2,
-            complete: "Fleet expanded! A mining ship and an escort. You're building a proper operation, monkey.",
-        },
-        // -- Phase 4: Station Mastery --
-        {
-            id: 'upgrade_equipment',
-            say: "Dock at a station and check the EQUIPMENT tab. Better weapons, shield boosters, and propulsion modules will make you more effective. Then use FITTING to install them on your ship.",
-            expression: 'lecturing',
-            check: (g) => g.player?.moduleInventory?.length >= 1 || g.stats?.kills >= 5,
-            complete: "Upgrading your gear - smart move. A well-fitted ship outperforms a bigger one any day.",
+            id: 'repair_after_combat',
+            say: "After a fight, always dock and check the REPAIR tab. Your armor and hull don't regenerate in space - only shields do. A damaged ship is a dead ship waiting to happen. Trust me on this one.",
+            expression: 'annoyed',
+            check: (g) => g.player && (g.player.hull >= g.player.maxHull * 0.95) && g.stats?.kills >= 1,
+            complete: "Fully repaired. Good habit to build. Unlike most of your habits.",
         },
         {
             id: 'insurance_tip',
-            say: "Real talk, monkey. Check the INSURANCE tab at stations. When you die - and you WILL die - insurance pays back a percentage of your ship's value. The better the plan, the more you get back. Gold covers everything.",
+            say: "Real talk, monkey. Visit the INSURANCE tab at stations. When you die - and you WILL die - insurance pays back a percentage of your ship's value. Get at least basic coverage. It's cheap and it'll save your wallet.",
             expression: 'concerned',
-            check: (g) => g.insurance?.active || g.stats?.deaths >= 1,
-            complete: "Insurance is the difference between a setback and a catastrophe. Wise choice.",
+            check: (g) => g.insurance?.active || g.credits >= 7000,
+            complete: "Smart. Insurance is the difference between a setback and a catastrophe out here.",
+        },
+        // =============================================
+        // Phase 5: Second Fleet Ship - Combat Escort (Slasher)
+        // =============================================
+        {
+            id: 'save_for_escort',
+            say: "Your Venture is mining, your treasury is growing. Now we need protection. Pirates won't stop coming, and your miner can't fight back. Save up 7,000 ISK for a Slasher - fast attack frigate. Your first escort.",
+            expression: 'lecturing',
+            check: (g) => g.credits >= 7000,
+            complete: "7,000 ISK banked! Time to add some teeth to your fleet.",
         },
         {
-            id: 'repair_reminder',
-            say: "Always check the REPAIR tab when docked. Your hull and armor don't regenerate in space. A full repair before heading out could save your life. And my sanity.",
-            expression: 'annoyed',
-            check: (g) => g.player && (g.player.hull >= g.player.maxHull * 0.95) && g.stats?.kills >= 2,
-            complete: null,
+            id: 'buy_combat_ship',
+            say: "Dock up and hit the SHIPS tab. Find the Slasher - it's a mercenary frigate with 4 weapon slots. Buy it with '+FLEET'. This little ship will keep your miners alive and pirates dead.",
+            expression: 'impressed',
+            check: (g) => g.fleet?.ships?.some(s => ['slasher','rifter','merlin','thrasher','corax','thorax','caracal','hurricane','drake'].includes(s.shipClass)),
+            complete: "A combat frigate joins the fleet! Now your miners have a guardian angel. A violent, heavily armed guardian angel.",
         },
-        // -- Phase 5: Navigation --
+        {
+            id: 'hire_combat_captain',
+            say: "Hire another captain from the CANTINA - this time look for combat skill. A pilot who can actually aim is worth their weight in tritanium. Assign them to your new warship.",
+            expression: 'lecturing',
+            check: (g) => g.fleet?.ships?.some(s => ['slasher','rifter','merlin','thrasher','corax','thorax','caracal','hurricane','drake'].includes(s.shipClass) && s.pilot !== null),
+            complete: "Combat pilot assigned! Your fleet now has offensive capability.",
+        },
+        {
+            id: 'order_escort_defend',
+            say: "In the Fleet panel (F key), select your combat ship and hit DEFEND. They'll patrol near your mining operation and engage any hostiles automatically. Your miners can work in peace now.",
+            expression: 'smug',
+            check: (g) => g.fleet?.ships?.some(s => s.aiState === 'defending' || s.aiState === 'attacking'),
+            complete: "Your escort is on guard duty! Mining plus protection - now THAT'S an operation. I might actually stop worrying about you. Might.",
+        },
+        // =============================================
+        // Phase 6: Fleet Expansion - Hauler (Heron)
+        // =============================================
+        {
+            id: 'explain_hauler_need',
+            say: "Your fleet is generating income, but there's a bottleneck. Fleet miners sell at 80% market rate to your treasury. A hauler can collect ore from your miners and you can sell it yourself for full price. Save up 5,000 ISK for a Heron.",
+            expression: 'lecturing',
+            check: (g) => g.credits >= 5000 && g.fleet?.ships?.length >= 2,
+            complete: "Credits ready. Let's get that hauler.",
+        },
+        {
+            id: 'buy_hauler',
+            say: "SHIPS tab - find the Heron, it's a hauler frigate with a big cargo bay for 5,000 ISK. Hit '+FLEET'. Haulers are the backbone of any industrial operation. Boring but essential, like plumbing.",
+            expression: 'bored',
+            check: (g) => g.fleet?.ships?.some(s => ['heron','wreathe','mammoth','mastodon','fenrir','charon'].includes(s.shipClass)),
+            complete: "Hauler acquired! Your logistics chain is taking shape.",
+        },
+        {
+            id: 'crew_hauler',
+            say: "Hire and assign a captain to your hauler. Navigation skill matters for haulers - fast warps mean faster deliveries. Get them seated and we'll talk fleet management.",
+            expression: 'lecturing',
+            check: (g) => g.fleet?.ships?.some(s => ['heron','wreathe','mammoth','mastodon','fenrir','charon'].includes(s.shipClass) && s.pilot !== null),
+            complete: "Hauler crewed up! Three ships, three captains. Your faction is becoming a real operation.",
+        },
+        // =============================================
+        // Phase 7: EWAR Scout (Vigil)
+        // =============================================
+        {
+            id: 'save_for_ewar',
+            say: "Last ship for our starter fleet - an EWAR frigate. The Vigil costs 8,000 ISK and can disrupt enemy warp drives and slow them down. In a fleet fight, EWAR wins battles. Trust the magnificence on this one.",
+            expression: 'lecturing',
+            check: (g) => g.credits >= 8000 && g.fleet?.ships?.length >= 3,
+            complete: "Funds secured for the Vigil. Let's round out your fleet.",
+        },
+        {
+            id: 'buy_ewar_ship',
+            say: "SHIPS tab again. Find the Vigil - it's a police frigate with warp disruption bonuses. Buy it with '+FLEET'. Electronic warfare is how small fleets punch above their weight, monkey.",
+            expression: 'impressed',
+            check: (g) => g.fleet?.ships?.some(s => ['vigil','bellicose','scythe','claymore','sleipnir','maelstrom','scorpion'].includes(s.shipClass)),
+            complete: "EWAR frigate online! Your fleet now has electronic warfare capability. Pirates won't know what hit them.",
+        },
+        {
+            id: 'crew_ewar',
+            say: "Hire one more captain for the Vigil and assign them. With this ship, your fleet can lock down targets and prevent them from escaping. Four ships, four captains - the foundation is complete.",
+            expression: 'lecturing',
+            check: (g) => g.fleet?.ships?.length >= 4 && g.fleet?.ships?.filter(s => s.pilot !== null).length >= 4,
+            complete: "Four ships crewed and operational! Miner, escort, hauler, and EWAR support. That's a proper starter fleet, monkey. I'm... dare I say it... slightly impressed.",
+        },
+        // =============================================
+        // Phase 8: Fleet Operations & Defense
+        // =============================================
+        {
+            id: 'control_groups_intro',
+            say: "Fleet management 101: Press F for Fleet panel. Use Ctrl+1 to assign your miners to group 1, Ctrl+2 for combat ships. Press 1 or 2 to quickly select that group. Organized fleets survive. Messy fleets explode.",
+            expression: 'lecturing',
+            check: (g) => g.fleetSystem?.controlGroups && [...g.fleetSystem.controlGroups.values()].some(s => s.size > 0),
+            complete: "Control groups set! Now you can issue orders to ship groups with a single keypress. Efficiency, monkey.",
+        },
+        {
+            id: 'fleet_defense_posture',
+            say: "Your combat ships should be on DEFEND stance. In the Fleet panel, make sure escorts have aggressive stance so they engage threats automatically. Miners should stay passive - their job is rocks, not rockets.",
+            expression: 'lecturing',
+            check: (g) => g.fleet?.ships?.some(s => s.stance === 'aggressive') && g.fleet?.ships?.some(s => s.stance === 'passive'),
+            complete: "Mixed stances configured. Your combat ships will fight, your industrial ships will flee. Smart division of labor.",
+        },
+        {
+            id: 'watch_treasury',
+            say: "Keep an eye on your faction treasury in the bottom bar. Your fleet miners are feeding it constantly. Once it hits 2,000+ ISK, you know the operation is humming along. Those credits fund everything - repairs, replacements, expansion.",
+            expression: 'smug',
+            check: (g) => (g.faction?.treasury || 0) >= 2000,
+            complete: "Treasury looking healthy! Passive income is flowing. This is the foundation of every great empire. Even monkey-run ones.",
+        },
+        // =============================================
+        // Phase 9: Navigation & Expansion
+        // =============================================
         {
             id: 'gate_discovery',
-            say: "See those swirling portals? Those are jump gates. Select one and press S to warp to it. Gates connect sectors - each with different difficulty and resources. Press M for the sector map.",
+            say: "See those swirling portals? Jump gates. Select one and press S to warp to it. Gates connect sectors - each with different difficulty, resources, and dangers. Press M for the sector map. Green sectors are safe, red means death.",
             expression: 'lecturing',
             check: (g) => g.stats?.jumps >= 1,
-            complete: "Your first gate jump! A whole new sector to explore. Check the difficulty rating - it's color-coded. Green is safe, red is deadly.",
+            complete: "Your first gate jump! A whole new sector to explore. Bring your fleet - never jump alone.",
         },
         {
             id: 'route_planning',
-            say: "Press M for the sector map. Click any distant sector to plot a multi-jump autopilot route. Yellow lines show your planned path. The autopilot handles gate-to-gate navigation automatically.",
+            say: "Press M for the sector map. Click any sector to plot a multi-jump autopilot route - yellow lines show the path. Stick to safe and tame sectors while your fleet is still small. The dangerous sectors have better ore, but also better pirates.",
             expression: 'lecturing',
             check: (g) => g.stats?.jumps >= 3,
-            complete: "You're a seasoned traveler now. Multiple sectors explored. The galaxy is opening up.",
+            complete: "Three jumps completed! You're learning to navigate the sector network. The galaxy is opening up, monkey.",
         },
         {
-            id: 'dangerous_space',
-            say: "Careful in dangerous sectors - they have tougher enemies but rarer ore and bigger bounties. Check the sector difficulty before jumping in blind. Press V for D-Scan to preview what's ahead.",
+            id: 'sector_difficulty_warning',
+            say: "Fair warning: sector difficulty is real. Safe sectors have weak pirates. Dangerous and deadly sectors will chew through an unprepared fleet. Build up in safe space first. There's no shame in caution - there IS shame in losing your entire fleet to hubris.",
             expression: 'concerned',
             check: (g) => g.stats?.sectorsVisited?.length >= 3,
             complete: null,
         },
-        // -- Phase 6: Economy Growth --
+        // =============================================
+        // Phase 10: Economy & Growth
+        // =============================================
         {
-            id: 'treasury_growing',
-            say: "Your faction treasury is growing from fleet mining operations! Those credits fund your expansion. Think bigger - more miners means more income. More escorts means safer miners. It's a beautiful cycle.",
-            expression: 'impressed',
-            check: (g) => (g.faction?.treasury || 0) >= 500,
-            complete: "Your faction is profitable! You're thinking like a real leader now. A monkey leader, but still.",
+            id: 'upgrade_equipment',
+            say: "Time to upgrade. Dock and check the EQUIPMENT tab for better weapons and shield boosters. The FITTING tab lets you install them. A well-fitted ship outperforms a bigger one any day. Fit your combat ships first.",
+            expression: 'lecturing',
+            check: (g) => g.player?.moduleInventory?.length >= 1 || g.stats?.kills >= 5,
+            complete: "Gear upgraded. Every module matters when you're in a tight fight.",
         },
         {
-            id: 'commerce_intro',
-            say: "Check the COMMERCE tab at stations for trade contracts. Buy goods cheap in one sector, sell high in another. It's capitalism, monkey. The oldest game in the galaxy.",
+            id: 'guild_introduction',
+            say: "The GUILDS tab offers repeatable quests. Mining Guild wants ore deliveries. Mercenary Guild wants kills. Complete quests for reputation and credits. Press J to track active quests. Extra income never hurts, monkey.",
             expression: 'lecturing',
-            check: (g) => g.stats?.playTime > 600,
+            check: (g) => g.guildSystem?.playerGuilds?.size >= 1 || g.stats?.playTime > 600,
             complete: null,
         },
         {
-            id: 'guild_quests',
-            say: "The GUILDS tab offers repeatable quests. Mining Guild wants ore deliveries. Mercenary Guild wants kills. Complete quests to earn reputation and unlock better rewards. Press J to track active quests.",
-            expression: 'lecturing',
-            check: (g) => g.guildSystem?.playerGuilds?.size >= 1 || g.stats?.playTime > 900,
-            complete: null,
-        },
-        // -- Phase 7: Advanced Fleet --
-        {
-            id: 'control_groups',
-            say: "Fleet pro tip: Ctrl+1 through Ctrl+5 assigns selected ships to control groups. Press 1-5 to select that group. Group your miners together, escorts together. Organized fleets are efficient fleets.",
-            expression: 'lecturing',
-            check: (g) => g.fleet?.ships?.length >= 3,
-            complete: "Three ships! Your fleet is becoming a force. Use control groups to manage them efficiently.",
-        },
-        {
-            id: 'specialized_roles',
-            say: "A balanced fleet needs specialists. Mining ships gather resources. Combat ships protect them. Consider role diversity when expanding. One good escort is worth three undefended miners.",
-            expression: 'lecturing',
-            check: (g) => g.fleet?.ships?.length >= 4,
-            complete: null,
-        },
-        {
-            id: 'fleet_logistics',
-            say: "Fleet miners auto-sell their ore to your faction treasury when their cargo gets full. If you're nearby, they'll transfer directly to you instead for full market value. Stay close for maximum profit!",
+            id: 'commerce_tip',
+            say: "Pro tip: The COMMERCE tab at stations shows trade contracts. Buy goods cheap in one sector, sell high in another. Combined with your hauler, trade runs can be very profitable. Capitalism, monkey - the galaxy's oldest game.",
             expression: 'smug',
-            check: (g) => (g.faction?.treasury || 0) >= 2000,
+            check: (g) => g.stats?.playTime > 480,
             complete: null,
         },
-        // -- Phase 8: Mastery --
+        // =============================================
+        // Phase 11: Advanced Combat & Skills
+        // =============================================
         {
-            id: 'ewar_combat',
-            say: "Advanced combat: EWAR modules - warp disruptors prevent escape, stasis webs slow targets. If you see DISRUPTED on your HUD, kill the tackler first or you can't warp out. Fit EWAR modules to control the battlefield.",
+            id: 'ewar_explanation',
+            say: "About those EWAR modules - warp disruptors prevent escape, stasis webs slow targets. If you see DISRUPTED on your HUD, kill the tackler FIRST or you can't warp out. Your Vigil can do the same to pirates. Turn the tables, monkey.",
             expression: 'concerned',
-            check: (g) => g.stats?.kills >= 15 || g.stats?.deaths >= 3,
+            check: (g) => g.stats?.kills >= 10 || g.stats?.deaths >= 2,
             complete: null,
         },
         {
             id: 'skill_training',
-            say: "Check the SKILLS tab at any station. You have five skills that improve as you play: Navigation, Gunnery, Mining, Engineering, and Trade. Higher levels give passive bonuses. Press K for your stats breakdown.",
+            say: "Check the SKILLS tab at stations. Five skills improve as you play: Navigation, Gunnery, Mining, Engineering, and Trade. Higher levels give passive bonuses. Press K for your stats breakdown. Long-term investment, monkey.",
             expression: 'lecturing',
-            check: (g) => g.stats?.playTime > 1200,
+            check: (g) => g.stats?.playTime > 900,
+            complete: null,
+        },
+        // =============================================
+        // Phase 12: The Long Game - POS & Empire
+        // =============================================
+        {
+            id: 'fleet_growing',
+            say: "Your fleet is operational and your treasury is growing. The next milestone? Keep expanding - more miners, more escorts. A fleet of 6-8 ships generates serious income. And then... well, I have a plan, monkey.",
+            expression: 'smug',
+            check: (g) => g.fleet?.ships?.length >= 5 || (g.faction?.treasury || 0) >= 10000,
+            complete: "Your operation is thriving! Let me tell you about the endgame.",
+        },
+        {
+            id: 'pos_dream',
+            say: "The ultimate goal: your own station. A Player-Owned Station - POS for short. It costs 500,000 ISK for a basic POS kit. That sounds like a lot, but with a fleet of miners feeding your treasury? It's achievable. Your own base in the stars, monkey.",
+            expression: 'impressed',
+            check: (g) => g.credits >= 50000 || (g.faction?.treasury || 0) >= 25000,
             complete: null,
         },
         {
-            id: 'achievement_hunter',
-            say: "Press U for achievements - 22 milestones to chase. Combat aces, mining moguls, exploration pioneers. They track automatically and some unlock bonuses. Consider this your long-term career plan, monkey. You have one of those, right?",
+            id: 'pos_preparation',
+            say: "To deploy a POS, you'll need: a POS kit from a station's trade goods (500K ISK, 20,000 m³ volume), and a capital-class hauler to carry it. That's the long game, monkey. Keep your fleet mining, keep expanding, and one day you'll plant your flag in the stars.",
+            expression: 'lecturing',
+            check: (g) => g.credits >= 100000 || (g.faction?.treasury || 0) >= 50000 || g.stats?.playTime > 1800,
+            complete: "You're well on your way. The universe is vast and full of opportunity for those persistent enough to seize it. Even monkeys.",
+        },
+        {
+            id: 'graduation',
+            say: "That's everything I can teach you, monkey. You've learned to mine, trade, fight, build a fleet, and dream of your own station. The rest is up to you. I'll still be here - watching, judging, and occasionally being impressed. Mostly judging.",
             expression: 'smug',
-            check: (g) => g.stats?.playTime > 1500,
-            complete: "And that's the full tour. You know everything I can teach you. The rest is up to you, monkey. Try not to disappoint me too badly. I have expectations now. Low ones, but still.",
+            check: (g) => g.stats?.playTime > 2100,
+            complete: "And so the monkey sets out to conquer the galaxy. I give you... moderate odds. Don't disappoint me. I have expectations now. Low ones, but still.",
         },
     ];
 

@@ -91,6 +91,16 @@ export class SaveManager {
     }
 
     /**
+     * Get the most recent save data (auto-save or newest manual)
+     */
+    getMostRecentSave() {
+        const slots = this.listSlots().filter(s => !s.empty);
+        if (slots.length === 0) return null;
+        slots.sort((a, b) => b.timestamp - a.timestamp);
+        return this.load(slots[0].key);
+    }
+
+    /**
      * Get display name for a slot
      */
     getSlotName(slotKey) {

@@ -801,6 +801,8 @@ export class Ship extends Entity {
      * Take damage
      */
     takeDamage(amount, source, damageType = 'em') {
+        if (!this.alive) return;
+
         this._lastDamageTime = performance.now();
         this.lastDamageSource = source;
 

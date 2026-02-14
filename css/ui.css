@@ -4706,6 +4706,12 @@ select:focus-visible {
 .drone-item.deployed .drone-item-icon {
     color: #00ff88;
 }
+.drone-size-badge {
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: 2px;
+    vertical-align: super;
+}
 
 .drone-item-info {
     flex: 1;
@@ -12278,3 +12284,111 @@ select:focus-visible {
 .ingot-ore { color: #99aabb; }
 .ingot-arrow { color: rgba(136, 68, 255, 0.6); }
 .ingot-result { color: #cc88ff; font-weight: bold; }
+
+/* =============================================
+   DEATH SCREEN
+   ============================================= */
+#death-screen {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    transition: background 1.5s ease;
+}
+#death-screen.visible {
+    background: rgba(5, 0, 0, 0.85);
+    pointer-events: all;
+}
+.death-screen-content {
+    text-align: center;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 1.5s ease 0.5s, transform 1.5s ease 0.5s;
+}
+#death-screen.visible .death-screen-content {
+    opacity: 1;
+    transform: scale(1);
+}
+.death-title {
+    font-family: var(--font-heading);
+    font-size: 48px;
+    font-weight: 700;
+    color: #ff2200;
+    text-transform: uppercase;
+    letter-spacing: 8px;
+    text-shadow: 0 0 30px rgba(255, 34, 0, 0.6), 0 0 60px rgba(255, 34, 0, 0.3);
+    margin-bottom: 12px;
+}
+.death-subtitle {
+    font-family: var(--font-body);
+    font-size: 16px;
+    color: #8899aa;
+    letter-spacing: 2px;
+    margin-bottom: 32px;
+}
+.death-stats {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: #99aabb;
+    margin-bottom: 40px;
+    line-height: 1.8;
+}
+.death-no-insurance {
+    color: #cc6644;
+    font-style: italic;
+}
+.death-buttons {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+}
+.death-btn {
+    font-family: var(--font-heading);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 12px 28px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.05);
+    color: #ccddeeff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+}
+.death-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+}
+.death-respawn-btn {
+    border-color: rgba(68, 170, 255, 0.4);
+    color: #88ccff;
+}
+.death-respawn-btn:hover {
+    background: rgba(68, 170, 255, 0.15);
+    border-color: rgba(68, 170, 255, 0.6);
+    color: #aaddff;
+    box-shadow: 0 0 20px rgba(68, 170, 255, 0.2);
+}
+.death-reload-btn {
+    border-color: rgba(255, 170, 68, 0.4);
+    color: #ffcc88;
+}
+.death-reload-btn:hover {
+    background: rgba(255, 170, 68, 0.15);
+    border-color: rgba(255, 170, 68, 0.6);
+    color: #ffddaa;
+}
+.death-menu-btn {
+    border-color: rgba(255, 68, 68, 0.3);
+    color: #aa8888;
+}
+.death-menu-btn:hover {
+    background: rgba(255, 68, 68, 0.1);
+    border-color: rgba(255, 68, 68, 0.5);
+    color: #ffaaaa;
+}

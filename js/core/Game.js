@@ -45,6 +45,7 @@ import { AudioManager } from './AudioManager.js';
 import { SaveManager } from './SaveManager.js';
 import { EventBus } from './EventBus.js';
 import { decayMarketState, getMarketState, loadMarketState } from '../data/tradeGoodsDatabase.js';
+import { formatCredits } from '../utils/math.js';
 
 export class Game {
     constructor() {
@@ -454,15 +455,19 @@ export class Game {
      * Handle player death
      */
     handlePlayerDeath() {
-        this.ui.log('Ship destroyed! Respawning at hub...', 'combat');
-        this.audio.play('explosion');
+        // Prevent re-entrant death handling
+        if (this._playerDeathPending) return;
+        this._playerDeathPending = true;
+
+        this.ui?.log('Ship destroyed!', 'combat');
+        this.audio?.play('explosion');
         this.ui?.damageFlash(0.6);
         this.camera?.shake(15, 0.5);
 
         // Track death
         this.stats.deaths++;
         this.saveStats();
-        this.ui?.addShipLogEntry('Ship destroyed! Respawning...', 'combat');
+        this.ui?.addShipLogEntry('Ship destroyed!', 'combat');
         this.ui?.addCombatLogEntry({
             type: 'death',
             source: this.player?.lastDamageSource,
@@ -473,7 +478,7 @@ export class Game {
         // Lose credits
         const loss = Math.floor(this.credits * CONFIG.DEATH_CREDIT_PENALTY);
         this.credits -= loss;
-        this.ui.log(`Lost ${loss} ISK`, 'combat');
+        this.ui?.log(`Lost ${loss} ISK`, 'combat');
         this.ui?.showCreditPopup(loss, window.innerWidth / 2, window.innerHeight / 2, 'loss');
 
         // Insurance payout
@@ -484,28 +489,91 @@ export class Game {
             const payout = Math.floor(shipValue * this.insurance.payoutRate);
             if (payout > 0) {
                 this.credits += payout;
-                this.ui.log(`Insurance payout: +${payout} ISK (${this.insurance.tierName})`, 'system');
+                this.ui?.log(`Insurance payout: +${payout} ISK (${this.insurance.tierName})`, 'system');
                 this.ui?.addShipLogEntry(`Insurance payout: +${payout} ISK`, 'trade');
                 this.audio?.play('sell');
                 setTimeout(() => {
                     this.ui?.showCreditPopup(payout, window.innerWidth / 2, window.innerHeight / 2 - 40, 'gain');
                 }, 500);
             }
-            // Insurance is single-use per purchase
             this.insurance = { active: false, tier: null, tierName: null, payoutRate: 0, premium: 0, shipInsured: null };
             this.saveInsurance();
         }
 
-        // Respawn after delay
-        setTimeout(() => {
+        // Show death screen with options
+        this.showDeathScreen();
+    }
+
+    /**
+     * Show death screen with respawn / main menu options
+     */
+    showDeathScreen() {
+        // Create death overlay
+        let overlay = document.getElementById('death-screen');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'death-screen';
+            document.body.appendChild(overlay);
+        }
+
+        overlay.innerHTML = `
+            <div class="death-screen-content">
+                <div class="death-title">SHIP DESTROYED</div>
+                <div class="death-subtitle">Your capsule has been recovered</div>
+                <div class="death-stats">
+                    <div>Credits lost: ${formatCredits(Math.floor((this.credits / (1 - CONFIG.DEATH_CREDIT_PENALTY)) * CONFIG.DEATH_CREDIT_PENALTY))} ISK</div>
+                    ${this.insurance.active ? '' : '<div class="death-no-insurance">No insurance coverage</div>'}
+                </div>
+                <div class="death-buttons">
+                    <button class="death-btn death-respawn-btn" id="death-respawn">RESPAWN AT STATION</button>
+                    <button class="death-btn death-reload-btn" id="death-reload">RELOAD LAST SAVE</button>
+                    <button class="death-btn death-menu-btn" id="death-menu">MAIN MENU</button>
+                </div>
+            </div>
+        `;
+        overlay.classList.add('visible');
+
+        // Wire buttons
+        document.getElementById('death-respawn')?.addEventListener('click', () => {
+            this.dismissDeathScreen();
             this.respawnPlayer();
-        }, 3000);
+        });
+        document.getElementById('death-reload')?.addEventListener('click', () => {
+            this.dismissDeathScreen();
+            // Try loading the most recent save
+            const lastSave = this.saveManager?.getMostRecentSave();
+            if (lastSave) {
+                this.loadFromSave(lastSave);
+                this.ui?.toast('Save loaded', 'success');
+            } else {
+                this.ui?.toast('No save found - respawning instead', 'warning');
+                this.respawnPlayer();
+            }
+        });
+        document.getElementById('death-menu')?.addEventListener('click', () => {
+            this.dismissDeathScreen();
+            location.reload();
+        });
+    }
+
+    /**
+     * Dismiss the death screen overlay
+     */
+    dismissDeathScreen() {
+        const overlay = document.getElementById('death-screen');
+        if (overlay) {
+            overlay.classList.remove('visible');
+            overlay.remove();
+        }
+        this._playerDeathPending = false;
     }
 
     /**
      * Respawn player at hub
      */
     respawnPlayer() {
+        this._playerDeathPending = false;
+
         // Recreate player ship
         this.createPlayer();
 
@@ -513,12 +581,11 @@ export class Game {
         this.changeSector('hub');
 
         // Position at station (far from central planet)
-        const station = this.currentSector.getStation();
+        const station = this.currentSector?.getStation();
         if (station) {
             this.player.x = station.x + station.radius + 100;
             this.player.y = station.y;
         } else {
-            // Safe fallback - away from center
             this.player.x = CONFIG.SECTOR_SIZE / 2 + 6000;
             this.player.y = CONFIG.SECTOR_SIZE / 2;
         }
@@ -529,7 +596,7 @@ export class Game {
         // Re-apply skill bonuses to new ship
         this.skillSystem?.applyBonuses();
 
-        this.ui.log('Ship reconstructed. Welcome back, capsuleer.', 'system');
+        this.ui?.log('Ship reconstructed. Welcome back, capsuleer.', 'system');
     }
 
     /**

@@ -1101,20 +1101,37 @@ export class Ship extends Entity {
      * Launch a single drone from the bay
      */
     launchDrone(index) {
-        if (!this.droneBay || index >= this.droneBay.drones.length) return null;
+        if (!this.droneBay || index >= this.droneBay.drones.length) return false;
 
         const droneData = this.droneBay.drones[index];
-        if (!droneData) return null;
+        if (!droneData) return false;
 
         // Check if already deployed
         if (this.droneBay.deployed.has(index)) {
-            return null;
+            return false;
         }
+
+        // Bandwidth enforcement - include pending launches
+        const droneConfig = CONFIG.DRONES[droneData.type];
+        if (!droneConfig) return false;
+
+        const pendingBW = this._pendingBandwidth || 0;
+        const usedBandwidth = this.getUsedBandwidth() + pendingBW;
+        const droneBW = droneConfig.bandwidth || 10;
+        if (usedBandwidth + droneBW > this.droneBay.bandwidth) {
+            if (this.isPlayer) {
+                this.game.ui?.log(`Not enough bandwidth to launch ${droneConfig.name} (${usedBandwidth}/${this.droneBay.bandwidth} Mbit/s)`, 'warning');
+            }
+            return false;
+        }
+
+        // Reserve bandwidth for this pending launch
+        this._pendingBandwidth = (this._pendingBandwidth || 0) + droneBW;
 
         // Import Drone dynamically to avoid circular dependency
         import('./Drone.js').then(({ Drone }) => {
-            const droneConfig = CONFIG.DRONES[droneData.type];
-            if (!droneConfig) return;
+            // Release pending bandwidth (now tracked in deployed)
+            this._pendingBandwidth = Math.max(0, (this._pendingBandwidth || 0) - droneBW);
 
             const drone = new Drone(this.game, {
                 x: this.x + (Math.random() - 0.5) * 50,
@@ -1127,24 +1144,38 @@ export class Ship extends Entity {
 
             this.game.currentSector?.addEntity(drone);
             this.droneBay.deployed.set(index, drone);
-            // Launch burst visual effect
             this.game.renderer?.effects?.spawn('drone-launch', drone.x, drone.y, { color: 0x00ffcc });
             if (this.isPlayer) {
                 this.game.ui?.log(`Launched ${droneConfig.name}`, 'system');
                 this.game.audio?.play('drone-launch');
             }
         });
+
+        return true;
     }
 
     /**
-     * Launch all drones in the bay
+     * Get bandwidth currently used by deployed drones
+     */
+    getUsedBandwidth() {
+        if (!this.droneBay) return 0;
+        let used = 0;
+        for (const drone of this.droneBay.deployed.values()) {
+            used += drone.bandwidth || 10;
+        }
+        return used;
+    }
+
+    /**
+     * Launch all drones in the bay (stops when bandwidth exhausted)
      */
     launchAllDrones() {
         if (!this.droneBay) return;
 
         for (let i = 0; i < this.droneBay.drones.length; i++) {
             if (this.droneBay.drones[i] && !this.droneBay.deployed.has(i)) {
-                this.launchDrone(i);
+                const launched = this.launchDrone(i);
+                if (!launched) break; // Stop on first failure (bandwidth full)
             }
         }
     }
@@ -1220,19 +1251,29 @@ export class Ship extends Entity {
         this.droneCommand = command;
 
         for (const drone of this.droneBay.deployed.values()) {
-            drone.setCommand(command, target);
+            // Smart command routing: EWAR drones get their specific command
+            if (command === 'attack' && drone.droneCategory === 'ewar') {
+                // EWAR drones use jam/damp instead of attack
+                drone.setCommand(drone.ewarType === 'jam' ? 'jam' : 'damp', target);
+            } else if (command === 'mine' && drone.droneCategory !== 'mining') {
+                // Non-mining drones idle when given mine command
+                drone.setCommand('idle');
+            } else {
+                drone.setCommand(command, target);
+            }
         }
 
         const commandNames = {
             'idle': 'Idle',
             'orbit': 'Orbiting',
-            'attack': 'Attacking',
+            'attack': 'Engaging',
             'mine': 'Mining',
-            'return': 'Returning'
+            'return': 'Returning',
+            'jam': 'Jamming',
+            'damp': 'Disrupting',
         };
         if (this.isPlayer) this.game.ui?.log(`Drones: ${commandNames[command] || command}`, 'system');
 
-        // If return command, recall when they get close
         if (command === 'return') {
             this.droneCommand = 'return';
         }

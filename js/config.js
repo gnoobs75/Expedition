@@ -184,35 +184,122 @@ export const CONFIG = {
         },
     },
 
-    // Drones
+    // Drones - Light/Medium/Heavy tiers for mining & combat, plus EWAR variants
     DRONES: {
-        'mining-drone': {
+        // ---- Mining Drones ----
+        'mining-drone-light': {
             name: 'Mining Drone I',
             type: 'mining',
-            miningYield: 5,           // Units per cycle
-            miningCycleTime: 3,       // Seconds
-            cargoCapacity: 50,        // Ore capacity before auto-return
+            size: 'light',
+            miningYield: 3,
+            miningCycleTime: 3,
+            cargoCapacity: 30,
+            speed: 180,
+            orbitRange: 80,
+            hp: 30,
+            bandwidth: 5,
+            price: 2000,
+        },
+        'mining-drone': {
+            name: 'Mining Drone II',
+            type: 'mining',
+            size: 'medium',
+            miningYield: 6,
+            miningCycleTime: 3,
+            cargoCapacity: 60,
             speed: 150,
             orbitRange: 100,
             hp: 50,
             bandwidth: 10,
             price: 5000,
         },
-        'combat-drone': {
-            name: 'Combat Drone I',
+        'mining-drone-heavy': {
+            name: 'Mining Drone III',
+            type: 'mining',
+            size: 'heavy',
+            miningYield: 12,
+            miningCycleTime: 4,
+            cargoCapacity: 100,
+            speed: 100,
+            orbitRange: 120,
+            hp: 100,
+            bandwidth: 25,
+            price: 15000,
+        },
+        // ---- Combat Drones ----
+        'combat-drone-light': {
+            name: 'Hornet I',
             type: 'combat',
-            damage: 10,
+            size: 'light',
+            damage: 6,
+            attackCycleTime: 1.5,
+            speed: 280,
+            orbitRange: 120,
+            range: 400,
+            hp: 40,
+            bandwidth: 5,
+            price: 4000,
+        },
+        'combat-drone': {
+            name: 'Hammerhead II',
+            type: 'combat',
+            size: 'medium',
+            damage: 12,
             attackCycleTime: 2,
             speed: 200,
             orbitRange: 150,
             range: 500,
             hp: 75,
-            bandwidth: 15,
+            bandwidth: 10,
             price: 10000,
         },
+        'combat-drone-heavy': {
+            name: 'Ogre III',
+            type: 'combat',
+            size: 'heavy',
+            damage: 25,
+            attackCycleTime: 3,
+            speed: 120,
+            orbitRange: 200,
+            range: 600,
+            hp: 150,
+            bandwidth: 25,
+            price: 25000,
+        },
+        // ---- EWAR Drones ----
+        'jamming-drone': {
+            name: 'EC-300 Jammer',
+            type: 'ewar',
+            size: 'medium',
+            ewarType: 'jam',
+            jamStrength: 3,           // Chance to break lock per cycle (vs sensor strength)
+            jamCycleTime: 8,          // Seconds between jam attempts
+            speed: 220,
+            orbitRange: 180,
+            range: 600,
+            hp: 35,
+            bandwidth: 10,
+            price: 12000,
+        },
+        'dampening-drone': {
+            name: 'SD-300 Dampener',
+            type: 'ewar',
+            size: 'medium',
+            ewarType: 'damp',
+            warpDisruptStrength: 1,   // Points of warp disruption
+            dampCycleTime: 5,         // Seconds between re-application
+            speed: 200,
+            orbitRange: 200,
+            range: 500,
+            hp: 40,
+            bandwidth: 10,
+            price: 10000,
+        },
+        // ---- Scout Drone (unchanged) ----
         'scout-drone': {
             name: 'Scout Drone I',
             type: 'scout',
+            size: 'light',
             speed: 300,
             orbitRange: 200,
             hp: 25,

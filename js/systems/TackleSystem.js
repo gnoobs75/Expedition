@@ -84,5 +84,19 @@ export class TackleSystem {
                 }
             }
         }
+
+        // Phase 3: Apply EWAR from deployed drones (dampening drones apply warp disruption)
+        for (const e of entities) {
+            if (!e.alive || e.type !== 'drone') continue;
+            if (e.droneCategory !== 'ewar' || !e.target || !e.target.alive) continue;
+
+            const dist = e.distanceTo(e.target);
+            if (dist > (e.ewarRange || 500)) continue;
+
+            // Dampening drones apply warp disruption
+            if (e.ewarType === 'damp' && (e.command === 'damp' || e.command === 'attack')) {
+                e.target.isPointed = true;
+            }
+        }
     }
 }

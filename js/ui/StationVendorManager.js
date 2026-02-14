@@ -84,6 +84,9 @@ export class StationVendorManager {
             case 'fitting':
                 this.renderFitting();
                 break;
+            case 'drones':
+                this.renderDroneMarket();
+                break;
             case 'manufacturing':
                 this.game.ui?.manufacturingPanelManager?.render(
                     document.getElementById('manufacturing-content')
@@ -591,6 +594,128 @@ export class StationVendorManager {
                 this.purchaseEquipment(equipId);
             });
         });
+    }
+
+    // =============================================
+    // DRONES TAB
+    // =============================================
+
+    renderDroneMarket() {
+        const container = document.getElementById('drone-market');
+        const player = this.game.player;
+        if (!container || !player) return;
+
+        const droneBay = player.droneBay;
+        const droneSlots = droneBay ? droneBay.capacity : 0;
+        const dronesOwned = droneBay ? droneBay.drones.filter(d => d !== null).length : 0;
+        const usedBW = player.getUsedBandwidth?.() || 0;
+        const totalBW = droneBay?.bandwidth || 0;
+
+        // All purchasable drone types
+        const droneTypes = Object.entries(CONFIG.DRONES);
+
+        // Category icons
+        const catIcons = { mining: '&#9874;', combat: '&#9876;', ewar: '&#9889;', scout: '&#9678;' };
+        const catLabels = { mining: 'Mining', combat: 'Combat', ewar: 'EWAR', scout: 'Scout' };
+        const sizeLabels = { light: 'Light', medium: 'Medium', heavy: 'Heavy' };
+
+        const dronesHtml = droneTypes.map(([droneId, config]) => {
+            const canAfford = this.game.credits >= config.price;
+            const bayFull = dronesOwned >= droneSlots;
+            const canBuy = canAfford && !bayFull && droneSlots > 0;
+
+            // Build stat line
+            let stats = `${catLabels[config.type] || config.type} ${sizeLabels[config.size] || ''} | ${config.bandwidth} Mbit/s`;
+            if (config.damage) stats += ` | ${config.damage} dmg`;
+            if (config.miningYield) stats += ` | ${config.miningYield} yield`;
+            if (config.ewarType === 'jam') stats += ` | Jam str ${config.jamStrength}`;
+            if (config.ewarType === 'damp') stats += ` | Warp disrupt ${config.warpDisruptStrength}`;
+            if (config.hp) stats += ` | ${config.hp} HP`;
+            if (config.speed) stats += ` | ${config.speed} m/s`;
+
+            const icon = catIcons[config.type] || '&#9679;';
+
+            return `
+                <div class="shop-item ${!canBuy ? 'too-expensive' : ''}" data-drone-id="${droneId}">
+                    <div class="item-info">
+                        <div class="item-name">${icon} ${config.name}</div>
+                        <div class="item-desc">${stats}</div>
+                    </div>
+                    <div class="item-price">${formatCredits(config.price)} ISK</div>
+                    <button class="buy-btn" ${!canBuy ? 'disabled' : ''} data-action="buy-drone" data-drone-id="${droneId}">
+                        ${bayFull ? 'BAY FULL' : (canAfford ? 'BUY' : '---')}
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="drones-market-header">
+                <h3>DRONE MARKET</h3>
+                <span class="drones-market-info">Bay: ${dronesOwned}/${droneSlots} | BW: ${usedBW}/${totalBW} Mbit/s</span>
+            </div>
+            <div class="market-list">${dronesHtml}</div>
+        `;
+
+        // Wire buy buttons
+        container.querySelectorAll('[data-action="buy-drone"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const droneId = btn.dataset.droneId;
+                this.purchaseDrone(droneId);
+            });
+        });
+    }
+
+    purchaseDrone(droneId) {
+        const player = this.game.player;
+        const config = CONFIG.DRONES[droneId];
+        if (!player || !config) return;
+
+        if (this.game.credits < config.price) {
+            this.game.ui?.toast('Insufficient funds', 'error');
+            return;
+        }
+
+        const droneBay = player.droneBay;
+        if (!droneBay || droneBay.capacity <= 0) {
+            this.game.ui?.toast('No drone bay on this ship', 'error');
+            return;
+        }
+
+        // Find empty slot
+        let emptySlot = -1;
+        for (let i = 0; i < droneBay.capacity; i++) {
+            if (!droneBay.drones[i]) {
+                emptySlot = i;
+                break;
+            }
+        }
+
+        // If no empty slot, check if we can add to end (within capacity)
+        if (emptySlot === -1 && droneBay.drones.length < droneBay.capacity) {
+            emptySlot = droneBay.drones.length;
+        }
+
+        if (emptySlot === -1) {
+            this.game.ui?.toast('Drone bay is full', 'error');
+            return;
+        }
+
+        // Purchase
+        this.game.credits -= config.price;
+        droneBay.drones[emptySlot] = {
+            type: droneId,
+            hp: config.hp || 50,
+        };
+
+        this.game.audio?.play('purchase');
+        this.game.ui?.toast(`Purchased ${config.name}!`, 'success');
+        this.game.ui?.log(`Purchased ${config.name} for ${formatCredits(config.price)} ISK`, 'system');
+        this.game.ui?.updateHUD();
+
+        // Refresh
+        this.renderDroneMarket();
     }
 
     // =============================================

@@ -2261,9 +2261,11 @@ export class UIManager {
                 const commandNames = {
                     'idle': 'Idle',
                     'orbit': 'Orbiting',
-                    'attack': 'Attacking',
+                    'attack': 'Engaging',
                     'mine': 'Mining',
-                    'return': 'Returning'
+                    'return': 'Returning',
+                    'jam': 'Jamming',
+                    'damp': 'Disrupting',
                 };
                 statusEl.textContent = commandNames[player.droneCommand] || 'Idle';
             }

@@ -477,18 +477,36 @@ export class ShipMenuManager {
 
         const drones = player.getDronesInBay();
         const deployedCount = player.getDeployedDroneCount();
+        const usedBW = player.getUsedBandwidth();
+
+        // Icon map for drone types
+        const droneIcons = {
+            'mining': '&#9874;',   // pick
+            'combat': '&#9876;',   // crossed swords
+            'ewar': '&#9889;',     // lightning bolt
+            'scout': '&#9678;',    // bullseye
+        };
+        // Size badge colors
+        const sizeBadges = {
+            'light': { label: 'L', color: '#4af' },
+            'medium': { label: 'M', color: '#fa4' },
+            'heavy': { label: 'H', color: '#f44' },
+        };
 
         const dronesHtml = drones.map(drone => {
             const config = drone.config || {};
             const statusClass = drone.deployed ? 'deployed' : 'in-bay';
             const hpPercent = Math.round((drone.hp / (config.hp || 50)) * 100);
+            const icon = droneIcons[config.type] || '&#9679;';
+            const badge = sizeBadges[config.size || 'medium'] || sizeBadges.medium;
+            const bwCost = config.bandwidth || 10;
 
             return `
                 <div class="drone-item ${statusClass}" data-index="${drone.index}">
-                    <div class="drone-item-icon">${drone.config?.type === 'mining' ? '&#9874;' : '&#9876;'}</div>
+                    <div class="drone-item-icon">${icon}<span class="drone-size-badge" style="color:${badge.color}">${badge.label}</span></div>
                     <div class="drone-item-info">
                         <span class="drone-item-name">${config.name || 'Drone'}</span>
-                        <span class="drone-item-status">${drone.deployed ? 'DEPLOYED' : 'IN BAY'}</span>
+                        <span class="drone-item-status">${drone.deployed ? 'DEPLOYED' : 'IN BAY'} &middot; ${bwCost} Mbit/s</span>
                     </div>
                     <div class="drone-item-hp">
                         <div class="drone-hp-bar" style="width: ${hpPercent}%"></div>
@@ -514,7 +532,7 @@ export class ShipMenuManager {
                 <span class="drones-count">${deployedCount}/${droneBay.capacity} Deployed</span>
             </div>
             <div class="drones-bandwidth">
-                <span>Bandwidth: ${droneBay.bandwidth} Mbit/s</span>
+                <span>Bandwidth: ${usedBW}/${droneBay.bandwidth} Mbit/s</span>
             </div>
             <div class="drones-actions">
                 <button class="drone-mass-action-btn" id="launch-all-drones">Launch All</button>

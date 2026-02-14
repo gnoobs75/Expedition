@@ -1,10 +1,20 @@
 // =============================================
 // Drone Entity
 // Small autonomous spacecraft that assists the player
+// Supports: mining (light/med/heavy), combat (light/med/heavy),
+//           EWAR (jamming, dampening), scout
 // =============================================
 
 import { Entity } from './Entity.js';
 import { CONFIG } from '../config.js';
+
+// Color palette per drone category and size
+const DRONE_COLORS = {
+    mining:  { light: 0x44aaff, medium: 0x2288dd, heavy: 0x1166aa },
+    combat:  { light: 0xff6644, medium: 0xdd3322, heavy: 0xaa1100 },
+    ewar:    { jam: 0xffdd00, damp: 0xaa44ff },
+    scout:   { light: 0x00ff88 },
+};
 
 export class Drone extends Entity {
     constructor(game, options = {}) {
@@ -18,7 +28,8 @@ export class Drone extends Entity {
         // Get config
         const config = CONFIG.DRONES[this.droneType] || {};
         this.name = config.name || 'Drone';
-        this.droneCategory = config.type || 'mining';
+        this.droneCategory = config.type || 'mining'; // mining, combat, ewar, scout
+        this.droneSize = config.size || 'medium';     // light, medium, heavy
 
         // Stats from config
         this.maxSpeed = config.speed || 150;
@@ -32,20 +43,31 @@ export class Drone extends Entity {
             this.miningYield = config.miningYield || 5;
             this.miningCycleTime = config.miningCycleTime || 3;
             this.miningTimer = 0;
-            // Drone cargo for mining drones
             this.cargoCapacity = config.cargoCapacity || 50;
-            this.cargo = 0; // Current ore held
-            this.cargoOreType = null; // Type of ore being carried
+            this.cargo = 0;
+            this.cargoOreType = null;
         } else if (this.droneCategory === 'combat') {
             this.damage = config.damage || 10;
             this.attackRange = config.range || 500;
             this.attackCycleTime = config.attackCycleTime || 2;
             this.attackTimer = 0;
+        } else if (this.droneCategory === 'ewar') {
+            this.ewarType = config.ewarType || 'jam'; // 'jam' or 'damp'
+            this.ewarRange = config.range || 500;
+            if (this.ewarType === 'jam') {
+                this.jamStrength = config.jamStrength || 3;
+                this.jamCycleTime = config.jamCycleTime || 8;
+                this.jamTimer = 0;
+            } else if (this.ewarType === 'damp') {
+                this.warpDisruptStrength = config.warpDisruptStrength || 1;
+                this.dampCycleTime = config.dampCycleTime || 5;
+                this.dampTimer = 0;
+            }
         }
 
         // Visual effect timers
         this.effectTimer = 0;
-        this.effectInterval = 0.2; // Spawn laser effect every 0.2s when active
+        this.effectInterval = 0.2;
 
         // State for returning to deposit ore
         this.returningToDeposit = false;
@@ -57,19 +79,30 @@ export class Drone extends Entity {
         this.acceleration = 100;
 
         // AI State
-        this.command = 'idle'; // idle, orbit, attack, mine, return
+        this.command = 'idle'; // idle, orbit, attack, mine, jam, damp, return
         this.target = null;
         this.orbitPhase = Math.random() * Math.PI * 2;
 
         // Visual
-        this.radius = 8;
-        this.color = 0x00ff88;
+        this.radius = this.droneSize === 'heavy' ? 12 : this.droneSize === 'light' ? 6 : 8;
+        this.color = this._getDroneColor();
+    }
+
+    /**
+     * Get color based on drone category and size/ewarType
+     */
+    _getDroneColor() {
+        if (this.droneCategory === 'ewar') {
+            return DRONE_COLORS.ewar[this.ewarType] || 0xffdd00;
+        }
+        const catColors = DRONE_COLORS[this.droneCategory];
+        if (!catColors) return 0x00ff88;
+        return catColors[this.droneSize] || Object.values(catColors)[0];
     }
 
     update(dt) {
         if (!this.alive) return;
 
-        // Execute current command
         switch (this.command) {
             case 'orbit':
                 this.executeOrbit(dt);
@@ -80,6 +113,12 @@ export class Drone extends Entity {
             case 'mine':
                 this.executeMine(dt);
                 break;
+            case 'jam':
+                this.executeJam(dt);
+                break;
+            case 'damp':
+                this.executeDamp(dt);
+                break;
             case 'return':
                 this.executeReturn(dt);
                 break;
@@ -89,7 +128,6 @@ export class Drone extends Entity {
                 break;
         }
 
-        // Apply movement
         super.update(dt);
     }
 
@@ -103,24 +141,21 @@ export class Drone extends Entity {
         // Reset timers
         this.miningTimer = 0;
         this.attackTimer = 0;
+        if (this.jamTimer !== undefined) this.jamTimer = 0;
+        if (this.dampTimer !== undefined) this.dampTimer = 0;
     }
 
-    /**
-     * Idle behavior - orbit owner
-     */
+    // ---- Idle ----
     executeIdle(dt) {
         if (!this.owner) return;
 
         this.orbitPhase += dt * 1.5;
         const targetX = this.owner.x + Math.cos(this.orbitPhase) * 80;
         const targetY = this.owner.y + Math.sin(this.orbitPhase) * 80;
-
         this.moveToward(targetX, targetY, dt);
     }
 
-    /**
-     * Orbit the target
-     */
+    // ---- Orbit ----
     executeOrbit(dt) {
         if (!this.target || !this.target.alive) {
             this.command = 'idle';
@@ -130,13 +165,10 @@ export class Drone extends Entity {
         this.orbitPhase += dt * 2;
         const targetX = this.target.x + Math.cos(this.orbitPhase) * this.orbitRange;
         const targetY = this.target.y + Math.sin(this.orbitPhase) * this.orbitRange;
-
         this.moveToward(targetX, targetY, dt);
     }
 
-    /**
-     * Attack the target (combat drones)
-     */
+    // ---- Attack (combat drones) ----
     executeAttack(dt) {
         if (!this.target || !this.target.alive) {
             this.command = 'idle';
@@ -145,7 +177,6 @@ export class Drone extends Entity {
 
         const dist = this.distanceTo(this.target);
 
-        // Move into range
         if (dist > this.attackRange * 0.8) {
             const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
             const targetDist = this.attackRange * 0.6;
@@ -153,20 +184,17 @@ export class Drone extends Entity {
             const targetY = this.target.y - Math.sin(angle) * targetDist;
             this.moveToward(targetX, targetY, dt);
         } else {
-            // Orbit and attack
             this.orbitPhase += dt * 2;
             const orbitX = this.target.x + Math.cos(this.orbitPhase) * (this.attackRange * 0.5);
             const orbitY = this.target.y + Math.sin(this.orbitPhase) * (this.attackRange * 0.5);
             this.moveToward(orbitX, orbitY, dt);
 
-            // Spawn attack laser effect continuously while in range
             this.effectTimer += dt;
             if (this.effectTimer >= this.effectInterval) {
                 this.effectTimer = 0;
                 this.spawnAttackLaser();
             }
 
-            // Attack timer
             this.attackTimer += dt;
             if (this.attackTimer >= this.attackCycleTime) {
                 this.attackTimer = 0;
@@ -175,33 +203,26 @@ export class Drone extends Entity {
         }
     }
 
-    /**
-     * Mine the target asteroid (mining drones)
-     */
+    // ---- Mine (mining drones) ----
     executeMine(dt) {
-        // Check if cargo is full - need to return to deposit
         if (this.cargo >= this.cargoCapacity) {
             this.returnToDeposit();
             return;
         }
 
         if (!this.target || !this.target.alive || this.target.type !== 'asteroid') {
-            // Find nearest asteroid with ore if no target
             const asteroids = this.game.currentSector?.getEntitiesByType('asteroid') || [];
-            if (asteroids.length > 0) {
-                let closest = null;
-                let closestDist = Infinity;
-                for (const ast of asteroids) {
-                    // Only target asteroids that have ore remaining
-                    if (ast.ore <= 0) continue;
-                    const d = this.distanceTo(ast);
-                    if (d < closestDist) {
-                        closest = ast;
-                        closestDist = d;
-                    }
+            let closest = null;
+            let closestDist = Infinity;
+            for (const ast of asteroids) {
+                if (ast.ore <= 0) continue;
+                const d = this.distanceTo(ast);
+                if (d < closestDist) {
+                    closest = ast;
+                    closestDist = d;
                 }
-                this.target = closest;
             }
+            this.target = closest;
 
             if (!this.target) {
                 this.command = 'idle';
@@ -209,7 +230,6 @@ export class Drone extends Entity {
             }
         }
 
-        // Check if current asteroid is depleted
         if (this.target.ore <= 0) {
             this.target = null;
             return;
@@ -217,27 +237,23 @@ export class Drone extends Entity {
 
         const dist = this.distanceTo(this.target);
 
-        // Move to mining range
         if (dist > this.orbitRange + 50) {
             const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
             const targetX = this.target.x - Math.cos(angle) * this.orbitRange;
             const targetY = this.target.y - Math.sin(angle) * this.orbitRange;
             this.moveToward(targetX, targetY, dt);
         } else {
-            // Orbit and mine
             this.orbitPhase += dt * 1.5;
             const orbitX = this.target.x + Math.cos(this.orbitPhase) * this.orbitRange;
             const orbitY = this.target.y + Math.sin(this.orbitPhase) * this.orbitRange;
             this.moveToward(orbitX, orbitY, dt);
 
-            // Spawn mining laser effect continuously while in range
             this.effectTimer += dt;
             if (this.effectTimer >= this.effectInterval) {
                 this.effectTimer = 0;
                 this.spawnMiningLaser();
             }
 
-            // Mining timer
             this.miningTimer += dt;
             if (this.miningTimer >= this.miningCycleTime) {
                 this.miningTimer = 0;
@@ -246,9 +262,81 @@ export class Drone extends Entity {
         }
     }
 
-    /**
-     * Return to owner
-     */
+    // ---- Jam (jamming drones - break target locks) ----
+    executeJam(dt) {
+        if (!this.target || !this.target.alive) {
+            this.command = 'idle';
+            return;
+        }
+
+        const dist = this.distanceTo(this.target);
+
+        if (dist > this.ewarRange * 0.8) {
+            const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+            const targetX = this.target.x - Math.cos(angle) * (this.ewarRange * 0.6);
+            const targetY = this.target.y - Math.sin(angle) * (this.ewarRange * 0.6);
+            this.moveToward(targetX, targetY, dt);
+        } else {
+            // Orbit the target
+            this.orbitPhase += dt * 1.8;
+            const orbitX = this.target.x + Math.cos(this.orbitPhase) * (this.ewarRange * 0.4);
+            const orbitY = this.target.y + Math.sin(this.orbitPhase) * (this.ewarRange * 0.4);
+            this.moveToward(orbitX, orbitY, dt);
+
+            // Jam beam visual
+            this.effectTimer += dt;
+            if (this.effectTimer >= 0.3) {
+                this.effectTimer = 0;
+                this.spawnEwarBeam();
+            }
+
+            // Jam cycle
+            this.jamTimer += dt;
+            if (this.jamTimer >= this.jamCycleTime) {
+                this.jamTimer = 0;
+                this.attemptJam();
+            }
+        }
+    }
+
+    // ---- Damp (dampening drones - prevent warp) ----
+    executeDamp(dt) {
+        if (!this.target || !this.target.alive) {
+            this.command = 'idle';
+            return;
+        }
+
+        const dist = this.distanceTo(this.target);
+
+        if (dist > this.ewarRange * 0.8) {
+            const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+            const targetX = this.target.x - Math.cos(angle) * (this.ewarRange * 0.6);
+            const targetY = this.target.y - Math.sin(angle) * (this.ewarRange * 0.6);
+            this.moveToward(targetX, targetY, dt);
+        } else {
+            // Orbit the target
+            this.orbitPhase += dt * 1.8;
+            const orbitX = this.target.x + Math.cos(this.orbitPhase) * (this.ewarRange * 0.4);
+            const orbitY = this.target.y + Math.sin(this.orbitPhase) * (this.ewarRange * 0.4);
+            this.moveToward(orbitX, orbitY, dt);
+
+            // Damp beam visual
+            this.effectTimer += dt;
+            if (this.effectTimer >= 0.3) {
+                this.effectTimer = 0;
+                this.spawnEwarBeam();
+            }
+
+            // Continuously apply warp disruption
+            this.dampTimer += dt;
+            if (this.dampTimer >= this.dampCycleTime) {
+                this.dampTimer = 0;
+                this.applyDamp();
+            }
+        }
+    }
+
+    // ---- Return ----
     executeReturn(dt) {
         if (!this.owner) {
             this.command = 'idle';
@@ -256,17 +344,12 @@ export class Drone extends Entity {
         }
 
         const dist = this.distanceTo(this.owner);
-
-        // Move toward owner
         this.moveToward(this.owner.x, this.owner.y, dt);
 
-        // If close enough
         if (dist < 50) {
-            // If returning to deposit ore, deposit and resume mining
             if (this.returningToDeposit) {
                 this.depositOre();
                 this.returningToDeposit = false;
-                // Resume previous command (mining)
                 if (this.previousCommand) {
                     this.command = this.previousCommand;
                     this.target = this.previousTarget;
@@ -276,27 +359,21 @@ export class Drone extends Entity {
                     this.command = 'mine';
                 }
             } else {
-                // Normal return - recall drone
                 this.owner.recallDrone(this);
             }
         }
     }
 
-    /**
-     * Return to owner to deposit ore, then resume mining
-     */
-    returnToDeposit() {
-        if (this.returningToDeposit) return; // Already returning
+    // ---- Helpers ----
 
+    returnToDeposit() {
+        if (this.returningToDeposit) return;
         this.returningToDeposit = true;
         this.previousCommand = this.command;
         this.previousTarget = this.target;
         this.command = 'return';
     }
 
-    /**
-     * Deposit ore into owner's cargo
-     */
     depositOre() {
         if (!this.owner || this.cargo <= 0) return;
 
@@ -308,17 +385,13 @@ export class Drone extends Entity {
 
         if (added > 0) {
             const oreName = CONFIG.ASTEROID_TYPES[oreType]?.name || oreType;
-            if (this.owner?.isPlayer) this.game.ui?.log(`Drone deposited ${added} ${oreName} ore`, 'mining');
+            if (this.owner?.isPlayer) this.game.ui?.log(`${this.name} deposited ${added} ${oreName} ore`, 'mining');
         }
 
-        // Clear drone cargo
         this.cargo = 0;
         this.cargoOreType = null;
     }
 
-    /**
-     * Move toward a position
-     */
     moveToward(targetX, targetY, dt) {
         const dx = targetX - this.x;
         const dy = targetY - this.y;
@@ -333,91 +406,129 @@ export class Drone extends Entity {
         const angle = Math.atan2(dy, dx);
         this.rotation = angle;
 
-        // Accelerate toward target
         const speed = Math.min(this.maxSpeed, dist * 2);
         this.velocity.x = Math.cos(angle) * speed;
         this.velocity.y = Math.sin(angle) * speed;
     }
 
-    /**
-     * Fire at target (combat drones)
-     */
     fireAtTarget() {
         if (!this.target || this.droneCategory !== 'combat') return;
 
         const dist = this.distanceTo(this.target);
         if (dist > this.attackRange) return;
 
-        // Deal damage
         this.game.combat?.fireAt(this, this.target, this.damage, this.attackRange, { damageType: 'thermal' });
     }
 
     /**
-     * Mine asteroid and store in drone's cargo
+     * Attempt to break the target's locks (jamming drone)
      */
+    attemptJam() {
+        if (!this.target || this.ewarType !== 'jam') return;
+        const dist = this.distanceTo(this.target);
+        if (dist > this.ewarRange) return;
+
+        // Jam chance: jamStrength vs target sensor strength (default 10)
+        const sensorStrength = this.target.sensorStrength || 10;
+        const jamChance = Math.min(0.8, this.jamStrength / sensorStrength);
+
+        if (Math.random() < jamChance) {
+            // Break target's lock
+            if (this.target.target) {
+                const victimName = this.target.name || 'Target';
+                this.target.target = null;
+                // Clear active modules (they lose lock)
+                if (this.target.activeModules) {
+                    this.target.activeModules.clear();
+                }
+                if (this.owner?.isPlayer) {
+                    this.game.ui?.log(`${this.name} jammed ${victimName} - lock broken!`, 'ewar');
+                }
+                // Notify via event
+                this.game.events?.emit('ewar:jam', { source: this, target: this.target });
+            }
+        } else {
+            if (this.owner?.isPlayer) {
+                this.game.ui?.log(`${this.name} jam attempt resisted`, 'ewar');
+            }
+        }
+    }
+
+    /**
+     * Apply warp disruption to target (dampening drone)
+     */
+    applyDamp() {
+        if (!this.target || this.ewarType !== 'damp') return;
+        const dist = this.distanceTo(this.target);
+        if (dist > this.ewarRange) return;
+
+        this.target.isPointed = true;
+
+        if (this.owner?.isPlayer) {
+            const victimName = this.target.name || 'Target';
+            this.game.ui?.log(`${this.name} disrupting ${victimName}'s warp drive`, 'ewar');
+        }
+
+        this.game.events?.emit('ewar:damp', { source: this, target: this.target });
+    }
+
     mineAsteroid() {
         if (!this.target || !this.owner || this.droneCategory !== 'mining') return;
         if (this.target.ore <= 0) return;
 
-        // Calculate how much we can mine (limited by cargo space and asteroid ore)
         const spaceRemaining = this.cargoCapacity - this.cargo;
         const yieldAmount = Math.min(this.miningYield, spaceRemaining, this.target.ore);
 
         if (yieldAmount <= 0) return;
 
-        // Extract ore from asteroid
         const extracted = this.target.mine(yieldAmount);
 
         if (extracted.units > 0) {
-            // Add to drone's cargo
             this.cargo += extracted.units;
             this.cargoOreType = extracted.type;
 
-            // Spawn mining particles at asteroid
             this.game.renderer?.effects.spawn('mining', this.target.x, this.target.y, {
                 color: this.target.color,
             });
 
-            // Play mining sound
             if (this.owner?.isPlayer) this.game.audio?.play('mining');
         }
 
-        // Check if asteroid depleted
         if (!this.target.alive) {
             if (this.owner?.isPlayer) this.game.ui?.log('Asteroid depleted', 'mining');
             this.target = null;
         }
     }
 
-    /**
-     * Spawn mining laser effect from drone to target asteroid
-     */
+    // ---- Effect Spawners ----
+
     spawnMiningLaser() {
         if (!this.target || !this.game.renderer?.effects) return;
-
-        // Light blue color for mining laser
         this.game.renderer.effects.spawn('laser', this.x, this.y, {
             target: this.target,
-            color: 0x44aaff, // Mining laser blue
+            color: 0x44aaff,
         });
     }
 
-    /**
-     * Spawn attack laser effect from drone to target
-     */
     spawnAttackLaser() {
         if (!this.target || !this.game.renderer?.effects) return;
-
-        // Red/orange color for attack laser
         this.game.renderer.effects.spawn('laser', this.x, this.y, {
             target: this.target,
-            color: 0xff6644, // Attack laser orange-red
+            color: 0xff6644,
         });
     }
 
-    /**
-     * Take damage
-     */
+    spawnEwarBeam() {
+        if (!this.target || !this.game.renderer?.effects) return;
+        const color = this.ewarType === 'jam' ? 0xffdd00 : 0xaa44ff;
+        this.game.renderer.effects.spawn('laser', this.x, this.y, {
+            target: this.target,
+            color: color,
+        });
+    }
+
+    // ---- Health & Damage ----
+
     takeDamage(amount) {
         this.hp -= amount;
 
@@ -426,10 +537,8 @@ export class Drone extends Entity {
             this.destroy();
             this.game.ui?.log(`${this.name} destroyed!`, 'combat');
 
-            // Remove from owner's deployed list
             if (this.owner?.droneBay) {
                 this.owner.droneBay.deployed.delete(this.droneIndex);
-                // Mark as destroyed in bay
                 if (this.owner.droneBay.drones[this.droneIndex]) {
                     this.owner.droneBay.drones[this.droneIndex] = null;
                 }
@@ -437,9 +546,6 @@ export class Drone extends Entity {
         }
     }
 
-    /**
-     * Get health percentage
-     */
     getHealthPercents() {
         return {
             shield: 0,
@@ -448,22 +554,58 @@ export class Drone extends Entity {
         };
     }
 
-    /**
-     * Create drone mesh
-     */
+    // ---- Mesh Creation ----
+
     createMesh() {
-        // Small diamond shape
         const shape = new THREE.Shape();
         const size = this.radius;
 
-        shape.moveTo(size, 0);
-        shape.lineTo(0, size * 0.6);
-        shape.lineTo(-size, 0);
-        shape.lineTo(0, -size * 0.6);
-        shape.closePath();
+        if (this.droneCategory === 'ewar') {
+            // Hexagonal shape for EWAR drones
+            const sides = 6;
+            for (let i = 0; i <= sides; i++) {
+                const a = (i / sides) * Math.PI * 2 - Math.PI / 2;
+                const px = Math.cos(a) * size;
+                const py = Math.sin(a) * size * 0.7;
+                if (i === 0) shape.moveTo(px, py);
+                else shape.lineTo(px, py);
+            }
+        } else if (this.droneSize === 'heavy') {
+            // Wider, more angular shape for heavy drones
+            shape.moveTo(size * 1.2, 0);
+            shape.lineTo(size * 0.3, size * 0.8);
+            shape.lineTo(-size * 0.8, size * 0.5);
+            shape.lineTo(-size, 0);
+            shape.lineTo(-size * 0.8, -size * 0.5);
+            shape.lineTo(size * 0.3, -size * 0.8);
+            shape.closePath();
+        } else if (this.droneSize === 'light') {
+            // Sleek narrow shape for light drones
+            shape.moveTo(size * 1.1, 0);
+            shape.lineTo(0, size * 0.4);
+            shape.lineTo(-size * 0.8, size * 0.2);
+            shape.lineTo(-size * 0.6, 0);
+            shape.lineTo(-size * 0.8, -size * 0.2);
+            shape.lineTo(0, -size * 0.4);
+            shape.closePath();
+        } else {
+            // Standard diamond for medium drones
+            shape.moveTo(size, 0);
+            shape.lineTo(0, size * 0.6);
+            shape.lineTo(-size, 0);
+            shape.lineTo(0, -size * 0.6);
+            shape.closePath();
+        }
 
-        const geometry = new THREE.ExtrudeGeometry(shape, { depth: size * 0.08, bevelEnabled: true, bevelThickness: size * 0.02, bevelSize: size * 0.01, bevelSegments: 1 });
+        const geometry = new THREE.ExtrudeGeometry(shape, {
+            depth: size * 0.08,
+            bevelEnabled: true,
+            bevelThickness: size * 0.02,
+            bevelSize: size * 0.01,
+            bevelSegments: 1,
+        });
         geometry.center();
+
         const material = new THREE.MeshStandardMaterial({
             color: this.color,
             emissive: this.color,
@@ -477,7 +619,7 @@ export class Drone extends Entity {
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.position.set(this.x, this.y, 1);
 
-        // Add glow effect
+        // Glow ring
         const glowGeometry = new THREE.CircleGeometry(size * 1.5, 16);
         const glowMaterial = new THREE.MeshBasicMaterial({
             color: this.color,
@@ -487,6 +629,44 @@ export class Drone extends Entity {
         const glow = new THREE.Mesh(glowGeometry, glowMaterial);
         glow.position.z = -0.1;
         this.mesh.add(glow);
+
+        // Heavy drones get an extra hull plate ring
+        if (this.droneSize === 'heavy') {
+            const armorRing = new THREE.RingGeometry(size * 1.1, size * 1.3, 8);
+            const armorMat = new THREE.MeshBasicMaterial({
+                color: this.color,
+                transparent: true,
+                opacity: 0.15,
+            });
+            const armor = new THREE.Mesh(armorRing, armorMat);
+            armor.position.z = -0.05;
+            this.mesh.add(armor);
+        }
+
+        // EWAR drones get a pulsing indicator
+        if (this.droneCategory === 'ewar') {
+            const pulseGeo = new THREE.RingGeometry(size * 0.4, size * 0.6, 12);
+            const pulseMat = new THREE.MeshBasicMaterial({
+                color: this.color,
+                transparent: true,
+                opacity: 0.4,
+            });
+            const pulse = new THREE.Mesh(pulseGeo, pulseMat);
+            pulse.position.z = 0.1;
+            this.mesh.add(pulse);
+            this._ewarPulse = pulse;
+        }
+
+        // Engine glow dot at rear
+        const engineGeo = new THREE.CircleGeometry(size * 0.2, 8);
+        const engineMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.6,
+        });
+        const engine = new THREE.Mesh(engineGeo, engineMat);
+        engine.position.set(-size * 0.6, 0, 0.05);
+        this.mesh.add(engine);
 
         return this.mesh;
     }

@@ -58,12 +58,20 @@ export const DEFAULT_BINDINGS = {
     'toggleWeaponRange': { key: 'Period', description: 'Toggle Weapon Range', category: 'UI' },
     'quickSave': { key: 'F5', description: 'Quick Save (Slot 1)', category: 'System' },
 
+    // Weapon Groups
+    'fireGroup1': { key: 'Digit1', description: 'Fire Weapon Group 1', category: 'Weapons' },
+    'fireGroup2': { key: 'Digit2', description: 'Fire Weapon Group 2', category: 'Weapons' },
+    'fireGroup3': { key: 'Digit3', description: 'Fire Weapon Group 3', category: 'Weapons' },
+
+    // Propulsion
+    'activatePropmod': { key: 'ShiftLeft', description: 'Toggle Afterburner/MWD', category: 'Navigation' },
+
     // Fleet Control Groups
-    'selectGroup1': { key: 'Digit1', description: 'Select Group 1', category: 'Fleet' },
-    'selectGroup2': { key: 'Digit2', description: 'Select Group 2', category: 'Fleet' },
-    'selectGroup3': { key: 'Digit3', description: 'Select Group 3', category: 'Fleet' },
-    'selectGroup4': { key: 'Digit4', description: 'Select Group 4', category: 'Fleet' },
-    'selectGroup5': { key: 'Digit5', description: 'Select Group 5', category: 'Fleet' },
+    'selectGroup1': { key: 'alt+Digit1', description: 'Select Group 1', category: 'Fleet' },
+    'selectGroup2': { key: 'alt+Digit2', description: 'Select Group 2', category: 'Fleet' },
+    'selectGroup3': { key: 'alt+Digit3', description: 'Select Group 3', category: 'Fleet' },
+    'selectGroup4': { key: 'alt+Digit4', description: 'Select Group 4', category: 'Fleet' },
+    'selectGroup5': { key: 'alt+Digit5', description: 'Select Group 5', category: 'Fleet' },
     'assignGroup1': { key: 'ctrl+Digit1', description: 'Assign to Group 1', category: 'Fleet' },
     'assignGroup2': { key: 'ctrl+Digit2', description: 'Assign to Group 2', category: 'Fleet' },
     'assignGroup3': { key: 'ctrl+Digit3', description: 'Assign to Group 3', category: 'Fleet' },
@@ -227,11 +235,18 @@ export class KeyBindings {
     eventToKeyString(event) {
         let key = event.code;
 
-        // Add modifiers
+        // Don't add modifier prefix when the key itself IS the modifier
+        const isModifierKey = key === 'ShiftLeft' || key === 'ShiftRight' ||
+            key === 'ControlLeft' || key === 'ControlRight' ||
+            key === 'AltLeft' || key === 'AltRight';
+
+        // Add modifiers (only for non-modifier keys)
         const modifiers = [];
-        if (event.ctrlKey) modifiers.push('ctrl');
-        if (event.altKey) modifiers.push('alt');
-        if (event.shiftKey) modifiers.push('shift');
+        if (!isModifierKey) {
+            if (event.ctrlKey) modifiers.push('ctrl');
+            if (event.altKey) modifiers.push('alt');
+            if (event.shiftKey) modifiers.push('shift');
+        }
 
         if (modifiers.length > 0) {
             key = modifiers.join('+') + '+' + key;

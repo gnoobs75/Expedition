@@ -480,6 +480,10 @@ export class SplashScreen {
                     <input type="text" id="faction-name-input" class="faction-name-input" placeholder="Enter faction name..." maxlength="24" autocomplete="off" spellcheck="false">
                 </div>
                 <div class="faction-input-row">
+                    <label class="faction-label">FLAGSHIP NAME</label>
+                    <input type="text" id="ship-name-input" class="faction-name-input" placeholder="Name your ship..." maxlength="24" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="faction-input-row">
                     <label class="faction-label">FACTION COLOR</label>
                     <div class="faction-color-picker">${colorSwatches}</div>
                 </div>
@@ -521,12 +525,15 @@ export class SplashScreen {
         });
 
         // Launch
+        const shipNameInput = this.subScreen.querySelector('#ship-name-input');
         this.subScreen.querySelector('#faction-launch-btn').addEventListener('click', () => {
             const factionName = nameInput.value.trim() || 'Unnamed Faction';
+            const shipName = shipNameInput?.value.trim() || 'Endeavour';
             this._resolve?.({
                 action: 'new',
                 tutorial: tutorial,
-                faction: { name: factionName, color: selectedColor, treasury: 0 }
+                faction: { name: factionName, color: selectedColor, treasury: 0 },
+                heroShipName: shipName,
             });
         });
 

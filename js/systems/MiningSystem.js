@@ -383,7 +383,7 @@ export class MiningSystem {
 
         if (extracted.units > 0) {
             // Add ore to ship's cargo
-            if (ship === this.game.player) {
+            if (ship.isPlayer) {
                 const added = ship.addOre(extracted.type, extracted.units, extracted.volume);
 
                 if (added > 0) {

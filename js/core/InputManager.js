@@ -150,6 +150,7 @@ export class InputManager {
      * Check if a click event is on an interactive UI element (not game world)
      */
     isClickOnUI(e) {
+        if (!e.target?.closest) return false;
         return !!e.target.closest('.panel:not(.hidden), #module-rack, #bottom-bar, .modal:not(.hidden), #context-menu:not(.hidden), #ship-indicator, #drone-bar:not(.hidden), #performance-monitor, #locked-targets-container, button, .menu-item, #encyclopedia:not(.hidden)');
     }
 
@@ -421,13 +422,18 @@ export class InputManager {
 
             // Targeting
             case 'lockTarget':
-                if (this.game.selectedTarget && !this.game.lockedTarget) {
+                if (this.game.selectedTarget) {
                     this.game.lockTarget(this.game.selectedTarget);
                 }
                 break;
 
             case 'unlockTarget':
-                this.game.unlockTarget();
+                // If a specific target is selected and locked, unlock it; otherwise unlock most recent
+                if (this.game.selectedTarget?.locked) {
+                    this.game.unlockTarget(this.game.selectedTarget);
+                } else {
+                    this.game.unlockTarget();
+                }
                 break;
 
             case 'cycleTargets':
@@ -607,6 +613,20 @@ export class InputManager {
                 }
                 break;
             }
+
+            // Weapon Groups
+            case 'fireGroup1':
+            case 'fireGroup2':
+            case 'fireGroup3': {
+                const weapGroupNum = parseInt(action.replace('fireGroup', ''));
+                this.game.fireWeaponGroup(weapGroupNum);
+                break;
+            }
+
+            // Propulsion module toggle
+            case 'activatePropmod':
+                this.game.togglePropmod();
+                break;
 
             // Fleet Control Groups - Select
             case 'selectGroup1':

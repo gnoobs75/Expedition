@@ -42,6 +42,17 @@ async function init() {
         game.faction = { ...result.faction };
     }
 
+    // Apply hero ship name for new game
+    if (result.heroShipName && game.player) {
+        game.player.heroName = result.heroShipName;
+        game.player.name = result.heroShipName;
+    }
+
+    // Auto-assign weapon groups on new game
+    if (result.action === 'new' && game.player) {
+        game.player.autoAssignWeaponGroups();
+    }
+
     // If loading a save, restore state before starting game loop
     if (result.action === 'load' && result.slotData) {
         game.loadFromSave(result.slotData);

@@ -16,6 +16,28 @@ export class MinimapRenderer {
         this.minimapCtx = this.minimapCanvas?.getContext('2d');
         this._radarAngle = 0;
         this.scanPulse = null;
+
+        // Observe container resizes to update canvas dimensions
+        this._resizeTimer = null;
+        const minimapPanel = document.getElementById('minimap');
+        if (minimapPanel && this.minimapCanvas) {
+            this._resizeObserver = new ResizeObserver(() => {
+                clearTimeout(this._resizeTimer);
+                this._resizeTimer = setTimeout(() => this._syncCanvasSize(), 100);
+            });
+            this._resizeObserver.observe(minimapPanel);
+        }
+    }
+
+    _syncCanvasSize() {
+        const canvas = this.minimapCanvas;
+        if (!canvas) return;
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
+            canvas.width = w;
+            canvas.height = h;
+        }
     }
 
     update() {
@@ -26,16 +48,15 @@ export class MinimapRenderer {
         const player = this.game.player;
         if (!player) return;
 
-        const W = this.minimapExpanded ? 400 : 210;
-        const H = this.minimapExpanded ? 400 : 210;
+        // Derive size from actual canvas dimensions
+        this._syncCanvasSize();
+        const W = canvas.width || 210;
+        const H = canvas.height || 210;
         const cx = W / 2;
         const cy = H / 2;
         const radarMult = this.game.hazardSystem?.getRadarMultiplier() ?? 1;
         const range = this.minimapRange * radarMult;
         const scale = (W / 2 - 10) / range;
-
-        if (canvas.width !== W) canvas.width = W;
-        if (canvas.height !== H) canvas.height = H;
 
         // Background
         ctx.clearRect(0, 0, W, H);
@@ -337,7 +358,18 @@ export class MinimapRenderer {
         this.minimapExpanded = !this.minimapExpanded;
         const minimap = document.getElementById('minimap');
         const btn = document.getElementById('minimap-expand-btn');
-        if (minimap) minimap.classList.toggle('minimap-expanded', this.minimapExpanded);
+        if (minimap) {
+            minimap.classList.toggle('minimap-expanded', this.minimapExpanded);
+            // Update panel size to match expanded/collapsed state
+            if (this.minimapExpanded) {
+                minimap.style.width = '400px';
+                minimap.style.height = '428px';
+            } else {
+                minimap.style.width = '210px';
+                minimap.style.height = '';
+            }
+        }
         if (btn) btn.textContent = this.minimapExpanded ? '\u25BE' : '\u25B4';
+        // Canvas will auto-sync via ResizeObserver
     }
 }

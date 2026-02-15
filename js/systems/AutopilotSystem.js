@@ -26,6 +26,10 @@ export class AutopilotSystem {
         // Multi-sector route
         this.route = [];        // Array of sector IDs to traverse
         this.routeIndex = 0;    // Current position in route
+
+        // Autopilot capacitor threshold (for tiered speed)
+        this.capThreshold = 0.50; // Default: Standard (50%)
+        this._capWaitTimer = null;
     }
 
     /**
@@ -198,24 +202,41 @@ export class AutopilotSystem {
         const targetX = this.target.x + Math.cos(targetAngle) * orbitRadius;
         const targetY = this.target.y + Math.sin(targetAngle) * orbitRadius * tiltFactor;
 
-        // Adjust for distance from orbit
-        if (Math.abs(dist - orbitRadius) > 100) {
-            // Move towards orbit radius (spiral approach)
+        // Radial correction: blend tangent with inward/outward push to maintain orbit distance
+        const radiusError = dist - orbitRadius;
+        const radiusErrorAbs = Math.abs(radiusError);
+
+        // Tangent direction along ellipse
+        const tangentAngle = Math.atan2(
+            Math.cos(targetAngle),
+            -Math.sin(targetAngle) * tiltFactor
+        );
+
+        if (radiusErrorAbs > 100) {
+            // Far from orbit — spiral approach toward orbit position
             const adjustAngle = wrappedDirection(
                 player.x, player.y,
                 targetX, targetY,
                 CONFIG.SECTOR_SIZE
             );
             player.desiredRotation = adjustAngle;
-        } else {
-            // Follow ellipse tangent
-            // For an ellipse with equation x = a*cos(θ), y = b*sin(θ)
-            // The tangent direction is atan2(a*cos(θ), -b*sin(θ))
-            // where a = orbitRadius (X axis) and b = orbitRadius * tiltFactor (Y axis)
-            const tangentAngle = Math.atan2(
-                Math.cos(targetAngle),
-                -Math.sin(targetAngle) * tiltFactor
+        } else if (radiusErrorAbs > 15) {
+            // Near orbit but drifting — blend tangent with radial correction
+            const correctionAngle = wrappedDirection(
+                player.x, player.y,
+                targetX, targetY,
+                CONFIG.SECTOR_SIZE
             );
+            // Stronger correction the further from desired radius
+            const correctionWeight = Math.min(radiusErrorAbs / 100, 0.5);
+            // Blend angles using atan2 of weighted sin/cos sums
+            const blendedAngle = Math.atan2(
+                Math.sin(tangentAngle) * (1 - correctionWeight) + Math.sin(correctionAngle) * correctionWeight,
+                Math.cos(tangentAngle) * (1 - correctionWeight) + Math.cos(correctionAngle) * correctionWeight
+            );
+            player.desiredRotation = blendedAngle;
+        } else {
+            // On orbit — follow tangent
             player.desiredRotation = tangentAngle;
         }
 
@@ -718,10 +739,53 @@ export class AutopilotSystem {
             return;
         }
 
-        // Continue to next gate after brief delay
-        setTimeout(() => {
-            this.navigateToNextGate();
-        }, 2500);
+        // Wait for capacitor to reach threshold before continuing
+        const tierLabel = Math.round(this.capThreshold * 100);
+        this.game.ui?.log(`Waiting for ${tierLabel}% capacitor before next jump...`, 'system');
+        this.waitForCapacitor(() => this.navigateToNextGate());
+    }
+
+    /**
+     * Wait for player capacitor to reach the configured threshold
+     */
+    waitForCapacitor(callback) {
+        if (this._capWaitTimer) {
+            clearTimeout(this._capWaitTimer);
+            this._capWaitTimer = null;
+        }
+
+        const check = () => {
+            const player = this.game.player;
+            if (!player || !player.alive) return;
+
+            // Route was cancelled
+            if (this.route.length === 0) return;
+
+            const capPct = player.maxCapacitor > 0
+                ? player.capacitor / player.maxCapacitor
+                : 1;
+
+            if (capPct >= this.capThreshold) {
+                this._capWaitTimer = null;
+                this.game.ui?.log('Capacitor ready - continuing route', 'system');
+                callback();
+            } else {
+                this._capWaitTimer = setTimeout(check, 500);
+            }
+        };
+
+        // Brief initial delay for sector to settle
+        this._capWaitTimer = setTimeout(check, 1000);
+    }
+
+    /**
+     * Set autopilot capacitor threshold tier
+     * @param {number} threshold - 0.25 to 1.0
+     */
+    setCapThreshold(threshold) {
+        this.capThreshold = Math.max(0.25, Math.min(1.0, threshold));
+        const pct = Math.round(this.capThreshold * 100);
+        this.game.ui?.log(`Autopilot speed: ${pct}% capacitor threshold`, 'system');
     }
 
     /**
@@ -730,6 +794,10 @@ export class AutopilotSystem {
     clearRoute() {
         this.route = [];
         this.routeIndex = 0;
+        if (this._capWaitTimer) {
+            clearTimeout(this._capWaitTimer);
+            this._capWaitTimer = null;
+        }
     }
 
     /**
@@ -743,6 +811,7 @@ export class AutopilotSystem {
             totalJumps: this.route.length - 1,
             remainingJumps: this.route.length - 1 - this.routeIndex,
             destination: this.route[this.route.length - 1],
+            capThreshold: this.capThreshold,
         };
     }
 

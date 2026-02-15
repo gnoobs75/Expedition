@@ -57,6 +57,37 @@ export const SHIP_SIZES = {
 export const SHIP_DATABASE = {
 
     // =============================================
+    // HERO SHIP (Player Starter)
+    // =============================================
+
+    'hero-frigate': {
+        name: 'Expedition Frigate',
+        description: 'Your personal flagship. A versatile frigate with 3 weapon hardpoints, balanced for combat and mining operations.',
+        size: 'frigate',
+        role: 'mercenary',
+        modelPath: 'assets/ships/Hero/hero_frigate.glb',
+        // Balanced starter: slightly better than average frigate
+        maxSpeed: 150,
+        acceleration: 32,
+        turnSpeed: 2.4,
+        shield: 100,
+        armor: 60,
+        hull: 70,
+        capacitor: 90,
+        capacitorRegen: 3,
+        signatureRadius: 28,
+        weaponSlots: 3,
+        moduleSlots: 2,
+        subsystemSlots: 2,
+        cargoCapacity: 200,
+        droneCapacity: 2,
+        droneBandwidth: 15,
+        price: 0, // starter ship, not purchasable
+        bonuses: {},
+        isHeroShip: true,
+    },
+
+    // =============================================
     // MINING SHIPS
     // =============================================
     // Mining role: +30% HP, -75% DPS (fewer weapon slots), -33% speed, +300-500% cargo

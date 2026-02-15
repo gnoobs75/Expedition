@@ -428,9 +428,13 @@ export class StatusEffects {
             const pulse = 0.5 + Math.sin(time) * 0.3 + Math.sin(time * 2.7) * 0.2;
             this.shieldShimmer.children[0].material.opacity = (0.08 + depleted * 0.12) * pulse;
 
-            // Rotating sparkle ring
-            this.shieldShimmer.children[1].rotation.z += dt * 0.8;
-            this.shieldShimmer.children[1].material.opacity = (0.1 + depleted * 0.15) * pulse;
+            // Rotating sparkle ring (children[1] is a Group of dots, not a Mesh)
+            const dotGroup = this.shieldShimmer.children[1];
+            dotGroup.rotation.z += dt * 0.8;
+            const dotOpacity = (0.1 + depleted * 0.15) * pulse;
+            dotGroup.children.forEach(dot => {
+                if (dot.material) dot.material.opacity = dotOpacity;
+            });
 
             // Scale breathe
             const breathe = 1 + Math.sin(time * 0.7) * 0.03;

@@ -64,7 +64,8 @@ export class Game {
         this.credits = CONFIG.PLAYER_START_CREDITS;
         this.currentSector = null;
         this.dockedAt = null;
-        this.lockedTarget = null;
+        this.lockedTarget = null;       // Primary locked target (backward compat, synced with lockedTargets[0])
+        this.lockedTargets = [];        // All locked targets (multi-lock)
         this.selectedTarget = null;
 
         // Bookmarks (persisted)
@@ -238,18 +239,23 @@ export class Game {
      * Create player ship with default loadout
      */
     createPlayer() {
-        const shipConfig = CONFIG.SHIPS.frigate;
+        // Use hero ship from SHIP_DATABASE, fall back to CONFIG.SHIPS.frigate
+        const heroShip = SHIP_DATABASE['hero-frigate'];
+        const shipConfig = heroShip || CONFIG.SHIPS.frigate;
 
         this.player = new PlayerShip(this, {
             x: CONFIG.SECTOR_SIZE / 2,
             y: CONFIG.SECTOR_SIZE / 2,
             ...shipConfig,
+            shipClass: 'frigate',
+            shipSize: 'frigate',
+            modelId: 'hero-frigate',
         });
 
-        // Default modules (1 attack laser + 1 mining laser)
-        this.player.fitModule('high-1', 'small-laser');
-        this.player.fitModule('high-2', 'mining-laser');
-        // high-3 left empty
+        // Default modules: 1 Laser + 1 Railgun + 1 Mining Laser
+        this.player.fitModule('high-1', 'small-pulse-laser');
+        this.player.fitModule('high-2', 'small-railgun');
+        this.player.fitModule('high-3', 'mining-laser');
         this.player.fitModule('mid-1', 'shield-booster');
         this.player.fitModule('mid-2', 'afterburner');
         this.player.fitModule('low-1', 'damage-mod');
@@ -273,8 +279,12 @@ export class Game {
 
         // Target destroyed
         this.events.on('entity:destroyed', (entity) => {
-            if (entity === this.lockedTarget) {
-                this.lockedTarget = null;
+            // Remove from locked targets array
+            const lockIdx = this.lockedTargets.indexOf(entity);
+            if (lockIdx >= 0) {
+                entity.locked = false;
+                this.lockedTargets.splice(lockIdx, 1);
+                this.lockedTarget = this.lockedTargets[0] || null;
             }
             if (entity === this.selectedTarget) {
                 this.selectedTarget = null;
@@ -716,16 +726,61 @@ export class Game {
     }
 
     /**
-     * Lock target for combat/mining
+     * Get maximum number of simultaneous target locks
+     * Based on ship class + skill bonuses + module bonuses
+     */
+    getMaxLockTargets() {
+        const player = this.player;
+        if (!player) return 1;
+
+        // Base by ship size
+        const baseLocks = {
+            'frigate': 2, 'destroyer': 3, 'cruiser': 4,
+            'battlecruiser': 5, 'battleship': 6, 'capital': 8,
+        };
+        const size = player.shipSize || player.shipClass || 'frigate';
+        let maxLocks = baseLocks[size] || 2;
+
+        // Skill bonus: gunnery gives +1 at levels 3 and 5
+        if (this.skillSystem?.skills?.gunnery) {
+            const gunneryLevel = this.skillSystem.skills.gunnery.level || 0;
+            if (gunneryLevel >= 3) maxLocks += 1;
+            if (gunneryLevel >= 5) maxLocks += 1;
+        }
+
+        // Module bonus: sensor booster gives +1 lock
+        if (player.modules) {
+            for (let i = 0; i < player.midSlots; i++) {
+                const modId = player.modules.mid[i];
+                if (modId && (modId === 'sensor-booster' || modId.startsWith('sensor-booster'))) {
+                    maxLocks += 1;
+                }
+            }
+        }
+
+        return maxLocks;
+    }
+
+    /**
+     * Lock target for combat/mining (multi-lock support)
      */
     lockTarget(entity) {
         if (!entity) return;
 
+        // Already locked?
+        if (this.lockedTargets.includes(entity)) return;
+
+        // Check max locks
+        if (this.lockedTargets.length >= this.getMaxLockTargets()) {
+            this.ui?.showToast(`Max targets locked (${this.getMaxLockTargets()})`, 'warning');
+            return;
+        }
+
         // Start lock timer
         const lockTime = CONFIG.LOCK_TIME_BASE;
 
-        this.ui.log(`Locking ${entity.name}...`, 'system');
-        this.audio.play('lock-start');
+        this.ui?.log(`Locking ${entity.name}...`, 'system');
+        this.audio?.play('lock-start');
 
         // Track locking progress for visual feedback
         this.lockingTarget = entity;
@@ -734,26 +789,147 @@ export class Game {
 
         // Simulate lock time
         setTimeout(() => {
-            if (entity.alive && this.player.alive) {
-                this.lockedTarget = entity;
+            if (entity.alive && this.player?.alive) {
+                this.lockedTargets.push(entity);
+                this.lockedTarget = this.lockedTargets[0];
                 entity.locked = true;
                 this.events.emit('target:locked', entity);
-                this.ui.log(`Target locked: ${entity.name}`, 'system');
-                this.audio.play('lock-complete');
+                this.ui?.log(`Target locked: ${entity.name}`, 'system');
+                this.audio?.play('lock-complete');
             }
             this.lockingTarget = null;
         }, lockTime * 1000);
     }
 
     /**
-     * Unlock current target
+     * Unlock most recent target, or a specific target
      */
-    unlockTarget() {
-        if (this.lockedTarget) {
-            this.lockedTarget.locked = false;
-            this.lockedTarget = null;
-            this.events.emit('target:unlocked');
+    unlockTarget(entity) {
+        if (entity) {
+            const idx = this.lockedTargets.indexOf(entity);
+            if (idx >= 0) {
+                entity.locked = false;
+                this.lockedTargets.splice(idx, 1);
+            }
+        } else if (this.lockedTargets.length > 0) {
+            // Unlock most recent
+            const last = this.lockedTargets.pop();
+            if (last) last.locked = false;
         }
+        this.lockedTarget = this.lockedTargets[0] || null;
+        this.events.emit('target:unlocked');
+    }
+
+    // ==========================================
+    // Manual Flight Controls (WASD)
+    // ==========================================
+
+    /**
+     * Poll WASD keys each frame for direct flight control.
+     * Overrides autopilot desiredSpeed/desiredRotation when any WASD key is held.
+     */
+    updateManualFlight(dt) {
+        if (!this.player?.alive || this.dockedAt) return;
+        const input = this.input;
+        if (!input) return;
+
+        const w = input.isKeyDown('KeyW');
+        const s = input.isKeyDown('KeyS');
+        const a = input.isKeyDown('KeyA');
+        const d = input.isKeyDown('KeyD');
+
+        if (!w && !s && !a && !d) {
+            this._manualFlightActive = false;
+            return;
+        }
+
+        // Cancel autopilot command when WASD takes over
+        if (!this._manualFlightActive) {
+            this.autopilot?.stop();
+            this._manualFlightActive = true;
+        }
+
+        // Throttle: W increases, S decreases
+        if (w) {
+            this.player.desiredSpeed = this.player.maxSpeed;
+        } else if (s) {
+            this.player.desiredSpeed = 0;
+        }
+
+        // Rotation: A turns left, D turns right
+        if (a || d) {
+            const turnAmount = this.player.turnSpeed * dt;
+            if (a) {
+                this.player.rotation += turnAmount;
+            }
+            if (d) {
+                this.player.rotation -= turnAmount;
+            }
+            // Keep desiredRotation in sync so Ship.updateRotation doesn't fight us
+            this.player.desiredRotation = this.player.rotation;
+        }
+    }
+
+    // ==========================================
+    // Weapon Groups
+    // ==========================================
+
+    /**
+     * Fire all modules in a weapon group
+     */
+    fireWeaponGroup(groupNum) {
+        if (!this.player?.alive) return;
+        const groups = this.player.weaponGroups;
+        if (!groups) return;
+
+        const slotIds = groups[groupNum];
+        if (!slotIds || slotIds.length === 0) return;
+
+        // Need at least one locked target to fire weapons at
+        const target = this.lockedTargets?.[0] || this.lockedTarget;
+
+        for (const slotId of slotIds) {
+            if (!this.player?.alive) break;
+            const parsed = this.player.parseSlotId(slotId);
+            if (!parsed) continue;
+            const [slotType, slotIndex] = parsed;
+            const moduleId = this.player.modules[slotType]?.[slotIndex];
+            if (!moduleId) continue;
+
+            // Activate the module if not already active
+            if (!this.player.activeModules.has(slotId)) {
+                this.player.activateModule(slotId);
+            }
+        }
+    }
+
+    // ==========================================
+    // Propulsion Module Toggle
+    // ==========================================
+
+    /**
+     * Toggle the first fitted AB or MWD module
+     */
+    togglePropmod() {
+        if (!this.player?.alive) return;
+
+        // Search mid slots for AB or MWD
+        for (let i = 0; i < this.player.midSlots; i++) {
+            const moduleId = this.player.modules.mid[i];
+            if (!moduleId) continue;
+            if (moduleId === 'afterburner' || moduleId.startsWith('afterburner') ||
+                moduleId === 'microwarpdrive' || moduleId.startsWith('microwarpdrive')) {
+                const slotId = `mid-${i + 1}`;
+                if (this.player.activeModules.has(slotId)) {
+                    this.player.deactivateModule(slotId);
+                } else {
+                    this.player.activateModule(slotId);
+                }
+                return;
+            }
+        }
+
+        this.ui?.showToast('No propulsion module fitted', 'warning');
     }
 
     /**
@@ -958,6 +1134,9 @@ export class Game {
         // Update autopilot FIRST (sets desiredSpeed/desiredRotation)
         this._safeUpdate(this.autopilot, 'Autopilot', dt);
 
+        // WASD direct flight overrides autopilot when active
+        this.updateManualFlight(dt);
+
         // Update player (uses desiredSpeed/desiredRotation)
         if (this.player && this.player.alive) {
             try { this.player.update(dt); } catch (e) { console.error('[Player] update error:', e); }
@@ -1061,8 +1240,8 @@ export class Game {
         // Check if player is in active combat
         const inCombat = this.player?.alive && (
             // Player has locked targets that are hostile
-            (this.lockedTarget && this.lockedTarget.alive &&
-                (this.lockedTarget.hostility === 'hostile' || this.lockedTarget.hostility === 'criminal')) ||
+            this.lockedTargets.some(t => t?.alive &&
+                (t.hostility === 'hostile' || t.hostility === 'criminal')) ||
             // Player is being attacked (recent damage)
             (this.player._lastDamageTime && (performance.now() - this.player._lastDamageTime) < 8000) ||
             // Player has active weapon modules firing at something
@@ -1337,6 +1516,33 @@ export class Game {
                 this.player.droneBay.drones = (data.droneBay.drones || []).map(d => ({ ...d }));
                 this.player.droneBay.capacity = data.droneBay.capacity || 0;
                 this.player.droneBay.bandwidth = data.droneBay.bandwidth || 0;
+            }
+
+            // Restore hero ship name
+            if (data.heroName) {
+                this.player.heroName = data.heroName;
+                this.player.name = data.heroName;
+            }
+
+            // Restore model ID for GLB loading
+            if (data.modelId) {
+                this.player.modelId = data.modelId;
+            }
+
+            // Restore weapon groups
+            if (data.weaponGroups) {
+                this.player.weaponGroups = { 1: [], 2: [], 3: [] };
+                for (const g of [1, 2, 3]) {
+                    if (data.weaponGroups[g]) {
+                        this.player.weaponGroups[g] = [...data.weaponGroups[g]];
+                    }
+                }
+            }
+
+            // Restore component upgrade levels and re-apply bonuses
+            if (data.componentLevels) {
+                this.player.componentLevels = { ...data.componentLevels };
+                this.player.applyComponentUpgrades();
             }
         }
 

@@ -62,9 +62,9 @@ export class CombatLogManager {
             this.combatLog.pop();
         }
 
-        // Update panel if visible
-        const panel = document.getElementById('combat-log-panel');
-        if (panel && !panel.classList.contains('hidden')) {
+        // Update if combat tab is visible
+        const combatTab = document.getElementById('log-combat-tab');
+        if (combatTab && combatTab.classList.contains('active')) {
             this.render();
         }
     }
@@ -73,13 +73,25 @@ export class CombatLogManager {
      * Toggle combat log panel
      */
     toggle() {
-        const panel = document.getElementById('combat-log-panel');
-        if (!panel) return;
-        panel.classList.toggle('hidden');
-        if (!panel.classList.contains('hidden')) {
-            this.render();
-            this.game.panelDragManager?.onPanelShown('combat-log-panel');
+        // Show the event log panel and switch to combat tab
+        const eventLogPanel = document.getElementById('event-log');
+        if (!eventLogPanel) return;
+
+        // If panel is hidden, show it
+        if (eventLogPanel.classList.contains('hidden')) {
+            eventLogPanel.classList.remove('hidden');
         }
+
+        // Switch to combat tab
+        document.querySelectorAll('.log-tab-btn').forEach(b => b.classList.remove('active'));
+        const combatTabBtn = document.querySelector('.log-tab-btn[data-log-tab="combat"]');
+        if (combatTabBtn) combatTabBtn.classList.add('active');
+
+        document.querySelectorAll('.log-tab-content').forEach(tc => tc.classList.remove('active'));
+        const combatTab = document.getElementById('log-combat-tab');
+        if (combatTab) combatTab.classList.add('active');
+
+        this.render();
     }
 
     /**

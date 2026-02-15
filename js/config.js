@@ -29,6 +29,23 @@ export const CONFIG = {
     PLAYER_WARP_SPEED: 3000,     // Speed during warp
     PLAYER_WARP_ALIGN_TIME: 3,   // Seconds to align for warp
 
+    // Hero Ship Hull Tiers (upgrade costs)
+    HULL_TIERS: {
+        'frigate':       { tier: 1, name: 'Frigate Hull',       cost: 0,      nextTier: 'destroyer' },
+        'destroyer':     { tier: 2, name: 'Destroyer Hull',     cost: 25000,  nextTier: 'cruiser' },
+        'cruiser':       { tier: 3, name: 'Cruiser Hull',       cost: 75000,  nextTier: 'battlecruiser' },
+        'battlecruiser': { tier: 4, name: 'Battlecruiser Hull', cost: 200000, nextTier: 'battleship' },
+        'battleship':    { tier: 5, name: 'Battleship Hull',    cost: 500000, nextTier: null },
+    },
+
+    // Component Upgrades (applied on top of ship base stats)
+    COMPONENT_UPGRADES: {
+        reactor:  { name: 'Reactor',  stat: 'capacitorRegen', levels: [1.0, 1.15, 1.30, 1.50], costs: [0, 5000, 15000, 40000], label: 'Cap Regen' },
+        engines:  { name: 'Engines',  stat: 'maxSpeed',       levels: [1.0, 1.10, 1.20, 1.35], costs: [0, 5000, 15000, 40000], label: 'Max Speed' },
+        sensors:  { name: 'Sensors',  stat: 'lockTimeBonus',  levels: [1.0, 0.90, 0.80, 0.65], costs: [0, 5000, 15000, 40000], label: 'Lock Time' },
+        plating:  { name: 'Plating',  stat: 'hullBonus',      levels: [1.0, 1.15, 1.30, 1.50], costs: [0, 8000, 20000, 50000], label: 'Hull HP' },
+    },
+
     // Combat
     WEAPON_RANGE_SHORT: 500,
     WEAPON_RANGE_MEDIUM: 1000,

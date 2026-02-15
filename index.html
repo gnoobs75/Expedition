@@ -126,6 +126,12 @@
                         <span id="heading-cardinal" class="heading-cardinal">N</span>
                     </div>
                 </div>
+                <button id="panels-toggle-btn" class="panels-toggle-btn" title="Toggle Panels">PANELS</button>
+            </div>
+
+            <!-- Panels Toggle Popup -->
+            <div id="panels-popup" class="panels-popup hidden">
+                <!-- Dynamically populated -->
             </div>
 
             <!-- Center: Ship Status Bars -->
@@ -182,13 +188,6 @@
                 <div id="faction-treasury-display" class="faction-treasury-display" title="Faction Treasury">
                     <span class="faction-treasury-icon">&#9733;</span>
                     <span id="faction-treasury-value">0</span>
-                </div>
-                <div id="cargo-display">
-                    <span class="label">CARGO</span>
-                    <div class="cargo-bar-container">
-                        <div id="cargo-bar" class="cargo-bar"></div>
-                        <span id="cargo-text">0 / 200 m³</span>
-                    </div>
                 </div>
                 <div id="stardate-display" class="stardate-display" title="Stardate (Game Time)">
                     <span class="stardate-label">SD</span>
@@ -406,21 +405,39 @@
             </div>
         </div>
 
-        <!-- Bottom Left: Event Log -->
+        <!-- Bottom Left: Event Log (merged events + combat) -->
         <div id="event-log" class="panel">
             <div class="panel-header">
-                <span class="panel-title">EVENT LOG</span>
-                <div id="log-filters">
-                    <button class="log-filter-btn active" data-log-filter="all">ALL</button>
-                    <button class="log-filter-btn" data-log-filter="combat" title="Combat">&#9876;</button>
-                    <button class="log-filter-btn" data-log-filter="mining" title="Mining">&#9874;</button>
-                    <button class="log-filter-btn" data-log-filter="trade" title="Trade">&#9878;</button>
-                    <button class="log-filter-btn" data-log-filter="system" title="System">&#9881;</button>
+                <span class="panel-title">LOG</span>
+                <div class="log-tab-btns">
+                    <button class="log-tab-btn active" data-log-tab="events">EVENTS</button>
+                    <button class="log-tab-btn" data-log-tab="combat">COMBAT</button>
                 </div>
             </div>
             <div class="panel-content">
-                <div id="log-messages">
-                    <!-- Dynamically populated -->
+                <!-- Events tab content -->
+                <div id="log-events-tab" class="log-tab-content active">
+                    <div id="log-filters">
+                        <button class="log-filter-btn active" data-log-filter="all">ALL</button>
+                        <button class="log-filter-btn" data-log-filter="combat" title="Combat">&#9876;</button>
+                        <button class="log-filter-btn" data-log-filter="mining" title="Mining">&#9874;</button>
+                        <button class="log-filter-btn" data-log-filter="trade" title="Trade">&#9878;</button>
+                        <button class="log-filter-btn" data-log-filter="system" title="System">&#9881;</button>
+                    </div>
+                    <div id="log-messages">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+                <!-- Combat tab content -->
+                <div id="log-combat-tab" class="log-tab-content">
+                    <div id="combat-log-summary"></div>
+                    <div id="combat-log-filters">
+                        <button class="clog-filter-btn active" data-clog="all">ALL</button>
+                        <button class="clog-filter-btn" data-clog="outgoing">DEALT</button>
+                        <button class="clog-filter-btn" data-clog="incoming">TAKEN</button>
+                        <button class="clog-filter-btn" data-clog="kills">KILLS</button>
+                    </div>
+                    <div id="combat-log-entries"></div>
                 </div>
             </div>
         </div>
@@ -727,23 +744,6 @@
             </div>
         </div>
 
-        <!-- Combat Log Panel -->
-        <div id="combat-log-panel" class="panel hidden">
-            <div class="panel-header">
-                <span class="panel-title">COMBAT LOG</span>
-                <button class="panel-close">&times;</button>
-            </div>
-            <div class="panel-content">
-                <div id="combat-log-summary"></div>
-                <div id="combat-log-filters">
-                    <button class="clog-filter-btn active" data-clog="all">ALL</button>
-                    <button class="clog-filter-btn" data-clog="outgoing">DEALT</button>
-                    <button class="clog-filter-btn" data-clog="incoming">TAKEN</button>
-                    <button class="clog-filter-btn" data-clog="kills">KILLS</button>
-                </div>
-                <div id="combat-log-entries"></div>
-            </div>
-        </div>
 
         <!-- Achievements Panel -->
         <div id="achievements-panel" class="panel hidden">
@@ -914,6 +914,7 @@
                 </div>
                 <div class="modal-tabs">
                     <button class="tab-btn active" data-tab="stats">STATS</button>
+                    <button class="tab-btn" data-tab="fittings">FITTINGS</button>
                     <button class="tab-btn" data-tab="inventory">INVENTORY</button>
                     <button class="tab-btn" data-tab="drones">DRONES</button>
                 </div>
@@ -934,6 +935,9 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    <div id="ship-tab-fittings" class="tab-content">
+                        <div id="ship-fittings-content"></div>
                     </div>
                     <div id="ship-tab-inventory" class="tab-content">
                         <h3>CARGO HOLD</h3>

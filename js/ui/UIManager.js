@@ -136,7 +136,7 @@ export class UIManager {
         this.helpSystem.init();
         this.initUIScale();
         this.initShipIndicatorViewer();
-        this.initPowerRouting();
+        // Power routing panel removed - no longer initialized
 
         // Listen for ship switch to update 3D viewer
         game.events.on('ship:switched', () => this.updateShipViewerMesh());
@@ -417,6 +417,19 @@ export class UIManager {
             });
         }
 
+        // Log tab switching (EVENTS / COMBAT)
+        document.querySelectorAll('.log-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.log-tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const tab = btn.dataset.logTab;
+                document.querySelectorAll('.log-tab-content').forEach(tc => tc.classList.remove('active'));
+                const target = document.getElementById(`log-${tab}-tab`);
+                if (target) target.classList.add('active');
+                if (tab === 'combat') this.combatLogManager.render();
+            });
+        });
+
         // Log filter buttons
         document.querySelectorAll('.log-filter-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -463,7 +476,7 @@ export class UIManager {
 
         // Close context menu on click elsewhere
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('#context-menu')) {
+            if (!e.target?.closest || !e.target.closest('#context-menu')) {
                 this.hideContextMenu();
             }
         });
@@ -548,7 +561,7 @@ export class UIManager {
         // Panel close buttons
         document.querySelectorAll('.panel-close').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                e.target.closest('.panel').classList.add('hidden');
+                e.target?.closest?.('.panel')?.classList.add('hidden');
             });
         });
 
@@ -726,10 +739,12 @@ export class UIManager {
 
         // Global tooltip delegation via data-tooltip attribute
         document.addEventListener('mouseenter', (e) => {
+            if (!e.target?.closest) return;
             const target = e.target.closest('[data-tooltip]');
             if (target) this.showGlobalTooltip(target);
         }, true);
         document.addEventListener('mouseleave', (e) => {
+            if (!e.target?.closest) return;
             const target = e.target.closest('[data-tooltip]');
             if (target) this.hideGlobalTooltip();
         }, true);
@@ -826,7 +841,6 @@ export class UIManager {
         this.panelDragManager.registerPanel('stats-panel');
         this.panelDragManager.registerPanel('achievements-panel');
         this.panelDragManager.registerPanel('ship-log-panel');
-        this.panelDragManager.registerPanel('combat-log-panel');
 
         // Setup minimap range buttons
         document.querySelectorAll('.minimap-range-btn').forEach(btn => {
@@ -863,6 +877,80 @@ export class UIManager {
 
         // Constrain all panels to viewport after loading saved positions
         requestAnimationFrame(() => this.panelDragManager.constrainAllPanels());
+
+        // Panels toggle menu
+        this.initPanelsToggle();
+    }
+
+    /**
+     * Initialize the panels toggle popup menu
+     */
+    initPanelsToggle() {
+        const btn = document.getElementById('panels-toggle-btn');
+        const popup = document.getElementById('panels-popup');
+        if (!btn || !popup) return;
+
+        const panelsList = [
+            { id: 'overview-panel', label: 'Overview', default: true },
+            { id: 'event-log', label: 'Event Log', default: true },
+            { id: 'minimap', label: 'Radar', default: true },
+            { id: 'ship-indicator', label: 'Ship Status', default: true },
+            { id: 'locked-targets-container', label: 'Locked Targets', default: true },
+            { id: 'fleet-panel', label: 'Fleet', default: false },
+            { id: 'stats-panel', label: 'Statistics', default: false },
+            { id: 'ship-log-panel', label: 'Ship Log', default: false },
+            { id: 'dscan-panel', label: 'D-Scan', default: false },
+            { id: 'drone-bar', label: 'Drones', default: false },
+            { id: 'bookmarks-panel', label: 'Bookmarks', default: false },
+        ];
+
+        const renderPopup = () => {
+            let html = '<div class="panels-popup-title">TOGGLE PANELS</div>';
+            for (const p of panelsList) {
+                const el = document.getElementById(p.id);
+                const visible = el && !el.classList.contains('hidden');
+                html += `<div class="panels-popup-item" data-panel-id="${p.id}">
+                    <div class="panels-popup-cb ${visible ? 'checked' : ''}">${visible ? '\u2713' : ''}</div>
+                    <span class="panels-popup-label">${p.label}</span>
+                </div>`;
+            }
+            popup.innerHTML = html;
+
+            popup.querySelectorAll('.panels-popup-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const panelId = item.dataset.panelId;
+                    const el = document.getElementById(panelId);
+                    if (el) {
+                        el.classList.toggle('hidden');
+                        if (!el.classList.contains('hidden')) {
+                            this.panelDragManager?.onPanelShown(panelId);
+                        }
+                        renderPopup();
+                    }
+                });
+            });
+        };
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = !popup.classList.contains('hidden');
+            if (isOpen) {
+                popup.classList.add('hidden');
+                btn.classList.remove('active');
+            } else {
+                renderPopup();
+                popup.classList.remove('hidden');
+                btn.classList.add('active');
+            }
+        });
+
+        // Click outside to close
+        document.addEventListener('click', (e) => {
+            if (!popup.classList.contains('hidden') && !popup.contains(e.target) && e.target !== btn) {
+                popup.classList.add('hidden');
+                btn.classList.remove('active');
+            }
+        });
     }
 
     /**
@@ -1319,7 +1407,7 @@ export class UIManager {
     }
 
     /**
-     * Update locked targets display (Eve-style circular icons)
+     * Update locked targets display (Eve-style circular icons) - multi-lock
      */
     updateLockedTargetsDisplay() {
         const container = this.elements.lockedTargetsContainer;
@@ -1328,52 +1416,72 @@ export class UIManager {
         const contentArea = container.querySelector('.locked-targets-content');
         if (!contentArea) return;
 
-        const locked = this.game.lockedTarget;
+        const targets = this.game.lockedTargets || [];
+        const aliveTargets = targets.filter(t => t?.alive);
         const selected = this.game.selectedTarget;
         const player = this.game.player;
 
-        // For now, we only support one locked target
-        // Could be expanded to support multiple
-        if (!locked || !locked.alive) {
+        if (aliveTargets.length === 0) {
             contentArea.innerHTML = '';
             return;
         }
 
-        const dist = player ? formatDistance(player.distanceTo(locked)) : '-';
-        const icon = this.getEntityIcon(locked);
-        const isSelected = locked === selected;
+        let html = '';
+        for (const locked of aliveTargets) {
+            const dist = player ? formatDistance(player.distanceTo(locked)) : '-';
+            const icon = this.getEntityIcon(locked);
+            const isSelected = locked === selected;
+            const isPrimary = locked === aliveTargets[0];
 
-        // Check if target is an asteroid - show ore instead of health
-        if (locked.type === 'asteroid') {
-            const oreInfo = locked.getOreInfo?.() || { current: 0, max: 1 };
-            const orePercent = Math.round((oreInfo.current / oreInfo.max) * 100);
-
-            contentArea.innerHTML = `
-                <div class="locked-target-icon asteroid ${isSelected ? 'selected' : ''}" data-entity-id="${locked.id}">
-                    <div class="locked-target-distance">${dist}</div>
-                    <div class="locked-target-ring asteroid-outline"></div>
-                    <div class="locked-target-ore-amount">${oreInfo.current}</div>
-                    <div class="locked-target-name">${locked.name}</div>
-                </div>
-            `;
-        } else {
-            const health = locked.getHealthPercents?.() || { shield: 100, armor: 100, hull: 100 };
-
-            contentArea.innerHTML = `
-                <div class="locked-target-icon ${isSelected ? 'selected' : ''}" data-entity-id="${locked.id}">
-                    <div class="locked-target-distance">${dist}</div>
-                    <div class="locked-target-ring shield" style="clip-path: inset(0 ${100 - health.shield}% 0 0 round 50%);"></div>
-                    <div class="locked-target-ring armor" style="clip-path: inset(0 ${100 - health.armor}% 0 0 round 50%);"></div>
-                    <div class="locked-target-ring hull" style="clip-path: inset(0 ${100 - health.hull}% 0 0 round 50%);"></div>
-                    <div class="locked-target-center">${icon}</div>
-                    <div class="locked-target-name">${locked.name}</div>
-                </div>
-            `;
+            if (locked.type === 'asteroid') {
+                const oreInfo = locked.getOreInfo?.() || { current: 0, max: 1 };
+                const orePct = oreInfo.max > 0 ? Math.round((oreInfo.current / oreInfo.max) * 100) : 0;
+                html += `
+                    <div class="locked-target-card ${isSelected ? 'selected' : ''} ${isPrimary ? 'primary' : ''}" data-entity-id="${locked.id}">
+                        <div class="locked-target-card-icon">${icon}</div>
+                        <div class="locked-target-card-info">
+                            <div class="locked-target-card-top">
+                                <span class="locked-target-card-name">${locked.name}</span>
+                                <span class="locked-target-card-dist">${dist}</span>
+                            </div>
+                            <div class="locked-target-card-bars">
+                                <div class="locked-target-card-bar"><div class="locked-target-card-bar-fill ore" style="width:${orePct}%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                const health = locked.getHealthPercents?.() || { shield: 100, armor: 100, hull: 100 };
+                html += `
+                    <div class="locked-target-card ${isSelected ? 'selected' : ''} ${isPrimary ? 'primary' : ''}" data-entity-id="${locked.id}">
+                        <div class="locked-target-card-icon">${icon}</div>
+                        <div class="locked-target-card-info">
+                            <div class="locked-target-card-top">
+                                <span class="locked-target-card-name">${locked.name}</span>
+                                <span class="locked-target-card-dist">${dist}</span>
+                            </div>
+                            <div class="locked-target-card-bars">
+                                <div class="locked-target-card-bar"><div class="locked-target-card-bar-fill shield" style="width:${health.shield}%"></div></div>
+                                <div class="locked-target-card-bar"><div class="locked-target-card-bar-fill armor" style="width:${health.armor}%"></div></div>
+                                <div class="locked-target-card-bar"><div class="locked-target-card-bar-fill hull" style="width:${health.hull}%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         }
 
-        // Add click handler
-        contentArea.querySelector('.locked-target-icon')?.addEventListener('click', () => {
-            this.game.selectTarget(locked);
+        contentArea.innerHTML = html;
+
+        // Add click handlers to each locked target card
+        contentArea.querySelectorAll('.locked-target-card').forEach(el => {
+            const entityId = el.dataset.entityId;
+            const target = aliveTargets.find(t => String(t.id) === entityId);
+            if (target) {
+                el.addEventListener('click', () => {
+                    this.game.selectTarget(target);
+                });
+            }
         });
     }
 
@@ -1766,12 +1874,13 @@ export class UIManager {
         const player = this.game.player;
         if (!player) return;
 
-        const shipConfig = SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
+        const shipLookupId = player.modelId || player.shipClass;
+        const shipConfig = SHIP_DATABASE[shipLookupId] || SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
         if (!shipConfig) return;
 
-        // Update name/class text immediately
+        // Update name/class text immediately (hero name takes priority)
         if (this.elements.shipIndicatorName) {
-            this.elements.shipIndicatorName.textContent = shipConfig.name || 'Your Ship';
+            this.elements.shipIndicatorName.textContent = this.game.player?.heroName || shipConfig.name || 'Your Ship';
         }
         if (this.elements.shipIndicatorClass) {
             const role = shipConfig.role ? shipConfig.role.toUpperCase() : '';
@@ -1781,7 +1890,7 @@ export class UIManager {
 
         // Load mesh async (GLB if available, procedural fallback)
         shipMeshFactory.generateShipMeshAsync({
-            shipId: player.shipClass,
+            shipId: shipLookupId,
             role: shipConfig.role || 'mercenary',
             size: shipConfig.size || 'frigate',
             detailLevel: 'high',
@@ -2507,6 +2616,7 @@ export class UIManager {
                     <div class="module-cooldown"></div>
                     <div class="module-cooldown-text"></div>
                     ${keyHint ? `<div class="module-slot-keybind">${keyHint}</div>` : ''}
+                    <div class="weapon-group-badge" style="display:none"></div>
                 </div>`;
                 globalIndex++;
             }
@@ -2539,6 +2649,39 @@ export class UIManager {
                     player.toggleModule(index);
                     this.game.audio?.play(wasActive ? 'module-deactivate' : 'module-activate');
                 }
+            });
+
+            // Right-click on high slots to cycle weapon group assignment (1->2->3->none)
+            slot.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                const slotData = slot.dataset.slot;
+                if (!slotData || !slotData.startsWith('high')) return;
+                if (!player.weaponGroups) return;
+
+                // Find which group this slot is in currently
+                let currentGroup = 0;
+                for (const g of [1, 2, 3]) {
+                    if (player.weaponGroups[g]?.includes(slotData)) {
+                        currentGroup = g;
+                        break;
+                    }
+                }
+
+                // Remove from current group
+                if (currentGroup > 0) {
+                    const idx = player.weaponGroups[currentGroup].indexOf(slotData);
+                    if (idx >= 0) player.weaponGroups[currentGroup].splice(idx, 1);
+                }
+
+                // Assign to next group (cycle 1->2->3->none)
+                const nextGroup = currentGroup < 3 ? currentGroup + 1 : 0;
+                if (nextGroup > 0) {
+                    player.weaponGroups[nextGroup].push(slotData);
+                    this.showToast(`Assigned to weapon group ${nextGroup}`, 'system');
+                } else {
+                    this.showToast('Removed from weapon groups', 'system');
+                }
+                this.game.audio?.play('click');
             });
         });
     }
@@ -2597,6 +2740,21 @@ export class UIManager {
                 slotElement.style.setProperty('--cap-warn-color', `rgba(${r},${g},0,${0.3 + severity * 0.5})`);
             } else {
                 slotElement.classList.remove('cap-warning');
+            }
+
+            // Weapon group badge
+            const wgBadge = slotElement.querySelector('.weapon-group-badge');
+            if (wgBadge && player.weaponGroups) {
+                const groups = [];
+                for (const g of [1, 2, 3]) {
+                    if (player.weaponGroups[g]?.includes(mod.slotId)) groups.push(g);
+                }
+                if (groups.length > 0) {
+                    wgBadge.textContent = groups.join('');
+                    wgBadge.style.display = '';
+                } else {
+                    wgBadge.style.display = 'none';
+                }
             }
 
             // Out-of-range dimming for weapons/miners with range
@@ -2793,6 +2951,31 @@ export class UIManager {
     buildContextMenuHTML(entity) {
         const items = [];
 
+        // Sector node from 3D star map - show autopilot tiers
+        if (entity?.isSectorNode) {
+            const isCurrent = entity.sectorId === this.game.currentSector?.id;
+            items.push(`<div class="menu-header">${entity.sectorName}</div>`);
+
+            if (isCurrent) {
+                items.push(`<div class="menu-item disabled">Current Location</div>`);
+            } else {
+                items.push(`
+                    <div class="menu-item has-submenu">
+                        <span class="submenu-arrow">&#9666;</span>
+                        Set Autopilot
+                        <div class="submenu">
+                            <div class="submenu-item" data-action="autopilot-best">Best Speed (25% cap)</div>
+                            <div class="submenu-item" data-action="autopilot-standard">Standard (50% cap)</div>
+                            <div class="submenu-item" data-action="autopilot-cautious">Cautious (75% cap)</div>
+                            <div class="submenu-item" data-action="autopilot-combat">Combat Ready (100% cap)</div>
+                        </div>
+                    </div>`);
+                items.push(`<div class="menu-item" data-action="sector-navigate">Navigate</div>`);
+            }
+            items.push(`<div class="menu-item" data-action="sector-info">Show Info</div>`);
+            return items.join('');
+        }
+
         // Approach - always available
         items.push(`<div class="menu-item" data-action="approach">Approach</div>`);
 
@@ -2828,7 +3011,7 @@ export class UIManager {
             items.push(`<div class="menu-separator"></div>`);
 
             // Lock / Unlock target
-            if (entity === this.game.lockedTarget) {
+            if (this.game.lockedTargets?.includes(entity) || entity === this.game.lockedTarget) {
                 items.push(`<div class="menu-item" data-action="unlock">Unlock Target</div>`);
             } else {
                 items.push(`<div class="menu-item" data-action="lock">Lock Target</div>`);
@@ -2943,6 +3126,36 @@ export class UIManager {
         const worldPos = this.contextMenuWorldPos;
         this.hideContextMenu();
 
+        // Handle autopilot tier actions from 3D star map
+        if (action.startsWith('autopilot-')) {
+            const tierMap = { best: 0.25, standard: 0.50, cautious: 0.75, combat: 1.0 };
+            const tier = action.replace('autopilot-', '');
+            const threshold = tierMap[tier] || 0.50;
+            this.game.autopilot?.setCapThreshold(threshold);
+            if (target?.sectorId) {
+                this.game.autopilot?.planRoute(target.sectorId);
+            }
+            this.sectorMapManager?.hide();
+            this.game.audio?.play('click');
+            return;
+        }
+
+        // Handle sector navigate (quick navigate from 3D map)
+        if (action === 'sector-navigate' && target?.sectorId) {
+            this.game.autopilot?.planRoute(target.sectorId);
+            this.sectorMapManager?.hide();
+            this.game.audio?.play('click');
+            return;
+        }
+
+        // Handle sector info
+        if (action === 'sector-info' && target?.sectorId) {
+            const sector = target;
+            this.showToast(`${sector.sectorName} - ${(sector.difficulty || '').toUpperCase()}`, 'info');
+            this.game.audio?.play('click');
+            return;
+        }
+
         // Handle approach - works with or without target
         if (action === 'approach') {
             if (target) {
@@ -3007,7 +3220,7 @@ export class UIManager {
                 this.game.lockTarget(target);
                 break;
             case 'unlock':
-                this.game.unlockTarget();
+                this.game.unlockTarget(target);
                 break;
             case 'look-at':
                 this.game.camera.lookAt(target);
@@ -4819,6 +5032,8 @@ export class UIManager {
             if (label) label.textContent = val + '%';
             document.documentElement.style.setProperty('--ui-scale', val / 100);
             localStorage.setItem('expedition-ui-scale', String(val));
+            // Constrain panels to new viewport bounds after zoom change
+            this.panelDragManager?.constrainAllPanels();
         });
     }
 

@@ -8,6 +8,7 @@
 import { CONFIG, UNIVERSE_LAYOUT } from '../config.js';
 import { formatDistance, formatCredits } from '../utils/math.js';
 import { GUILD_FACTIONS } from '../data/guildFactionDatabase.js';
+import { UniverseMapRenderer3D } from './UniverseMapRenderer3D.js';
 
 export class SectorMapManager {
     constructor(game) {
@@ -19,6 +20,9 @@ export class SectorMapManager {
         this.universeCanvas = null;
         this.localCtx = null;
         this.universeCtx = null;
+
+        // 3D universe map renderer
+        this.universeRenderer3D = null;
 
         // Local map state
         this.localZoom = 1.0;
@@ -99,6 +103,13 @@ export class SectorMapManager {
                 const tabId = `map-tab-${btn.dataset.tab}`;
                 document.getElementById(tabId)?.classList.add('active');
                 this.activeTab = btn.dataset.tab;
+                // Start/stop 3D renderer based on active tab
+                if (this.activeTab === 'universe' && this.universeRenderer3D) {
+                    this.universeRenderer3D.resize();
+                    this.universeRenderer3D.startAnimation();
+                } else {
+                    this.universeRenderer3D?.stopAnimation();
+                }
                 this.render();
                 this.game.audio?.play('click');
             });
@@ -127,14 +138,12 @@ export class SectorMapManager {
             this.localCanvas.addEventListener('contextmenu', (e) => this.handleLocalRightClick(e));
         }
 
-        if (this.universeCanvas && !this.universeCtx) {
-            this.universeCanvas.width = this.universeCanvas.parentElement?.clientWidth || 800;
-            this.universeCanvas.height = this.universeCanvas.parentElement?.clientHeight || 500;
-            this.universeCtx = this.universeCanvas.getContext('2d');
-
-            this.universeCanvas.addEventListener('click', (e) => this.handleUniverseClick(e));
-            this.universeCanvas.addEventListener('mousemove', (e) => this.handleUniverseHover(e));
-            this.universeCanvas.addEventListener('mouseleave', () => this.hideTooltip());
+        if (this.universeCanvas && !this.universeRenderer3D) {
+            const container = this.universeCanvas.parentElement;
+            if (container) {
+                this.universeRenderer3D = new UniverseMapRenderer3D(this.game, container);
+                this.universeRenderer3D.init();
+            }
         }
 
         if (!this.controlsInitialized) {
@@ -156,17 +165,26 @@ export class SectorMapManager {
         this.modal.classList.remove('hidden');
         this.visible = true;
 
-        if (!this.localCtx || !this.universeCtx) {
+        if (!this.localCtx || !this.universeRenderer3D) {
             setTimeout(() => {
                 this.initCanvases();
                 this.centerOnPlayer();
                 this.render();
                 this.startAnimation();
+                // Start 3D animation if on universe tab
+                if (this.activeTab === 'universe' && this.universeRenderer3D) {
+                    this.universeRenderer3D.resize();
+                    this.universeRenderer3D.startAnimation();
+                }
             }, 50);
         } else {
             this.centerOnPlayer();
             this.render();
             this.startAnimation();
+            if (this.activeTab === 'universe' && this.universeRenderer3D) {
+                this.universeRenderer3D.resize();
+                this.universeRenderer3D.startAnimation();
+            }
         }
         this.game.audio?.play('click');
     }
@@ -176,6 +194,7 @@ export class SectorMapManager {
         this.modal.classList.add('hidden');
         this.visible = false;
         this.stopAnimation();
+        this.universeRenderer3D?.stopAnimation();
         this.hideTooltip();
     }
 
@@ -1197,6 +1216,8 @@ export class SectorMapManager {
     // ==========================================
 
     renderUniverseMap() {
+        // 3D renderer handles its own animation loop
+        if (this.universeRenderer3D) return;
         if (!this.universeCtx || !this.universeCanvas) return;
 
         const ctx = this.universeCtx;

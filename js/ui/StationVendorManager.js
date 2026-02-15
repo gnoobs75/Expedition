@@ -116,10 +116,63 @@ export class StationVendorManager {
         const shipConfig = SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
         const shipName = shipConfig?.name || player.shipClass;
 
+        // Build hull upgrade section
+        const hullTiers = CONFIG.HULL_TIERS || {};
+        const currentSize = player.shipSize || 'frigate';
+        const currentTier = hullTiers[currentSize];
+        const nextTierKey = currentTier?.nextTier;
+        const nextTier = nextTierKey ? hullTiers[nextTierKey] : null;
+
+        let hullUpgradeHtml = '';
+        if (nextTier) {
+            const canAfford = this.game.credits >= nextTier.cost;
+            hullUpgradeHtml = `
+                <div class="shop-item hull-upgrade ${canAfford ? '' : 'disabled'}">
+                    <div class="item-info">
+                        <div class="item-name">HULL UPGRADE: ${nextTier.name}</div>
+                        <div class="item-desc">Upgrade your ship to ${nextTierKey} class. More slots, HP, and firepower.</div>
+                    </div>
+                    <button class="buy-btn ${canAfford ? '' : 'disabled'}" id="hull-upgrade-btn"
+                        ${canAfford ? '' : 'disabled'}>${formatCredits(nextTier.cost)} ISK</button>
+                </div>`;
+        } else {
+            hullUpgradeHtml = `<div class="shop-item" style="opacity:0.5"><div class="item-info"><div class="item-name">MAX HULL TIER</div><div class="item-desc">Your ship has reached maximum hull class.</div></div></div>`;
+        }
+
+        // Build component upgrades section
+        const compUpgrades = CONFIG.COMPONENT_UPGRADES || {};
+        let compHtml = '';
+        for (const [compId, def] of Object.entries(compUpgrades)) {
+            const currentLevel = player.componentLevels?.[compId] || 0;
+            const maxLevel = def.levels.length - 1;
+            const nextLevel = currentLevel + 1;
+            const isMaxed = currentLevel >= maxLevel;
+            const cost = isMaxed ? 0 : def.costs[nextLevel];
+            const canAfford = !isMaxed && this.game.credits >= cost;
+            const currentBonus = def.levels[currentLevel];
+            const nextBonus = isMaxed ? currentBonus : def.levels[nextLevel];
+
+            const formatBonus = (v) => {
+                if (def.stat === 'lockTimeBonus') return `${Math.round(v * 100)}%`; // lower is better
+                return `${Math.round((v - 1) * 100)}%`;
+            };
+
+            compHtml += `
+                <div class="shop-item component-upgrade ${isMaxed ? 'maxed' : ''}">
+                    <div class="item-info">
+                        <div class="item-name">${def.name} Mk.${currentLevel + 1}${isMaxed ? ' (MAX)' : ''}</div>
+                        <div class="item-desc">${def.label}: +${formatBonus(currentBonus)}${isMaxed ? '' : ` -> +${formatBonus(nextBonus)}`}</div>
+                    </div>
+                    ${isMaxed ? '<div class="item-price" style="color:var(--text-dim)">MAXED</div>' :
+                    `<button class="buy-btn ${canAfford ? '' : 'disabled'}" data-comp="${compId}"
+                        ${canAfford ? '' : 'disabled'}>${formatCredits(cost)} ISK</button>`}
+                </div>`;
+        }
+
         hangarShips.innerHTML = `
             <div class="shop-item current-ship">
                 <div class="item-info">
-                    <div class="item-name">${shipName}</div>
+                    <div class="item-name">${player.heroName || shipName}</div>
                     <div class="item-desc">
                         ${shipConfig?.role ? shipConfig.role.toUpperCase() + ' - ' : ''}${shipConfig?.size ? shipConfig.size.toUpperCase() : ''}
                         | Shield: ${Math.floor(player.shield)}/${player.maxShield}
@@ -128,7 +181,27 @@ export class StationVendorManager {
                 </div>
                 <div class="item-price" style="color: var(--text-secondary)">ACTIVE</div>
             </div>
+            <h3 style="margin-top:12px">Hull Upgrade</h3>
+            ${hullUpgradeHtml}
+            <h3 style="margin-top:12px">Component Upgrades</h3>
+            ${compHtml}
         `;
+
+        // Hull upgrade button handler
+        const hullBtn = document.getElementById('hull-upgrade-btn');
+        if (hullBtn && nextTierKey) {
+            hullBtn.addEventListener('click', () => {
+                this.upgradeHull(nextTierKey, nextTier.cost);
+            });
+        }
+
+        // Component upgrade button handlers
+        hangarShips.querySelectorAll('.component-upgrade .buy-btn[data-comp]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const compId = btn.dataset.comp;
+                this.upgradeComponent(compId);
+            });
+        });
 
         // Cargo
         const cargo = player.getCargoContents();
@@ -145,6 +218,92 @@ export class StationVendorManager {
                 </div>
             `).join('');
         }
+    }
+
+    /**
+     * Upgrade hero ship hull to next tier
+     */
+    upgradeHull(nextTierKey, cost) {
+        if (!this.game.spendCredits(cost)) {
+            this.game.ui?.showToast('Not enough credits', 'error');
+            return;
+        }
+
+        const player = this.game.player;
+        // Find a ship in SHIP_DATABASE that matches the target size
+        // Look for a generic ship of that size class
+        let targetShipId = nextTierKey;
+        for (const [shipId, config] of Object.entries(SHIP_DATABASE)) {
+            if (config.size === nextTierKey) {
+                targetShipId = shipId;
+                break;
+            }
+        }
+
+        const savedName = player.heroName;
+        const savedComponents = { ...player.componentLevels };
+        const savedWeaponGroups = { ...player.weaponGroups };
+
+        player.switchShip(targetShipId);
+
+        // Restore hero ship state
+        player.heroName = savedName;
+        player.name = savedName;
+        player.componentLevels = savedComponents;
+        player.weaponGroups = savedWeaponGroups;
+        player.applyComponentUpgrades();
+
+        this.game.ui?.showToast(`Hull upgraded to ${nextTierKey}!`, 'success');
+        this.game.audio?.play('quest-complete');
+        this.renderHangar();
+    }
+
+    /**
+     * Upgrade a ship component
+     */
+    upgradeComponent(compId) {
+        const player = this.game.player;
+        const def = CONFIG.COMPONENT_UPGRADES?.[compId];
+        if (!def || !player) return;
+
+        const currentLevel = player.componentLevels[compId] || 0;
+        const nextLevel = currentLevel + 1;
+        if (nextLevel >= def.levels.length) return;
+
+        const cost = def.costs[nextLevel];
+        if (!this.game.spendCredits(cost)) {
+            this.game.ui?.showToast('Not enough credits', 'error');
+            return;
+        }
+
+        player.componentLevels[compId] = nextLevel;
+
+        // Re-apply all component upgrades (need to reset stats first)
+        // The simplest way: switchShip to same class to reset base stats, then reapply
+        const savedName = player.heroName;
+        const savedModules = {
+            high: [...player.modules.high],
+            mid: [...player.modules.mid],
+            low: [...player.modules.low],
+        };
+        const savedActiveModules = new Set(player.activeModules);
+
+        // Reset base stats from ship config
+        const shipConfig = SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
+        if (shipConfig) {
+            player.maxSpeed = shipConfig.maxSpeed;
+            player.capacitorRegen = shipConfig.capacitorRegen;
+            player.maxHull = shipConfig.hull;
+            player.hull = player.maxHull;
+        }
+
+        // Re-apply component upgrades
+        player.applyComponentUpgrades();
+        player.name = savedName;
+
+        this.game.ui?.showToast(`${def.name} upgraded to Mk.${nextLevel + 1}!`, 'success');
+        this.game.audio?.play('click');
+        this.renderHangar();
     }
 
     // =============================================

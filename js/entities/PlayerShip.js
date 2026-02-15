@@ -31,6 +31,23 @@ export class PlayerShip extends Ship {
         // Module inventory (purchased but not fitted)
         this.moduleInventory = [];
 
+        // Weapon groups (1-3): maps group number to array of slotIds
+        this.weaponGroups = { 1: [], 2: [], 3: [] };
+
+        // Hero ship name (persisted)
+        this.heroName = options.heroName || options.name || 'Your Ship';
+
+        // Model ID override for GLB loading (separate from shipClass for hull tier compat)
+        this.modelId = options.modelId || null;
+
+        // Component upgrade levels (0 = base, up to 3)
+        this.componentLevels = options.componentLevels || {
+            reactor: 0,
+            engines: 0,
+            sensors: 0,
+            plating: 0,
+        };
+
         // Orbit visual effect state
         this.orbitPhase = 0;      // Current angle in orbit (radians, 0-2π)
         this.orbitTilt = 0.7;     // Tilt factor for ellipse perspective (0.7 = ~35° visual tilt)
@@ -42,8 +59,8 @@ export class PlayerShip extends Ship {
     update(dt) {
         super.update(dt);
 
-        // Update target from game state
-        this.target = this.game.lockedTarget;
+        // Update target from game state (primary locked target)
+        this.target = this.game.lockedTargets?.[0] || this.game.lockedTarget;
 
         // Sync EWAR state for AutopilotSystem compatibility
         this.warpDisrupted = this.isPointed;
@@ -188,7 +205,7 @@ export class PlayerShip extends Ship {
      * Load GLB model and swap into the scene when ready
      */
     loadGLBMesh() {
-        const shipId = this.shipClass || 'frigate';
+        const shipId = this.modelId || this.shipClass || 'frigate';
 
         shipMeshFactory.loadModel(shipId, this.radius * 2.5).then(glbGroup => {
             if (!glbGroup || !this.alive) return;
@@ -256,6 +273,32 @@ export class PlayerShip extends Ship {
             }
 
             this.updateDamageVisuals();
+        }
+    }
+
+    /**
+     * Auto-assign all high-slot weapons to weapon group 1
+     */
+    autoAssignWeaponGroups() {
+        this.weaponGroups = { 1: [], 2: [], 3: [] };
+        for (let i = 0; i < this.highSlots; i++) {
+            if (this.modules.high[i]) {
+                this.weaponGroups[1].push(`high-${i + 1}`);
+            }
+        }
+    }
+
+    /**
+     * Assign a slot to a weapon group (toggles)
+     */
+    assignToWeaponGroup(groupNum, slotId) {
+        if (groupNum < 1 || groupNum > 3) return;
+        const group = this.weaponGroups[groupNum];
+        const idx = group.indexOf(slotId);
+        if (idx >= 0) {
+            group.splice(idx, 1);
+        } else {
+            group.push(slotId);
         }
     }
 
@@ -329,8 +372,48 @@ export class PlayerShip extends Ship {
             this.game.renderer.scene.add(this.mesh);
         }
 
-        this.game.ui?.log(`Switched to ${shipConfig.name}`, 'system');
+        // Apply component upgrades on top of base stats
+        this.applyComponentUpgrades();
+
+        // Preserve hero name
+        this.name = this.heroName || shipConfig.name;
+
+        this.game.ui?.log(`Upgraded to ${shipConfig.name}`, 'system');
         this.game.events.emit('ship:switched', { ship: this, shipClass: newShipClass });
+    }
+
+    /**
+     * Apply component upgrade bonuses to current ship stats
+     */
+    applyComponentUpgrades() {
+        const CONFIG_REF = this.game?.constructor?.prototype?.constructor ? null : null;
+        let upgrades;
+        try {
+            upgrades = CONFIG.COMPONENT_UPGRADES;
+        } catch {
+            return;
+        }
+        if (!upgrades || !this.componentLevels) return;
+
+        for (const [comp, def] of Object.entries(upgrades)) {
+            const level = this.componentLevels[comp] || 0;
+            if (level <= 0) continue;
+            const multiplier = def.levels[level] || 1.0;
+
+            switch (def.stat) {
+                case 'capacitorRegen':
+                    this.capacitorRegen *= multiplier;
+                    break;
+                case 'maxSpeed':
+                    this.maxSpeed *= multiplier;
+                    break;
+                case 'hullBonus':
+                    this.maxHull *= multiplier;
+                    this.hull = this.maxHull;
+                    break;
+                // lockTimeBonus is applied in Game.getMaxLockTargets/lockTarget
+            }
+        }
     }
 
     /**

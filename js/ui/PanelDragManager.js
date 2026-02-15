@@ -31,13 +31,12 @@ export class PanelDragManager {
             'stats-panel': { top: 100, left: 350 },
             'achievements-panel': { top: 100, right: 10 },
             'ship-log-panel': { top: 300, right: 10 },
-            'combat-log-panel': { top: 150, left: 350 },
             'skippy-panel': { bottom: 200, right: 240 },
         };
 
         // Storage key - bump version to force reset when layout changes
         this.storageKey = 'expedition-panel-layout';
-        this.layoutVersion = 6;
+        this.layoutVersion = 7;
         this.versionKey = 'expedition-panel-layout-version';
 
         // Force reset if layout version changed
@@ -53,6 +52,13 @@ export class PanelDragManager {
         // Bind methods
         this.handleMouseMove = this.handleMouseMove.bind(this);
         this.handleMouseUp = this.handleMouseUp.bind(this);
+    }
+
+    /**
+     * Get current UI zoom factor from CSS variable
+     */
+    getZoom() {
+        return parseFloat(document.documentElement.style.getPropertyValue('--ui-scale')) || 1;
     }
 
     /**
@@ -97,10 +103,11 @@ export class PanelDragManager {
         const rect = panel.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return;
 
+        const zoom = this.getZoom();
         const vw = window.innerWidth;
         const vh = window.innerHeight;
-        const headerH = 40;
-        const minVisible = Math.min(rect.width, 100);
+        const headerH = 40 * zoom;
+        const minVisible = Math.min(rect.width, 100 * zoom);
 
         let left = rect.left;
         let top = rect.top;
@@ -124,8 +131,8 @@ export class PanelDragManager {
         }
 
         if (changed) {
-            panel.style.left = `${Math.round(left)}px`;
-            panel.style.top = `${Math.round(top)}px`;
+            panel.style.left = `${Math.round(left / zoom)}px`;
+            panel.style.top = `${Math.round(top / zoom)}px`;
             panel.style.right = 'auto';
             panel.style.bottom = 'auto';
         }
@@ -203,10 +210,11 @@ export class PanelDragManager {
 
         const panel = panelData.element;
         const rect = panel.getBoundingClientRect();
+        const zoom = this.getZoom();
 
         this.dragOffset = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
+            x: (e.clientX - rect.left) / zoom,
+            y: (e.clientY - rect.top) / zoom,
         };
 
         this.dragging = panelId;
@@ -228,12 +236,14 @@ export class PanelDragManager {
 
         const panel = panelData.element;
         const rect = panel.getBoundingClientRect();
+        const zoom = this.getZoom();
 
-        let newX = e.clientX - this.dragOffset.x;
-        let newY = e.clientY - this.dragOffset.y;
+        // Convert screen coords to CSS coords (divide by zoom)
+        let newX = e.clientX / zoom - this.dragOffset.x;
+        let newY = e.clientY / zoom - this.dragOffset.y;
 
-        const maxX = window.innerWidth - rect.width;
-        const maxY = window.innerHeight - rect.height;
+        const maxX = window.innerWidth / zoom - rect.width / zoom;
+        const maxY = window.innerHeight / zoom - rect.height / zoom;
 
         newX = Math.max(0, Math.min(newX, maxX));
         newY = Math.max(0, Math.min(newY, maxY));
@@ -281,8 +291,9 @@ export class PanelDragManager {
         panel.style.left = 'auto';
 
         if (layout) {
-            const w = window.innerWidth;
-            const h = window.innerHeight;
+            const zoom = this.getZoom();
+            const w = window.innerWidth / zoom;
+            const h = window.innerHeight / zoom;
             const savedW = layout.width || 200;
             const savedH = layout.height || 100;
             const offscreen =
@@ -330,6 +341,7 @@ export class PanelDragManager {
 
     saveLayout() {
         const layout = {};
+        const zoom = this.getZoom();
 
         for (const [panelId, panelData] of this.panels) {
             const panel = panelData.element;
@@ -338,11 +350,12 @@ export class PanelDragManager {
             const rect = panel.getBoundingClientRect();
             if (rect.width === 0 && rect.height === 0) continue;
 
+            // Save in unzoomed (CSS) coordinates so positions are zoom-independent
             layout[panelId] = {
-                top: Math.round(rect.top),
-                left: Math.round(rect.left),
-                width: Math.round(rect.width),
-                height: Math.round(rect.height),
+                top: Math.round(rect.top / zoom),
+                left: Math.round(rect.left / zoom),
+                width: Math.round(rect.width / zoom),
+                height: Math.round(rect.height / zoom),
             };
         }
 

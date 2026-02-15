@@ -122,11 +122,8 @@ export class CombatSystem {
                     damageType = 'armor';
                 }
 
-                // Apply power routing damage modifier for player
+                // Power routing removed — damage at full rate
                 let finalDamage = damage;
-                if (source.isPlayer && this.game.powerRouting) {
-                    finalDamage *= 0.5 + (this.game.powerRouting.weapons / 100) * 1.5;
-                }
 
                 // Apply damage (with damage type from weapon config)
                 const dmgType = moduleConfig?.damageType || 'em';

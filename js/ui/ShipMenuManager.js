@@ -5,6 +5,7 @@
 
 import { CONFIG } from '../config.js';
 import { SHIP_DATABASE } from '../data/shipDatabase.js';
+import { EQUIPMENT_DATABASE } from '../data/equipmentDatabase.js';
 import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
 import { formatDistance, formatCredits } from '../utils/math.js';
 
@@ -31,6 +32,17 @@ export class ShipMenuManager {
         // State
         this.visible = false;
         this.initialized = false;
+
+        // Mouse drag rotation state
+        this.isDragging = false;
+        this.previousMouseX = 0;
+        this.previousMouseY = 0;
+        this.rotationX = 0.3;    // Default tilt angle
+        this.rotationY = 0;      // Current Y rotation
+        this.autoRotate = true;  // Auto-rotate when not dragging
+
+        // Fittings tab state
+        this.selectedSlot = null; // { slotType: 'high', index: 0 }
 
         // Cache DOM elements
         this.cacheElements();
@@ -139,6 +151,45 @@ export class ShipMenuManager {
         this.addGridBackground();
 
         this.initialized = true;
+
+        // Setup mouse drag rotation on canvas
+        this.setupDragRotation();
+    }
+
+    /**
+     * Setup mouse drag rotation for the 3D ship viewer
+     */
+    setupDragRotation() {
+        if (!this.statsCanvas) return;
+
+        this.statsCanvas.addEventListener('mousedown', (e) => {
+            this.isDragging = true;
+            this.autoRotate = false;
+            this.previousMouseX = e.clientX;
+            this.previousMouseY = e.clientY;
+            this.statsCanvas.style.cursor = 'grabbing';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!this.isDragging) return;
+            const deltaX = e.clientX - this.previousMouseX;
+            const deltaY = e.clientY - this.previousMouseY;
+            this.rotationY += deltaX * 0.01;
+            this.rotationX += deltaY * 0.01;
+            // Clamp vertical rotation
+            this.rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.rotationX));
+            this.previousMouseX = e.clientX;
+            this.previousMouseY = e.clientY;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (this.isDragging) {
+                this.isDragging = false;
+                this.statsCanvas.style.cursor = 'grab';
+            }
+        });
+
+        this.statsCanvas.style.cursor = 'grab';
     }
 
     /**
@@ -161,11 +212,13 @@ export class ShipMenuManager {
         // Remove existing ship mesh
         this.removeShipMesh();
 
-        const shipConfig = SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
+        // Use modelId for GLB lookup (hero-frigate), fall back to shipClass
+        const shipLookupId = player.modelId || player.shipClass;
+        const shipConfig = SHIP_DATABASE[shipLookupId] || SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
 
         // Try async GLB loading
         shipMeshFactory.generateShipMeshAsync({
-            shipId: player.shipClass,
+            shipId: shipLookupId,
             role: shipConfig?.role || 'mercenary',
             size: shipConfig?.size || 'frigate',
             detailLevel: 'high',
@@ -173,7 +226,15 @@ export class ShipMenuManager {
             if (!mesh || !this.visible) return;
             this.removeShipMesh();
             this.shipMesh = mesh;
+            // Reset rotation
+            this.rotationY = 0;
+            this.rotationX = 0.3;
+            this.autoRotate = true;
             this.scene.add(this.shipMesh);
+            // Restart animation loop if it stopped while waiting for mesh
+            if (!this.animationId) {
+                this.animate();
+            }
         });
     }
 
@@ -201,16 +262,21 @@ export class ShipMenuManager {
      * Animate the ship model rotation
      */
     animate() {
-        if (!this.visible || !this.shipMesh || !this.renderer) {
+        if (!this.visible || !this.renderer) {
             this.animationId = null;
             return;
         }
 
-        // Rotate ship
-        this.shipMesh.rotation.y += 0.005;
-        this.shipMesh.rotation.x = Math.sin(Date.now() * 0.001) * 0.1;
+        // Rotate ship if loaded
+        if (this.shipMesh) {
+            if (this.autoRotate) {
+                this.rotationY += 0.005;
+            }
+            this.shipMesh.rotation.y = this.rotationY;
+            this.shipMesh.rotation.x = this.rotationX;
+        }
 
-        // Render
+        // Render scene (shows grid even while model loads)
         this.renderer.render(this.scene, this.camera);
 
         // Continue animation
@@ -238,6 +304,7 @@ export class ShipMenuManager {
         // Update content
         this.updateStats();
         this.updateModules();
+        this.updateFittings();
         this.updateInventory();
         this.updateDrones();
 
@@ -282,9 +349,9 @@ export class ShipMenuManager {
         const shipClass = player.shipClass || 'frigate';
         const shipConfig = CONFIG.SHIPS[shipClass] || CONFIG.SHIPS.frigate;
 
-        // Update ship name
+        // Update ship name - use player's chosen heroName
         if (this.shipNameEl) {
-            this.shipNameEl.textContent = shipConfig.name || 'Unknown Ship';
+            this.shipNameEl.textContent = player.heroName || shipConfig.name || 'Unknown Ship';
         }
 
         // Calculate effective stats with bonuses
@@ -408,16 +475,229 @@ export class ShipMenuManager {
     }
 
     /**
-     * Update inventory display
+     * Update fittings tab with slot selection and inventory browser
+     */
+    updateFittings() {
+        const player = this.game.player;
+        const container = document.getElementById('ship-fittings-content');
+        if (!player || !container) return;
+
+        const modules = player.getFittedModules();
+        const highSlots = modules.filter(m => m.slotType === 'high');
+        const midSlots = modules.filter(m => m.slotType === 'mid');
+        const lowSlots = modules.filter(m => m.slotType === 'low');
+
+        const renderSlotRow = (mod) => {
+            const isSelected = this.selectedSlot &&
+                this.selectedSlot.slotType === mod.slotType &&
+                this.selectedSlot.slotId === mod.slotId;
+            const selClass = isSelected ? 'fitting-slot-selected' : '';
+            const moduleConfig = mod.config;
+            const weaponGroup = this.getWeaponGroupForSlot(mod.slotId);
+
+            return `
+                <div class="fitting-slot ${selClass} ${mod.moduleId ? '' : 'empty'}"
+                     data-slot-id="${mod.slotId}" data-slot-type="${mod.slotType}">
+                    <span class="fitting-slot-label">${mod.slotId.toUpperCase()}</span>
+                    <span class="fitting-slot-module">${moduleConfig ? moduleConfig.name : '-- Empty --'}</span>
+                    ${moduleConfig?.damage ? `<span class="fitting-slot-stat">DMG ${moduleConfig.damage}</span>` : ''}
+                    ${moduleConfig?.miningYield ? `<span class="fitting-slot-stat">Yield ${moduleConfig.miningYield}</span>` : ''}
+                    ${moduleConfig?.shieldBoost ? `<span class="fitting-slot-stat">+${moduleConfig.shieldBoost} SH</span>` : ''}
+                    ${moduleConfig?.armorRepair ? `<span class="fitting-slot-stat">+${moduleConfig.armorRepair} AR</span>` : ''}
+                    ${moduleConfig?.speedBonus ? `<span class="fitting-slot-stat">+${Math.round(moduleConfig.speedBonus * 100)}% SPD</span>` : ''}
+                    ${weaponGroup ? `<span class="fitting-weapon-group">G${weaponGroup}</span>` : ''}
+                    ${mod.moduleId ? `<button class="fitting-unfit-btn" data-slot-id="${mod.slotId}" title="Remove module">&#10005;</button>` : ''}
+                </div>
+            `;
+        };
+
+        // Build inventory panel for selected slot
+        let inventoryHtml = '';
+        if (this.selectedSlot) {
+            const compatible = this.getCompatibleModules(this.selectedSlot.slotType);
+            if (compatible.length === 0) {
+                inventoryHtml = `<div class="fitting-inv-empty">No compatible modules in inventory</div>`;
+            } else {
+                inventoryHtml = compatible.map((item, idx) => {
+                    const config = item.config || EQUIPMENT_DATABASE[item.id] || CONFIG.MODULES[item.id];
+                    if (!config) return '';
+                    return `
+                        <div class="fitting-inv-item" data-inv-index="${idx}" data-module-id="${item.id}">
+                            <span class="fitting-inv-name">${config.name || item.id}</span>
+                            <div class="fitting-inv-stats">
+                                ${config.damage ? `<span>DMG: ${config.damage}</span>` : ''}
+                                ${config.optimalRange ? `<span>Range: ${config.optimalRange}m</span>` : ''}
+                                ${config.miningYield ? `<span>Yield: ${config.miningYield}</span>` : ''}
+                                ${config.shieldBoost ? `<span>Shield: +${config.shieldBoost}</span>` : ''}
+                                ${config.armorRepair ? `<span>Armor: +${config.armorRepair}</span>` : ''}
+                                ${config.speedBonus ? `<span>Speed: +${Math.round(config.speedBonus * 100)}%</span>` : ''}
+                                ${config.capacitorUse ? `<span>Cap: ${config.capacitorUse}/s</span>` : ''}
+                                ${config.cycleTime ? `<span>Cycle: ${config.cycleTime}s</span>` : ''}
+                            </div>
+                            <button class="fitting-equip-btn" data-module-id="${item.id}" data-inv-index="${item.originalIndex}">EQUIP</button>
+                        </div>
+                    `;
+                }).join('');
+            }
+        } else {
+            inventoryHtml = `<div class="fitting-inv-empty">Select a slot to see compatible modules</div>`;
+        }
+
+        container.innerHTML = `
+            <div class="fittings-layout">
+                <div class="fittings-slots-panel">
+                    <div class="fitting-section">
+                        <h4>HIGH SLOTS (Weapons)</h4>
+                        ${highSlots.map(renderSlotRow).join('')}
+                    </div>
+                    <div class="fitting-section">
+                        <h4>MID SLOTS (Utility)</h4>
+                        ${midSlots.map(renderSlotRow).join('')}
+                    </div>
+                    <div class="fitting-section">
+                        <h4>LOW SLOTS (Passive)</h4>
+                        ${lowSlots.map(renderSlotRow).join('')}
+                    </div>
+                    <div class="fitting-docked-notice">
+                        ${this.game.dockedAt ? '' : 'Dock at a station to change fittings'}
+                    </div>
+                </div>
+                <div class="fittings-inventory-panel">
+                    <h4>${this.selectedSlot ? `COMPATIBLE MODULES (${this.selectedSlot.slotType.toUpperCase()})` : 'MODULE INVENTORY'}</h4>
+                    <div class="fittings-inv-list">
+                        ${inventoryHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Event listeners - slot selection
+        container.querySelectorAll('.fitting-slot').forEach(el => {
+            el.addEventListener('click', (e) => {
+                if (e.target.classList.contains('fitting-unfit-btn')) return;
+                const slotId = el.dataset.slotId;
+                const slotType = el.dataset.slotType;
+                this.selectedSlot = { slotId, slotType };
+                this.updateFittings();
+                this.game.audio?.play('click');
+            });
+        });
+
+        // Event listeners - unfit buttons
+        container.querySelectorAll('.fitting-unfit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!this.game.dockedAt) {
+                    this.game.ui?.toast('Must be docked to change fittings', 'warning');
+                    return;
+                }
+                const slotId = btn.dataset.slotId;
+                const moduleId = player.unfitModule(slotId);
+                if (moduleId) {
+                    const config = EQUIPMENT_DATABASE[moduleId] || CONFIG.MODULES[moduleId];
+                    if (!player.moduleInventory) player.moduleInventory = [];
+                    player.moduleInventory.push({ id: moduleId, config });
+                    this.game.ui?.toast(`Removed ${config?.name || moduleId}`, 'info');
+                }
+                this.updateFittings();
+                this.updateModules();
+                this.game.audio?.play('click');
+            });
+        });
+
+        // Event listeners - equip buttons
+        container.querySelectorAll('.fitting-equip-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (!this.game.dockedAt) {
+                    this.game.ui?.toast('Must be docked to change fittings', 'warning');
+                    return;
+                }
+                if (!this.selectedSlot) return;
+                const moduleId = btn.dataset.moduleId;
+                const invIndex = parseInt(btn.dataset.invIndex);
+
+                // Unfit existing module first
+                const existingModuleId = player.modules[this.selectedSlot.slotType]?.[parseInt(this.selectedSlot.slotId.split('-')[1]) - 1];
+                if (existingModuleId) {
+                    player.unfitModule(this.selectedSlot.slotId);
+                    const existingConfig = EQUIPMENT_DATABASE[existingModuleId] || CONFIG.MODULES[existingModuleId];
+                    player.moduleInventory.push({ id: existingModuleId, config: existingConfig });
+                }
+
+                // Fit new module
+                const success = player.fitModule(this.selectedSlot.slotId, moduleId);
+                if (success) {
+                    // Remove from inventory
+                    player.moduleInventory.splice(invIndex, 1);
+                    const config = EQUIPMENT_DATABASE[moduleId] || CONFIG.MODULES[moduleId];
+                    this.game.ui?.toast(`Fitted ${config?.name || moduleId}`, 'success');
+                } else {
+                    // Put back unfit module if fit failed
+                    if (existingModuleId) {
+                        player.fitModule(this.selectedSlot.slotId, existingModuleId);
+                        player.moduleInventory.pop();
+                    }
+                }
+                this.updateFittings();
+                this.updateModules();
+                this.game.audio?.play('click');
+            });
+        });
+    }
+
+    /**
+     * Get compatible modules from inventory for a slot type
+     */
+    getCompatibleModules(slotType) {
+        const player = this.game.player;
+        if (!player?.moduleInventory) return [];
+
+        // Map internal slot types to equipment DB slot values
+        const slotMap = { high: ['weapon', 'high'], mid: ['module', 'mid'], low: ['subsystem', 'low'] };
+        const validSlots = slotMap[slotType] || [slotType];
+
+        return player.moduleInventory
+            .map((item, idx) => {
+                const config = item.config || EQUIPMENT_DATABASE[item.id] || CONFIG.MODULES[item.id];
+                if (!config) return null;
+                const itemSlot = config.slot;
+                if (!validSlots.includes(itemSlot)) return null;
+                return { ...item, config, originalIndex: idx };
+            })
+            .filter(Boolean);
+    }
+
+    /**
+     * Get weapon group number for a slot (if assigned)
+     */
+    getWeaponGroupForSlot(slotId) {
+        const player = this.game.player;
+        if (!player?.weaponGroups) return null;
+        for (const [group, slots] of Object.entries(player.weaponGroups)) {
+            if (slots.includes(slotId)) return group;
+        }
+        return null;
+    }
+
+    /**
+     * Update inventory display (ore, trade goods, materials, modules)
      */
     updateInventory() {
         const player = this.game.player;
         if (!player || !this.inventoryContainer) return;
 
         const cargo = player.cargo || {};
-        const cargoEntries = Object.entries(cargo).filter(([type, data]) => data.units > 0);
+        const tradeGoods = player.tradeGoods || {};
+        const materials = player.materials || {};
+        const moduleInv = player.moduleInventory || [];
 
-        if (cargoEntries.length === 0) {
+        const cargoEntries = Object.entries(cargo).filter(([, data]) => data.units > 0);
+        const tradeEntries = Object.entries(tradeGoods).filter(([, data]) => data.quantity > 0);
+        const materialEntries = Object.entries(materials).filter(([, qty]) => qty > 0);
+
+        const hasItems = cargoEntries.length > 0 || tradeEntries.length > 0 || materialEntries.length > 0 || moduleInv.length > 0;
+
+        if (!hasItems) {
             this.inventoryContainer.innerHTML = `
                 <div class="inventory-empty">
                     <p>Cargo hold is empty</p>
@@ -428,11 +708,12 @@ export class ShipMenuManager {
         }
 
         let totalValue = 0;
-        const itemsHtml = cargoEntries.map(([type, data]) => {
+
+        // Ore items
+        const oreHtml = cargoEntries.map(([type, data]) => {
             const oreConfig = CONFIG.ASTEROID_TYPES[type] || { name: type, value: 10, color: '#888888' };
             const value = data.units * oreConfig.value;
             totalValue += value;
-
             return `
                 <div class="inventory-item">
                     <div class="inventory-item-icon" style="background-color: ${oreConfig.color}"></div>
@@ -445,13 +726,61 @@ export class ShipMenuManager {
             `;
         }).join('');
 
+        // Trade goods
+        const tradeHtml = tradeEntries.map(([goodId, data]) => {
+            const vol = (data.quantity * (data.volumePerUnit || 1)).toFixed(1);
+            return `
+                <div class="inventory-item">
+                    <div class="inventory-item-icon" style="background-color: #d4a855"></div>
+                    <div class="inventory-item-info">
+                        <span class="inventory-item-name">${goodId.replace(/-/g, ' ')}</span>
+                        <span class="inventory-item-amount">${data.quantity.toLocaleString()} units (${vol} m³)</span>
+                    </div>
+                    <span class="inventory-item-value">Trade Good</span>
+                </div>
+            `;
+        }).join('');
+
+        // Materials
+        const matsHtml = materialEntries.map(([matId, qty]) => {
+            return `
+                <div class="inventory-item">
+                    <div class="inventory-item-icon" style="background-color: #88aacc"></div>
+                    <div class="inventory-item-info">
+                        <span class="inventory-item-name">${matId.replace(/-/g, ' ')}</span>
+                        <span class="inventory-item-amount">${qty.toLocaleString()} units</span>
+                    </div>
+                    <span class="inventory-item-value">Material</span>
+                </div>
+            `;
+        }).join('');
+
+        // Module inventory
+        const modsHtml = moduleInv.map((item) => {
+            const config = item.config || EQUIPMENT_DATABASE[item.id] || CONFIG.MODULES[item.id];
+            const name = config?.name || item.id || 'Unknown Module';
+            return `
+                <div class="inventory-item">
+                    <div class="inventory-item-icon" style="background-color: #66cc88"></div>
+                    <div class="inventory-item-info">
+                        <span class="inventory-item-name">${name}</span>
+                        <span class="inventory-item-amount">Equipment</span>
+                    </div>
+                    <span class="inventory-item-value">${config?.price ? formatCredits(config.price) + ' ISK' : ''}</span>
+                </div>
+            `;
+        }).join('');
+
         this.inventoryContainer.innerHTML = `
             <div class="inventory-summary">
                 <span>Cargo: ${player.cargoUsed?.toFixed(1) || 0} / ${player.cargoCapacity} m³</span>
-                <span class="inventory-total-value">Total: ${formatCredits(totalValue)} ISK</span>
+                <span class="inventory-total-value">Total Ore Value: ${formatCredits(totalValue)} ISK</span>
             </div>
             <div class="inventory-items">
-                ${itemsHtml}
+                ${cargoEntries.length > 0 ? `<div class="inventory-category-header">ORE</div>${oreHtml}` : ''}
+                ${tradeEntries.length > 0 ? `<div class="inventory-category-header">TRADE GOODS</div>${tradeHtml}` : ''}
+                ${materialEntries.length > 0 ? `<div class="inventory-category-header">MATERIALS</div>${matsHtml}` : ''}
+                ${moduleInv.length > 0 ? `<div class="inventory-category-header">EQUIPMENT (${moduleInv.length})</div>${modsHtml}` : ''}
             </div>
         `;
     }

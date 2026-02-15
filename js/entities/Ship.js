@@ -132,9 +132,7 @@ export class Ship extends Entity {
         // Regenerate shield (passive, boosted by power routing + doctrine + formation)
         if (this.shield < this.maxShield) {
             let shieldRegenRate = 1;
-            if (this.isPlayer && this.game.powerRouting) {
-                shieldRegenRate *= 0.5 + (this.game.powerRouting.shields / 100) * 1.5;
-            }
+            // Power routing removed — shield regen at full rate
             // Doctrine shield regen bonus
             const dMods = this.game.fleetSystem?.getDoctrineModifiers() || {};
             if ((this.type === 'fleet' || this.isPlayer) && dMods.shieldRegen) {
@@ -250,10 +248,7 @@ export class Ship extends Entity {
             if (cmdBonus.maxSpeed) effectiveMaxSpeed *= cmdBonus.maxSpeed;
         }
 
-        // Power routing: engine power affects max speed for player
-        if (this.isPlayer && this.game.powerRouting) {
-            effectiveMaxSpeed *= 0.7 + (this.game.powerRouting.engines / 100) * 0.9;
-        }
+        // Power routing removed — speed at full rate
 
         // Accelerate/decelerate towards desired speed
         const targetSpeed = Math.min(this.desiredSpeed, effectiveMaxSpeed);
@@ -726,7 +721,10 @@ export class Ship extends Entity {
         // Fire!
         this.game.combat.fireAt(this, this.target, damage, effectiveRange, moduleConfig);
         if (this.isPlayer) {
-            this.game.audio?.play(moduleConfig.category === 'missile' ? 'missile-launch' : 'laser');
+            const [st, si] = this.parseSlotId(slotId);
+            const eqId = this.modules[st]?.[si];
+            const soundName = moduleConfig.category === 'missile' ? 'missile-launch' : 'laser';
+            this.game.audio?.playForEquipment(soundName, 1, eqId);
         }
     }
 

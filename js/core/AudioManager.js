@@ -65,6 +65,12 @@ export class AudioManager {
             'structural-alarm': { type: 'structuralAlarm', duration: 0.6 },
         };
 
+        // OGG sound mapping system
+        this.soundMappings = { equipment: {}, events: {} };
+        this.audioBufferCache = {};
+        this.soundDB = null;
+        this.loadSoundMappings();
+
         // Load saved settings
         this.loadSettings();
 
@@ -104,6 +110,9 @@ export class AudioManager {
             this.initialized = true;
             console.log('Audio initialized');
 
+            // Preload custom OGG sounds from IndexedDB
+            this.preloadMappedSounds();
+
             // Start ambient engine hum
             this.startEngineHum();
 
@@ -129,6 +138,13 @@ export class AudioManager {
     play(soundName, volumeMultiplier = 1) {
         if (!this.enabled || !this.initialized) return;
 
+        // Check for custom OGG mapping for this event sound
+        const mappedFile = this.soundMappings.events?.[soundName];
+        if (mappedFile && this.audioBufferCache[mappedFile]) {
+            this.playOggBuffer(this.audioBufferCache[mappedFile], volumeMultiplier);
+            return;
+        }
+
         const sound = this.sounds[soundName];
         if (!sound) {
             console.warn(`Unknown sound: ${soundName}`);
@@ -137,6 +153,25 @@ export class AudioManager {
 
         // Generate the sound
         this.synthesize(sound.type, sound.duration, volumeMultiplier);
+    }
+
+    /**
+     * Play a sound for equipment, checking equipment-specific mapping first
+     */
+    playForEquipment(soundName, volumeMultiplier = 1, equipmentId = null) {
+        if (!this.enabled || !this.initialized) return;
+
+        // Check equipment-specific OGG mapping
+        if (equipmentId) {
+            const mappedFile = this.soundMappings.equipment?.[equipmentId];
+            if (mappedFile && this.audioBufferCache[mappedFile]) {
+                this.playOggBuffer(this.audioBufferCache[mappedFile], volumeMultiplier);
+                return;
+            }
+        }
+
+        // Fall through to normal play (which checks event mappings, then synth)
+        this.play(soundName, volumeMultiplier);
     }
 
     /**
@@ -1251,6 +1286,135 @@ export class AudioManager {
         this.enabled = !this.enabled;
         this.saveSettings();
         return this.enabled;
+    }
+
+    // ==========================================
+    // OGG Sound Mapping System
+    // ==========================================
+
+    loadSoundMappings() {
+        try {
+            const data = localStorage.getItem('expedition-sound-mappings');
+            if (data) this.soundMappings = JSON.parse(data);
+        } catch (e) { /* corrupt */ }
+        if (!this.soundMappings.equipment) this.soundMappings.equipment = {};
+        if (!this.soundMappings.events) this.soundMappings.events = {};
+    }
+
+    saveSoundMappings() {
+        try {
+            localStorage.setItem('expedition-sound-mappings', JSON.stringify(this.soundMappings));
+        } catch (e) { /* storage full */ }
+    }
+
+    setSoundMapping(type, key, filename) {
+        this.soundMappings[type][key] = filename;
+        this.saveSoundMappings();
+    }
+
+    getSoundMapping(type, key) {
+        return this.soundMappings[type]?.[key] || null;
+    }
+
+    removeSoundMapping(type, key) {
+        delete this.soundMappings[type][key];
+        this.saveSoundMappings();
+    }
+
+    openSoundDB() {
+        return new Promise((resolve, reject) => {
+            if (this.soundDB) { resolve(this.soundDB); return; }
+            const req = indexedDB.open('expedition-sounds', 1);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('files')) {
+                    db.createObjectStore('files', { keyPath: 'name' });
+                }
+            };
+            req.onsuccess = (e) => {
+                this.soundDB = e.target.result;
+                resolve(this.soundDB);
+            };
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async storeSoundFile(filename, arrayBuffer) {
+        const db = await this.openSoundDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('files', 'readwrite');
+            tx.objectStore('files').put({ name: filename, data: arrayBuffer });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async getSoundFile(filename) {
+        const db = await this.openSoundDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('files', 'readonly');
+            const req = tx.objectStore('files').get(filename);
+            req.onsuccess = () => resolve(req.result?.data || null);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async deleteSoundFile(filename) {
+        const db = await this.openSoundDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('files', 'readwrite');
+            tx.objectStore('files').delete(filename);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async loadOggBuffer(filename) {
+        if (this.audioBufferCache[filename]) return this.audioBufferCache[filename];
+        if (!this.context) return null;
+        const arrayBuffer = await this.getSoundFile(filename);
+        if (!arrayBuffer) return null;
+        const buffer = await this.context.decodeAudioData(arrayBuffer.slice(0));
+        this.audioBufferCache[filename] = buffer;
+        return buffer;
+    }
+
+    playOggBuffer(buffer, volumeMultiplier = 1) {
+        if (!buffer || !this.context || !this.masterGain) return;
+        const src = this.context.createBufferSource();
+        src.buffer = buffer;
+        const gain = this.context.createGain();
+        gain.gain.value = volumeMultiplier;
+        src.connect(gain);
+        gain.connect(this.masterGain);
+        src.start();
+    }
+
+    async preloadMappedSounds() {
+        try {
+            await this.openSoundDB();
+        } catch (e) { return; }
+
+        const filenames = new Set();
+        for (const fn of Object.values(this.soundMappings.equipment)) filenames.add(fn);
+        for (const fn of Object.values(this.soundMappings.events)) filenames.add(fn);
+
+        for (const fn of filenames) {
+            try { await this.loadOggBuffer(fn); } catch (e) { /* skip bad files */ }
+        }
+    }
+
+    async previewSoundFile(file) {
+        if (!this.initialized || !this.context) return;
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = await this.context.decodeAudioData(arrayBuffer.slice(0));
+        this.playOggBuffer(buffer);
+    }
+
+    async previewMappedSound(filename) {
+        if (!this.initialized || !this.context) return;
+        const buffer = await this.loadOggBuffer(filename);
+        if (buffer) this.playOggBuffer(buffer);
     }
 
     saveSettings() {

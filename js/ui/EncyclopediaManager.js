@@ -66,6 +66,7 @@ export class EncyclopediaManager {
         this.discoveries = this.loadDiscoveries();
 
         // Auto-discover player's starting ship + hub sector
+        this.discoverItem('ships', 'hero-frigate');
         this.discoverItem('ships', 'venture');
         this.discoverItem('sectors', 'hub');
 
@@ -211,6 +212,7 @@ export class EncyclopediaManager {
                     <button class="enc-tab" data-tab="factions">FACTIONS <span class="enc-tab-count"></span></button>
                     <button class="enc-tab" data-tab="universe">UNIVERSE <span class="enc-tab-count"></span></button>
                     <button class="enc-tab" data-tab="tradegoods">TRADE GOODS <span class="enc-tab-count"></span></button>
+                    <button class="enc-tab" data-tab="sounds">SOUNDS</button>
                 </div>
                 <div class="enc-toolbar"></div>
                 <div class="enc-content"></div>
@@ -347,6 +349,9 @@ export class EncyclopediaManager {
                 if (this.viewMode === 'detail') this.renderTradeGoodDetail(this.detailItem);
                 else this.renderTradeGoodsGrid();
                 break;
+            case 'sounds':
+                this.renderSoundsGrid();
+                break;
         }
     }
 
@@ -356,10 +361,13 @@ export class EncyclopediaManager {
         let totalDisc = 0, totalAll = 0;
 
         tabs.forEach((tab, i) => {
+            if (tab.dataset.tab === 'sounds') return; // No discovery tracking for SOUNDS
             const cat = categories[i];
+            if (!cat) return;
             const disc = this.getDiscoveryCount(cat);
             const total = this.getTotalCount(cat);
-            tab.querySelector('.enc-tab-count').textContent = `(${disc}/${total})`;
+            const countEl = tab.querySelector('.enc-tab-count');
+            if (countEl) countEl.textContent = `(${disc}/${total})`;
             totalDisc += disc;
             totalAll += total;
         });
@@ -982,10 +990,186 @@ export class EncyclopediaManager {
                     <div class="enc-stat-section">
                         <div class="enc-stat-row enc-price"><span>Price</span><span>${formatCredits(eq.price)} ISK</span></div>
                     </div>
+                    ${this.renderEquipmentSoundPicker(eqId)}
                 </div>
             </div>
         `;
         this.footerEl.classList.add('hidden');
+        this.bindEquipmentSoundPicker(eqId);
+    }
+
+    // =============================================
+    // EQUIPMENT SOUND PICKER
+    // =============================================
+
+    renderEquipmentSoundPicker(eqId) {
+        const audio = this.game.audio;
+        const currentFile = audio?.getSoundMapping('equipment', eqId);
+        return `
+            <div class="enc-sound-section">
+                <h3>Sound Effect</h3>
+                <div class="enc-sound-picker" data-eq-id="${eqId}">
+                    <span class="enc-sound-current">${currentFile || 'Synthesized (default)'}</span>
+                    <label class="enc-sound-file-label">
+                        Choose File
+                        <input type="file" accept=".ogg,.wav,.mp3" class="enc-sound-file-input" style="display:none">
+                    </label>
+                    <button class="enc-sound-play-btn" ${currentFile ? '' : 'disabled'}>Play</button>
+                    <button class="enc-sound-clear-btn" ${currentFile ? '' : 'disabled'}>Clear</button>
+                </div>
+            </div>`;
+    }
+
+    bindEquipmentSoundPicker(eqId) {
+        const picker = this.contentEl.querySelector(`.enc-sound-picker[data-eq-id="${eqId}"]`);
+        if (!picker) return;
+        const audio = this.game.audio;
+
+        picker.querySelector('.enc-sound-file-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const arrayBuffer = await file.arrayBuffer();
+            await audio.storeSoundFile(file.name, arrayBuffer);
+            audio.setSoundMapping('equipment', eqId, file.name);
+            await audio.loadOggBuffer(file.name);
+            picker.querySelector('.enc-sound-current').textContent = file.name;
+            picker.querySelector('.enc-sound-play-btn').disabled = false;
+            picker.querySelector('.enc-sound-clear-btn').disabled = false;
+        });
+
+        picker.querySelector('.enc-sound-play-btn').addEventListener('click', () => {
+            const fn = audio.getSoundMapping('equipment', eqId);
+            if (fn) audio.previewMappedSound(fn);
+        });
+
+        picker.querySelector('.enc-sound-clear-btn').addEventListener('click', async () => {
+            const fn = audio.getSoundMapping('equipment', eqId);
+            if (fn) await audio.deleteSoundFile(fn);
+            audio.removeSoundMapping('equipment', eqId);
+            delete audio.audioBufferCache[fn];
+            picker.querySelector('.enc-sound-current').textContent = 'Synthesized (default)';
+            picker.querySelector('.enc-sound-play-btn').disabled = true;
+            picker.querySelector('.enc-sound-clear-btn').disabled = true;
+        });
+    }
+
+    // =============================================
+    // SOUNDS TAB
+    // =============================================
+
+    renderSoundsGrid() {
+        this.toolbarEl.innerHTML = `<div class="enc-toolbar-row">
+            <span style="color:#8af">Assign custom OGG/WAV/MP3 files to game sounds. These persist across sessions.</span>
+        </div>`;
+
+        const audio = this.game.audio;
+        const SOUND_CATEGORIES = {
+            'Combat': ['laser', 'hit', 'explosion', 'shield-hit', 'armor-hit', 'hull-hit',
+                        'missile-launch', 'missile-hit', 'missile-explosion', 'target-destroyed'],
+            'Navigation': ['warp-start', 'warp-end', 'dock', 'undock', 'jump-gate'],
+            'Modules': ['module-activate', 'module-deactivate', 'mining', 'repair-beam',
+                        'scan', 'scan-complete'],
+            'Alerts': ['warning', 'capacitor-low', 'shield-low', 'hull-critical', 'cargo-full',
+                        'warp-disrupted', 'ewar-warning', 'structural-alarm'],
+            'UI': ['click', 'buy', 'sell', 'repair', 'loot-pickup'],
+            'Progression': ['quest-accept', 'quest-complete', 'quest-fail', 'reputation-up', 'level-up'],
+            'Dialogue': ['dialogue-open', 'dialogue-close'],
+            'Drones': ['drone-launch', 'drone-recall'],
+            'Targeting': ['lock-start', 'lock-complete'],
+        };
+
+        let html = '<div class="enc-sounds-grid">';
+
+        for (const [category, sounds] of Object.entries(SOUND_CATEGORIES)) {
+            html += `<div class="enc-sounds-category"><h3>${category}</h3></div>`;
+            for (const soundName of sounds) {
+                const currentFile = audio?.getSoundMapping('events', soundName);
+                html += `
+                    <div class="enc-sound-row" data-sound="${soundName}">
+                        <span class="enc-sound-name">${soundName}</span>
+                        <span class="enc-sound-current">${currentFile || 'Synthesized'}</span>
+                        <label class="enc-sound-file-label">
+                            Choose
+                            <input type="file" accept=".ogg,.wav,.mp3" class="enc-sound-file-input" style="display:none">
+                        </label>
+                        <button class="enc-sound-play-btn" title="Play">&#9654;</button>
+                        <button class="enc-sound-clear-btn" title="Clear" ${currentFile ? '' : 'disabled'}>&#10005;</button>
+                    </div>`;
+            }
+        }
+
+        // Equipment overrides section
+        const eqMappings = audio?.soundMappings?.equipment || {};
+        const eqEntries = Object.entries(eqMappings);
+        if (eqEntries.length > 0) {
+            html += `<div class="enc-sounds-category"><h3>Equipment Overrides</h3></div>`;
+            for (const [eqId, filename] of eqEntries) {
+                const eq = EQUIPMENT_DATABASE[eqId];
+                html += `
+                    <div class="enc-sound-row enc-sound-eq-row" data-eq-id="${eqId}">
+                        <span class="enc-sound-name">${eq?.name || eqId}</span>
+                        <span class="enc-sound-current">${filename}</span>
+                        <button class="enc-sound-play-btn" title="Play">&#9654;</button>
+                        <button class="enc-sound-jump-btn" title="View in Equipment tab">&#8594;</button>
+                    </div>`;
+            }
+        }
+
+        html += '</div>';
+        this.contentEl.innerHTML = html;
+        this.footerEl.classList.add('hidden');
+
+        // Bind event sound rows
+        this.contentEl.querySelectorAll('.enc-sound-row:not(.enc-sound-eq-row)').forEach(row => {
+            const soundName = row.dataset.sound;
+
+            row.querySelector('.enc-sound-file-input').addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const arrayBuffer = await file.arrayBuffer();
+                await audio.storeSoundFile(file.name, arrayBuffer);
+                audio.setSoundMapping('events', soundName, file.name);
+                await audio.loadOggBuffer(file.name);
+                row.querySelector('.enc-sound-current').textContent = file.name;
+                row.querySelector('.enc-sound-clear-btn').disabled = false;
+            });
+
+            row.querySelector('.enc-sound-play-btn').addEventListener('click', () => {
+                const fn = audio.getSoundMapping('events', soundName);
+                if (fn) {
+                    audio.previewMappedSound(fn);
+                } else {
+                    audio.play(soundName);
+                }
+            });
+
+            row.querySelector('.enc-sound-clear-btn').addEventListener('click', async () => {
+                const fn = audio.getSoundMapping('events', soundName);
+                if (fn) await audio.deleteSoundFile(fn);
+                audio.removeSoundMapping('events', soundName);
+                if (fn) delete audio.audioBufferCache[fn];
+                row.querySelector('.enc-sound-current').textContent = 'Synthesized';
+                row.querySelector('.enc-sound-clear-btn').disabled = true;
+            });
+        });
+
+        // Bind equipment override rows
+        this.contentEl.querySelectorAll('.enc-sound-eq-row').forEach(row => {
+            const eqId = row.dataset.eqId;
+
+            row.querySelector('.enc-sound-play-btn')?.addEventListener('click', () => {
+                const fn = audio.getSoundMapping('equipment', eqId);
+                if (fn) audio.previewMappedSound(fn);
+            });
+
+            row.querySelector('.enc-sound-jump-btn')?.addEventListener('click', () => {
+                this.activeTab = 'equipment';
+                this.detailItem = eqId;
+                this.viewMode = 'detail';
+                this.el.querySelectorAll('.enc-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'equipment'));
+                this.renderCurrentTab();
+            });
+        });
     }
 
     // =============================================

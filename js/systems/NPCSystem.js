@@ -133,9 +133,13 @@ export class NPCSystem {
         const sector = this.game.currentSector;
         if (!sector) return;
 
-        // Clean dead NPCs
-        this.miners = this.miners.filter(m => m.alive);
-        this.security = this.security.filter(s => s.alive);
+        // Clean dead NPCs (in-place to avoid per-frame array allocation)
+        for (let i = this.miners.length - 1; i >= 0; i--) {
+            if (!this.miners[i].alive) this.miners.splice(i, 1);
+        }
+        for (let i = this.security.length - 1; i >= 0; i--) {
+            if (!this.security[i].alive) this.security.splice(i, 1);
+        }
 
         // Throttle decisions
         this.decisionTimer += dt;

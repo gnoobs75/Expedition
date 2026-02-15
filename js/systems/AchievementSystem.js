@@ -216,7 +216,6 @@ export class AchievementSystem {
         // Visual effect
         const p = this.game.player;
         if (p) {
-            this.game.renderer?.effects?.spawnEffect?.('quest-complete', p.x, p.y);
             this.game.renderer?.effects?.spawn?.('quest-complete', p.x, p.y);
         }
     }

@@ -386,7 +386,6 @@ export class PlayerShip extends Ship {
      * Apply component upgrade bonuses to current ship stats
      */
     applyComponentUpgrades() {
-        const CONFIG_REF = this.game?.constructor?.prototype?.constructor ? null : null;
         let upgrades;
         try {
             upgrades = CONFIG.COMPONENT_UPGRADES;

@@ -323,10 +323,12 @@ export class Game {
             if (data.target === this.player) {
                 this.audio.play('hit');
                 // Screen flash based on damage severity
-                const hpPercent = this.player.hp / this.player.maxHp;
+                const totalHp = this.player.shield + this.player.armor + this.player.hull;
+                const totalMaxHp = this.player.maxShield + this.player.maxArmor + this.player.maxHull;
+                const hpPercent = totalMaxHp > 0 ? totalHp / totalMaxHp : 1;
                 if (hpPercent < 0.5) {
                     this.ui?.damageFlash(0.4);
-                } else if (data.damage > this.player.maxHp * 0.1) {
+                } else if (data.damage > totalMaxHp * 0.1) {
                     this.ui?.damageFlash(0.2);
                 }
                 // Directional damage indicator
@@ -1216,9 +1218,19 @@ export class Game {
         const now = performance.now();
         const window = this.dpsTracker.window;
 
-        // Prune old entries
-        this.dpsTracker.incomingLog = this.dpsTracker.incomingLog.filter(e => now - e.time < window);
-        this.dpsTracker.outgoingLog = this.dpsTracker.outgoingLog.filter(e => now - e.time < window);
+        // Prune old entries in-place (avoids allocating new arrays each frame)
+        let i = 0;
+        while (i < this.dpsTracker.incomingLog.length) {
+            if (now - this.dpsTracker.incomingLog[i].time >= window) {
+                this.dpsTracker.incomingLog.splice(i, 1);
+            } else { i++; }
+        }
+        i = 0;
+        while (i < this.dpsTracker.outgoingLog.length) {
+            if (now - this.dpsTracker.outgoingLog[i].time >= window) {
+                this.dpsTracker.outgoingLog.splice(i, 1);
+            } else { i++; }
+        }
 
         // Calculate DPS
         const inTotal = this.dpsTracker.incomingLog.reduce((sum, e) => sum + e.damage, 0);
@@ -1254,7 +1266,8 @@ export class Game {
             // Player is being attacked (recent damage)
             (this.player._lastDamageTime && (performance.now() - this.player._lastDamageTime) < 8000) ||
             // Player has active weapon modules firing at something
-            (this.player.activeModules && Array.from(this.player.activeModules.values()).some(m => m.damage > 0))
+            (this.player.activeModules && this.player.activeModules.size > 0 &&
+                Array.from(this.player.activeModules).some(slotId => slotId.startsWith('high-')))
         );
 
         if (inCombat) {

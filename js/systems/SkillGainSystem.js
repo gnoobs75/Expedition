@@ -135,7 +135,7 @@ export class SkillGainSystem {
 
         const p = this.game.player;
         if (p) {
-            this.game.renderer?.effects?.spawnEffect('level-up', p.x, p.y);
+            this.game.renderer?.effects?.spawn('level-up', p.x, p.y);
         }
 
         this.applyBonuses();

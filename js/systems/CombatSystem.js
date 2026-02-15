@@ -61,6 +61,9 @@ export class CombatSystem {
             laserColor = 0x4488ff; // Security blue
         }
 
+        // Capture sector for stale-timer guards
+        const combatSectorId = this.game.currentSector?.id;
+
         if (isMissile) {
             // Missile: smoke trail from source to target (snapshot positions)
             const sx = source.x, sy = source.y;
@@ -72,6 +75,7 @@ export class CombatSystem {
                 const px = sx + dx * t + (Math.random() - 0.5) * 20;
                 const py = sy + dy * t + (Math.random() - 0.5) * 20;
                 setTimeout(() => {
+                    if (this.game.currentSector?.id !== combatSectorId) return;
                     this.game.renderer?.effects?.spawn('missile-trail', px, py);
                 }, t * 200);
             }
@@ -98,6 +102,7 @@ export class CombatSystem {
         // Apply damage with slight delay (for visual sync, longer for missiles)
         const impactDelay = isMissile ? 300 : 100;
         setTimeout(() => {
+            if (this.game.currentSector?.id !== combatSectorId) return;
             if (target.alive) {
                 // Miss handling
                 if (!hits) {

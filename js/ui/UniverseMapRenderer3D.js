@@ -1064,11 +1064,8 @@ export class UniverseMapRenderer3D {
     updateCurrentSector() {
         const currentId = this.game.currentSector?.id;
         for (const [sectorId, mesh] of Object.entries(this.sectorMeshes)) {
-            const isCurrent = sectorId === currentId;
-            const isHovered = sectorId === this.hoveredSector;
-            if (!isHovered) {
-                const scale = isCurrent ? 1.0 : 1.0;
-                mesh.scale.setScalar(scale);
+            if (sectorId !== this.hoveredSector) {
+                mesh.scale.setScalar(1.0);
             }
         }
     }

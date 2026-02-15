@@ -366,23 +366,7 @@ export class Renderer {
      * Create vignette overlay mesh (darkened edges for atmospheric depth)
      */
     createVignette() {
-        // Use a screen-space quad with radial gradient texture
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-
-        const gradient = ctx.createRadialGradient(256, 256, 100, 256, 256, 360);
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        gradient.addColorStop(0.6, 'rgba(0, 0, 0, 0)');
-        gradient.addColorStop(0.85, 'rgba(0, 4, 12, 0.3)');
-        gradient.addColorStop(1.0, 'rgba(0, 4, 12, 0.6)');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 512, 512);
-
-        this._vignetteTexture = new THREE.CanvasTexture(canvas);
-
-        // Use a CSS overlay instead — cheaper and resolution-independent
+        // CSS overlay — cheaper and resolution-independent
         const vignetteEl = document.createElement('div');
         vignetteEl.id = 'vignette-overlay';
         vignetteEl.style.cssText = `
@@ -649,15 +633,13 @@ export class Renderer {
 
     /**
      * Update fleet formation lines connecting fleet ships in same control group
+     * Reuses cached geometry/materials to avoid per-frame allocation
      */
     updateFleetFormation() {
-        // Clear old lines
-        for (const line of this.fleetLines) {
-            this.uiGroup.remove(line);
-            line.geometry.dispose();
-            line.material.dispose();
+        // Hide all existing fleet visuals first
+        for (const obj of this.fleetLines) {
+            obj.visible = false;
         }
-        this.fleetLines = [];
 
         const fleet = this.game.fleetSystem;
         if (!fleet?.controlGroups) return;
@@ -667,6 +649,17 @@ export class Renderer {
         // Group colors
         const groupColors = [0, 0x44ffaa, 0x44aaff, 0xffaa44, 0xff44aa, 0xaaff44];
 
+        // Lazy-init shared dot geometry
+        if (!this._fleetDotGeo) {
+            this._fleetDotGeo = new THREE.CircleGeometry(3, 6);
+        }
+
+        let lineIdx = 0;
+        let dotIdx = 0;
+        // Separate tracking for lines vs dots within the shared array
+        if (!this._fleetLineObjs) this._fleetLineObjs = [];
+        if (!this._fleetDotObjs) this._fleetDotObjs = [];
+
         for (const [groupId, memberIds] of fleet.controlGroups) {
             if (memberIds.size < 1) continue;
 
@@ -674,46 +667,47 @@ export class Renderer {
             const allFleetShips = this.game.fleet?.ships || [];
             for (const id of memberIds) {
                 const ship = allFleetShips.find(s => s.fleetId === id);
-                if (ship?.alive) {
-                    ships.push(ship);
-                }
+                if (ship?.alive) ships.push(ship);
             }
             if (ships.length < 1) continue;
 
             const color = groupColors[groupId] || 0x88ff88;
 
-            // Draw lines from player to each fleet ship in this group
             for (const ship of ships) {
-                const points = [
-                    new THREE.Vector3(player.x, player.y, 2),
-                    new THREE.Vector3(ship.x, ship.y, 2),
-                ];
-                const geo = new THREE.BufferGeometry().setFromPoints(points);
-                const mat = new THREE.LineBasicMaterial({
-                    color,
-                    transparent: true,
-                    opacity: 0.08,
-                    depthWrite: false,
-                });
-                const line = new THREE.Line(geo, mat);
-                line.frustumCulled = false;
-                this.uiGroup.add(line);
-                this.fleetLines.push(line);
-            }
+                // Reuse or create line
+                let line = this._fleetLineObjs[lineIdx];
+                if (!line) {
+                    const geo = new THREE.BufferGeometry();
+                    geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(6), 3));
+                    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.08, depthWrite: false });
+                    line = new THREE.Line(geo, mat);
+                    line.frustumCulled = false;
+                    this.uiGroup.add(line);
+                    this._fleetLineObjs.push(line);
+                    this.fleetLines.push(line);
+                }
+                // Update positions in-place
+                const posArr = line.geometry.attributes.position.array;
+                posArr[0] = player.x; posArr[1] = player.y; posArr[2] = 2;
+                posArr[3] = ship.x;   posArr[4] = ship.y;   posArr[5] = 2;
+                line.geometry.attributes.position.needsUpdate = true;
+                line.material.color.setHex(color);
+                line.visible = true;
+                lineIdx++;
 
-            // Small group number badge (as a text sprite would be complex, use a dot instead)
-            for (const ship of ships) {
-                const dotGeo = new THREE.CircleGeometry(3, 6);
-                const dotMat = new THREE.MeshBasicMaterial({
-                    color,
-                    transparent: true,
-                    opacity: 0.5,
-                    depthWrite: false,
-                });
-                const dot = new THREE.Mesh(dotGeo, dotMat);
+                // Reuse or create dot
+                let dot = this._fleetDotObjs[dotIdx];
+                if (!dot) {
+                    const dotMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, depthWrite: false });
+                    dot = new THREE.Mesh(this._fleetDotGeo, dotMat);
+                    this.uiGroup.add(dot);
+                    this._fleetDotObjs.push(dot);
+                    this.fleetLines.push(dot);
+                }
                 dot.position.set(ship.x, ship.y + (ship.radius || 20) + 8, 5);
-                this.uiGroup.add(dot);
-                this.fleetLines.push(dot); // reuse array for cleanup
+                dot.material.color.setHex(color);
+                dot.visible = true;
+                dotIdx++;
             }
         }
     }
@@ -938,32 +932,35 @@ export class Renderer {
         // Update starfield parallax
         this.starField.update(this.game.camera);
 
+        // Use actual delta time from game loop (fall back to 1/60 if unavailable)
+        const dt = this.game.deltaTime || (1 / 60);
+
         // Update nebula animation
-        this.nebula.update(1 / 60);
+        this.nebula.update(dt);
 
         // Update ambient space dust
-        this.spaceDust.update(1 / 60, this.game.camera);
+        this.spaceDust.update(dt, this.game.camera);
 
         // Update engine trails
-        this.engineTrails.update(1 / 60);
+        this.engineTrails.update(dt);
 
         // Update status effects (EWAR beams, shield flashes, etc.)
-        this.statusEffects.update(1 / 60);
+        this.statusEffects.update(dt);
 
         // Update speed lines
-        this.updateSpeedLines(1 / 60);
+        this.updateSpeedLines(dt);
 
         // Update debris pieces
-        this.updateDebris(1 / 60);
+        this.updateDebris(dt);
 
         // Update sensor sweep
-        this.updateSensorSweep(1 / 60);
+        this.updateSensorSweep(dt);
 
         // Update fleet formation lines
         this.updateFleetFormation();
 
         // Station ambient particles — occasional dock sparks and energy wisps
-        this._stationParticleTimer = (this._stationParticleTimer || 0) + 1/60;
+        this._stationParticleTimer = (this._stationParticleTimer || 0) + dt;
         if (this._stationParticleTimer > 0.3) {
             this._stationParticleTimer = 0;
             const entities = this.game.currentSector?.entities || [];
@@ -987,10 +984,10 @@ export class Renderer {
         }
 
         // Update effects
-        this.effects.update(1 / 60);
+        this.effects.update(dt);
 
         // Update dynamic lights
-        this.lightPool.update(1 / 60);
+        this.lightPool.update(dt);
 
         // Render the scene
         this.renderer.render(this.scene, this.camera);

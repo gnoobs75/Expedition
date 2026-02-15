@@ -67,39 +67,39 @@ export class MiningSystem {
 
         let beam = this.miningBeams.get(ship);
         if (!beam) {
+            // Shared unit plane geometry - scale controls size each frame
+            if (!this._unitPlane) this._unitPlane = new THREE.PlaneGeometry(1, 1);
+
             // Create beam core (white-hot center)
-            const coreGeo = new THREE.PlaneGeometry(1, 1.5);
             const coreMat = new THREE.MeshBasicMaterial({
                 color: 0xffffff,
                 transparent: true,
                 opacity: 0.9,
                 depthWrite: false,
             });
-            const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+            const coreMesh = new THREE.Mesh(this._unitPlane, coreMat);
             coreMesh.position.z = 9.5;
             effectsGroup.add(coreMesh);
 
             // Create beam body (colored)
-            const beamGeo = new THREE.PlaneGeometry(1, 3);
             const beamMat = new THREE.MeshBasicMaterial({
                 color: 0x4488ff,
                 transparent: true,
                 opacity: 0.6,
                 depthWrite: false,
             });
-            const beamMesh = new THREE.Mesh(beamGeo, beamMat);
+            const beamMesh = new THREE.Mesh(this._unitPlane, beamMat);
             beamMesh.position.z = 9;
             effectsGroup.add(beamMesh);
 
             // Create outer glow
-            const glowGeo = new THREE.PlaneGeometry(1, 10);
             const glowMat = new THREE.MeshBasicMaterial({
                 color: 0x88bbff,
                 transparent: true,
                 opacity: 0.12,
                 depthWrite: false,
             });
-            const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+            const glowMesh = new THREE.Mesh(this._unitPlane, glowMat);
             glowMesh.position.z = 8.5;
             effectsGroup.add(glowMesh);
 
@@ -162,23 +162,20 @@ export class MiningSystem {
         beam.beamMesh.material.color.setHex(heatColor);
         beam.glowMesh.material.color.setHex(heatColor);
 
-        // Update core beam (white-hot center)
-        beam.coreMesh.geometry.dispose();
-        beam.coreMesh.geometry = new THREE.PlaneGeometry(length, corePulse);
+        // Update core beam (white-hot center) - use scale instead of geometry recreation
+        beam.coreMesh.scale.set(length, corePulse, 1);
         beam.coreMesh.position.set(midX + jitterX * 0.5, midY + jitterY * 0.5, 9.5);
         beam.coreMesh.rotation.z = angle;
         beam.coreMesh.material.opacity = 0.7 + 0.25 * Math.sin(beam.time * 15);
 
         // Update beam body
-        beam.beamMesh.geometry.dispose();
-        beam.beamMesh.geometry = new THREE.PlaneGeometry(length, bodyPulse);
+        beam.beamMesh.scale.set(length, bodyPulse, 1);
         beam.beamMesh.position.set(midX + jitterX, midY + jitterY, 9);
         beam.beamMesh.rotation.z = angle;
         beam.beamMesh.material.opacity = 0.5 + 0.3 * Math.sin(beam.time * 12);
 
         // Update outer glow
-        beam.glowMesh.geometry.dispose();
-        beam.glowMesh.geometry = new THREE.PlaneGeometry(length, glowPulse);
+        beam.glowMesh.scale.set(length, glowPulse, 1);
         beam.glowMesh.position.set(midX, midY, 8.5);
         beam.glowMesh.rotation.z = angle;
         beam.glowMesh.material.opacity = 0.1 + 0.06 * Math.sin(beam.time * 6);

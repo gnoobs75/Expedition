@@ -240,7 +240,7 @@ export class SkillSystem {
         // Visual effect at player
         const p = this.game.player;
         if (p) {
-            this.game.renderer?.effects?.spawnEffect('level-up', p.x, p.y);
+            this.game.renderer?.effects?.spawn('level-up', p.x, p.y);
         }
 
         // At level 3, prompt specialization choice if not already chosen

@@ -1043,9 +1043,12 @@ export class GuildShip extends Ship {
         this.game.guildEconomySystem?.handleGuildShipDestroyed(this);
 
         if (this.isPirate) {
-            // Pirate ship killed - award bounty to player, drop wreck for salvage
+            // Pirate ship killed - award bounty only if player or fleet made the kill
             const pirateBounty = 300 + Math.floor(Math.random() * 1200);
-            if (this.game.player?.alive) {
+            const killer = this.lastDamageSource;
+            const isPlayerKill = killer === this.game.player;
+            const isFleetKill = killer?.type === 'fleet' || killer?.isFleet;
+            if ((isPlayerKill || isFleetKill) && this.game.player?.alive) {
                 this.game.addCredits(pirateBounty);
                 this.game.ui?.log(`Pirate destroyed! +${pirateBounty} ISK bounty`, 'combat');
                 this.game.audio?.play('loot-pickup');
@@ -1069,14 +1072,14 @@ export class GuildShip extends Ship {
             });
             this.game.currentSector?.addEntity(wreck);
         } else {
-            // Legitimate guild ship killed - award small salvage if player nearby
-            if (this.game.player?.alive) {
-                const dist = this.distanceTo(this.game.player);
-                if (dist < 2000) {
-                    const loot = Math.floor(Math.random() * (this.lootValue.max - this.lootValue.min) + this.lootValue.min);
-                    this.game.addCredits(loot);
-                    this.game.ui?.log(`+${loot} ISK salvage`, 'combat');
-                }
+            // Legitimate guild ship killed - award small salvage only if player/fleet killed it
+            const killer2 = this.lastDamageSource;
+            const isPlayerKill2 = killer2 === this.game.player;
+            const isFleetKill2 = killer2?.type === 'fleet' || killer2?.isFleet;
+            if ((isPlayerKill2 || isFleetKill2) && this.game.player?.alive) {
+                const loot = Math.floor(Math.random() * (this.lootValue.max - this.lootValue.min) + this.lootValue.min);
+                this.game.addCredits(loot);
+                this.game.ui?.log(`+${loot} ISK salvage`, 'combat');
             }
         }
 

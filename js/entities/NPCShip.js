@@ -95,17 +95,16 @@ export class NPCShip extends Ship {
             this.droneBay.deployed.clear();
         }
 
-        // Award loot to player if player killed this
-        if (this.game.player?.alive) {
+        // Award loot only if player or fleet killed this
+        const killer = this.lastDamageSource;
+        const isPlayerKill = killer === this.game.player;
+        const isFleetKill = killer?.type === 'fleet' || killer?.isFleet;
+        if ((isPlayerKill || isFleetKill) && this.game.player?.alive) {
             const lootValue = Math.floor(
                 Math.random() * (this.lootValue.max - this.lootValue.min) + this.lootValue.min
             );
-            // Only award if player was involved (nearby and aggressive)
-            const dist = this.distanceTo(this.game.player);
-            if (dist < 2000) {
-                this.game.addCredits(lootValue);
-                this.game.ui?.log(`+${lootValue} ISK salvage`, 'combat');
-            }
+            this.game.addCredits(lootValue);
+            this.game.ui?.log(`+${lootValue} ISK salvage`, 'combat');
         }
 
         super.destroy();

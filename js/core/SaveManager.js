@@ -271,7 +271,9 @@ export class SaveManager {
             },
 
             // Subsystem localStorage keys - read directly
-            skills: this.readLocalStorage('expedition-skills'),
+            skills: this.readLocalStorage('expedition-skills'),   // legacy
+            skillGains: this.readLocalStorage('expedition-skill-gains'),
+            skillTree: this.readLocalStorage('expedition-skill-tree'),
             achievements: this.readLocalStorage('expedition-achievements'),
             guildState: this.readLocalStorage('expedition-guild-state'),
             guildEconomy: this.readLocalStorage('expedition-guild-economy'),

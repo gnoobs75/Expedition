@@ -836,6 +836,7 @@
                     <button class="tab-btn active" data-tab="keybindings">KEY BINDINGS</button>
                     <button class="tab-btn" data-tab="audio">AUDIO</button>
                     <button class="tab-btn" data-tab="graphics">GRAPHICS</button>
+                    <button class="tab-btn" data-tab="layout">LAYOUT</button>
                 </div>
                 <div class="modal-body">
                     <!-- Keybindings Tab -->
@@ -890,6 +891,20 @@
                                 <option value="medium" selected>Medium</option>
                                 <option value="high">High</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Layout Tab -->
+                    <div id="tab-layout" class="tab-content">
+                        <div class="settings-section-title">WINDOW PLACEMENT</div>
+                        <p class="settings-hint">Drag panels onto each other to create tabbed groups. Drag a tab away from the group to separate it.</p>
+                        <div class="settings-row">
+                            <label>Reset All Panel Positions</label>
+                            <button id="reset-panel-layout" class="settings-btn">Reset Layout</button>
+                        </div>
+                        <div class="settings-row">
+                            <label>Reset Tab Groups</label>
+                            <button id="reset-tab-groups" class="settings-btn">Ungroup All</button>
                         </div>
                     </div>
                 </div>

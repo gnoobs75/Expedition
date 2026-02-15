@@ -151,7 +151,7 @@ export class InputManager {
      */
     isClickOnUI(e) {
         if (!e.target?.closest) return false;
-        return !!e.target.closest('.panel:not(.hidden), #module-rack, #bottom-bar, .modal:not(.hidden), #context-menu:not(.hidden), #ship-indicator, #drone-bar:not(.hidden), #performance-monitor, #locked-targets-container, button, .menu-item, #encyclopedia:not(.hidden)');
+        return !!e.target.closest('.panel:not(.hidden), #module-rack, #bottom-bar, .modal:not(.hidden), #context-menu:not(.hidden), #ship-indicator, #drone-bar:not(.hidden), #performance-monitor, #locked-targets-container, button, .menu-item, #encyclopedia:not(.hidden), #skill-tree-modal:not(.hidden)');
     }
 
     onClick(e) {
@@ -588,6 +588,10 @@ export class InputManager {
 
             case 'toggleSkippy':
                 this.game.ui?.toggleSkippy();
+                break;
+
+            case 'toggleSkillTree':
+                this.game.skillTreeRenderer?.toggle();
                 break;
 
             case 'toggleSensorSweep': {

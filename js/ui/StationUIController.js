@@ -398,6 +398,7 @@ export class StationUIController {
             this.ui.log('Ship fully repaired', 'system');
             this.ui.toast('Ship repaired!', 'success');
             this.game.audio?.play('repair');
+            this.game.events.emit('station:repair', { ship: this.game.player });
             this.updateShopPanel(station);
 
             // Repair flash animation on ship indicator
@@ -617,76 +618,79 @@ export class StationUIController {
         const container = document.getElementById('skills-content');
         if (!container) return;
 
-        const skillSystem = this.game.skillSystem;
-        if (!skillSystem) {
+        const gainSystem = this.game.skillGainSystem;
+        const treeSystem = this.game.skillTreeSystem;
+        if (!gainSystem) {
             container.innerHTML = '<div class="skills-empty">Skills not available</div>';
             return;
         }
 
-        const skills = skillSystem.getAllSkills();
+        const skills = gainSystem.getAllSkills();
+        const sp = gainSystem.skillPoints || 0;
+        const allocated = treeSystem?.getTotalAllocated() || 0;
+
         let html = `<div class="skills-panel">`;
-        html += `<div class="skills-header">PILOT SKILLS</div>`;
+        html += `<div class="skills-header">`;
+        html += `<span>PILOT SKILLS</span>`;
+        html += `<span class="skills-sp-display">SP: ${sp} available | ${allocated} allocated</span>`;
+        html += `</div>`;
 
         for (const s of skills) {
             const pctFill = Math.floor(s.progress * 100);
-            const levelDots = Array.from({ length: 5 }, (_, i) =>
-                `<span class="skill-dot ${i < s.level ? 'filled' : ''}" style="${i < s.level ? `background:${s.color}` : ''}"></span>`
-            ).join('');
 
+            // Build bonus text from passive bonuses
             let bonusText = '';
-            for (const perk of s.perLevel) {
-                const totalVal = (perk.value * s.level * 100).toFixed(0);
-                bonusText += `<span class="skill-bonus-line">${perk.label.replace(/\+\d+%/, `+${totalVal}%`)}</span>`;
-            }
-
-            // Specialization bonuses (levels 3+)
-            let specHtml = '';
-            if (s.specName) {
-                specHtml = `<div class="skill-spec-badge" style="color:${s.color}">${s.specName}</div>`;
-            } else if (s.canSpecialize) {
-                const specEntries = Object.entries(s.specializations || {});
-                specHtml = `<div class="skill-spec-choose">`;
-                specHtml += `<div class="skill-spec-prompt">Choose Specialization:</div>`;
-                for (const [key, spec] of specEntries) {
-                    specHtml += `<button class="skill-spec-btn" data-skill="${s.id}" data-spec="${key}" style="border-color:${s.color}">`;
-                    specHtml += `<strong>${spec.name}</strong><br><small>${spec.description}</small>`;
-                    specHtml += `<br><em>${spec.perLevel.map(p => p.label).join(', ')}</em>`;
-                    specHtml += `</button>`;
-                }
-                specHtml += `</div>`;
+            for (const [stat, perLevel] of Object.entries(s.passivePerLevel)) {
+                const totalVal = (perLevel * s.level * 100).toFixed(1);
+                const statName = this.formatStatName(stat);
+                bonusText += `<span class="skill-bonus-line">+${totalVal}% ${statName}</span>`;
             }
 
             html += `<div class="skill-card" style="border-left: 3px solid ${s.color}">`;
             html += `<div class="skill-card-top">`;
-            html += `<span class="skill-icon" style="color:${s.color}">${s.icon}</span>`;
             html += `<div class="skill-info">`;
-            html += `<div class="skill-name">${s.name} <span class="skill-level">Lv.${s.level}</span></div>`;
+            html += `<div class="skill-name" style="color:${s.color}">${s.name} <span class="skill-level">Lv.${s.level}/100</span></div>`;
             html += `<div class="skill-desc">${s.description}</div>`;
             html += `</div>`;
-            html += `<div class="skill-dots">${levelDots}</div>`;
             html += `</div>`;
             html += `<div class="skill-xp-bar-outer">`;
             html += `<div class="skill-xp-bar-inner" style="width:${pctFill}%;background:${s.color}"></div>`;
             html += `</div>`;
             html += `<div class="skill-card-bottom">`;
-            html += `<span class="skill-xp-text">${s.maxed ? 'MAX' : `${s.xp.toLocaleString()} / ${s.nextXP.toLocaleString()} XP`}</span>`;
+            html += `<span class="skill-xp-text">${s.maxed ? 'MAX LEVEL' : `${s.xp.toLocaleString()} / ${s.nextXP.toLocaleString()} XP`}</span>`;
             html += `<span class="skill-bonuses">${bonusText}</span>`;
             html += `</div>`;
-            html += specHtml;
             html += `</div>`;
         }
 
-        // Add click handlers for spec buttons after render
+        html += `<div class="skills-tree-btn-row">`;
+        html += `<button class="skills-open-tree-btn">OPEN SKILL TREE (T)</button>`;
+        html += `</div>`;
+
         html += `</div>`;
         container.innerHTML = html;
 
-        container.querySelectorAll('.skill-spec-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const skillId = btn.dataset.skill;
-                const specKey = btn.dataset.spec;
-                skillSystem.chooseSpecialization(skillId, specKey);
-                this.updateSkillsTab();
-            });
+        // Open skill tree button
+        container.querySelector('.skills-open-tree-btn')?.addEventListener('click', () => {
+            this.game.skillTreeRenderer?.show();
         });
+    }
+
+    formatStatName(stat) {
+        const map = {
+            damageBonus: 'Weapon Damage',
+            trackingBonus: 'Tracking Speed',
+            maxSpeedBonus: 'Max Speed',
+            warpSpeedBonus: 'Warp Speed',
+            miningYieldBonus: 'Mining Yield',
+            miningSpeedBonus: 'Mining Speed',
+            shieldBonus: 'Shield HP',
+            capacitorBonus: 'Capacitor',
+            priceBonus: 'Trade Margin',
+            cargoBonus: 'Cargo Space',
+            ewarBonus: 'EWAR Strength',
+            fleetBonus: 'Fleet Bonus',
+        };
+        return map[stat] || stat.replace(/Bonus$/, '');
     }
 }

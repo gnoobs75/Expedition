@@ -84,8 +84,11 @@ export class EnemyShip extends Ship {
             Math.random() * (this.lootValue.max - this.lootValue.min) + this.lootValue.min
         );
 
-        // Award bounty directly
-        if (this.game.player && this.game.player.alive) {
+        // Award bounty only if player or fleet made the kill
+        const killer = this.lastDamageSource;
+        const isPlayerKill = killer === this.game.player;
+        const isFleetKill = killer?.type === 'fleet' || killer?.isFleet;
+        if ((isPlayerKill || isFleetKill) && this.game.player?.alive) {
             this.game.addCredits(this.bounty);
             this.game.ui?.log(`+${this.bounty} ISK bounty`, 'combat');
             this.game.audio?.play('loot-pickup');

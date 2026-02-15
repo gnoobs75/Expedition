@@ -6,7 +6,7 @@
 import { CONFIG, UNIVERSE_LAYOUT } from '../config.js';
 import { EQUIPMENT_DATABASE } from '../data/equipmentDatabase.js';
 import { SHIP_DATABASE } from '../data/shipDatabase.js';
-import { SKILL_DEFINITIONS } from '../systems/SkillSystem.js';
+import { SKILL_GAIN_DEFINITIONS } from '../data/skillGainDatabase.js';
 import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
 import { formatDistance, formatCredits } from '../utils/math.js';
 import { keyBindings } from '../core/KeyBindings.js';
@@ -653,6 +653,24 @@ export class UIManager {
             }
         });
 
+        // Layout settings - reset panel positions
+        document.getElementById('reset-panel-layout')?.addEventListener('click', () => {
+            this.panelDragManager?.resetPositions();
+            this.game.audio?.play('click');
+        });
+
+        // Layout settings - ungroup all tab groups
+        document.getElementById('reset-tab-groups')?.addEventListener('click', () => {
+            if (this.panelDragManager) {
+                for (const [groupId] of [...this.panelDragManager.tabGroups]) {
+                    this.panelDragManager._dissolveGroup(groupId);
+                }
+                this.panelDragManager.saveTabGroups();
+                this.log('All tab groups dissolved', 'system');
+            }
+            this.game.audio?.play('click');
+        });
+
         // Sell all ore button (with confirmation for large amounts)
         document.getElementById('sell-all-ore-btn')?.addEventListener('click', () => {
             const player = this.game.player;
@@ -878,6 +896,9 @@ export class UIManager {
         // Constrain all panels to viewport after loading saved positions
         requestAnimationFrame(() => this.panelDragManager.constrainAllPanels());
 
+        // Load saved tab groups (must be after all panels are registered)
+        requestAnimationFrame(() => this.panelDragManager.loadTabGroups());
+
         // Panels toggle menu
         this.initPanelsToggle();
     }
@@ -908,10 +929,12 @@ export class UIManager {
             let html = '<div class="panels-popup-title">TOGGLE PANELS</div>';
             for (const p of panelsList) {
                 const el = document.getElementById(p.id);
-                const visible = el && !el.classList.contains('hidden');
+                const grouped = this.panelDragManager?.isPanelGrouped(p.id);
+                const visible = grouped || (el && !el.classList.contains('hidden'));
+                const groupTag = grouped ? ' <span style="color:var(--text-dim);font-size:10px">[TAB]</span>' : '';
                 html += `<div class="panels-popup-item" data-panel-id="${p.id}">
                     <div class="panels-popup-cb ${visible ? 'checked' : ''}">${visible ? '\u2713' : ''}</div>
-                    <span class="panels-popup-label">${p.label}</span>
+                    <span class="panels-popup-label">${p.label}${groupTag}</span>
                 </div>`;
             }
             popup.innerHTML = html;
@@ -920,13 +943,30 @@ export class UIManager {
                 item.addEventListener('click', () => {
                     const panelId = item.dataset.panelId;
                     const el = document.getElementById(panelId);
-                    if (el) {
+                    if (!el) return;
+
+                    const grouped = this.panelDragManager?.isPanelGrouped(panelId);
+                    if (grouped) {
+                        // Remove from tab group when toggling off
+                        const info = this.panelDragManager.getPanelGroupInfo(panelId);
+                        if (info && info.active === panelId) {
+                            // If it's active tab, just hide/remove from group
+                            this.panelDragManager.removeFromTabGroup(panelId);
+                            el.classList.add('hidden');
+                        } else {
+                            // Switch to this tab to show it
+                            this.panelDragManager.switchTab(
+                                this.panelDragManager.panelToGroup.get(panelId),
+                                panelId
+                            );
+                        }
+                    } else {
                         el.classList.toggle('hidden');
                         if (!el.classList.contains('hidden')) {
                             this.panelDragManager?.onPanelShown(panelId);
                         }
-                        renderPopup();
                     }
+                    renderPopup();
                 });
             });
         };

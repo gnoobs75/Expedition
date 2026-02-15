@@ -2,6 +2,7 @@
 // Panel Drag Manager
 // Handles draggable & resizable UI panels
 // Always-on drag by panel headers, persistent positions
+// Tab grouping: drag panel onto another to stack, drag tab to tear off
 // =============================================
 
 export class PanelDragManager {
@@ -14,6 +15,21 @@ export class PanelDragManager {
         // Drag state
         this.dragging = null;
         this.dragOffset = { x: 0, y: 0 };
+
+        // Tab group state
+        this.tabGroups = new Map();     // groupId -> { panels:[], active, element, tabBar, content }
+        this.panelToGroup = new Map();  // panelId -> groupId
+        this.nextGroupId = 1;
+        this.mergeTarget = null;        // panelId or groupId being hovered during drag
+        this.mergeHighlight = null;     // DOM element showing merge indicator
+        this.groupDragging = null;      // { groupId, offsetX, offsetY }
+        this.tabDragging = null;        // { groupId, panelId, startX, startY, torn }
+        this.tabGhost = null;           // floating ghost element during tab tear
+
+        // Panels that cannot be grouped (special layout)
+        this.ungroupable = new Set([
+            'minimap', 'ship-indicator', 'drone-bar', 'locked-targets-container',
+        ]);
 
         // Default positions for each panel
         this.defaultPositions = {
@@ -36,13 +52,15 @@ export class PanelDragManager {
 
         // Storage key - bump version to force reset when layout changes
         this.storageKey = 'expedition-panel-layout';
-        this.layoutVersion = 7;
+        this.layoutVersion = 8;
         this.versionKey = 'expedition-panel-layout-version';
+        this.tabGroupStorageKey = 'expedition-tab-groups';
 
         // Force reset if layout version changed
         const savedVersion = parseInt(localStorage.getItem(this.versionKey) || '0');
         if (savedVersion < this.layoutVersion) {
             localStorage.removeItem(this.storageKey);
+            localStorage.removeItem(this.tabGroupStorageKey);
             localStorage.setItem(this.versionKey, String(this.layoutVersion));
         }
 
@@ -80,14 +98,26 @@ export class PanelDragManager {
             clearTimeout(this.saveTimer);
             this.saveTimer = setTimeout(() => this.saveLayout(), 300);
         });
+
+        // Create merge highlight element
+        this.mergeHighlight = document.createElement('div');
+        this.mergeHighlight.className = 'tab-merge-highlight hidden';
+        document.body.appendChild(this.mergeHighlight);
     }
 
-    /**
-     * Constrain all panels to viewport bounds
-     */
+    // =============================================
+    // Panel Registration & Constraining
+    // =============================================
+
     constrainAllPanels() {
         for (const [panelId] of this.panels) {
-            this.constrainPanel(panelId);
+            if (!this.panelToGroup.has(panelId)) {
+                this.constrainPanel(panelId);
+            }
+        }
+        // Also constrain tab groups
+        for (const [groupId] of this.tabGroups) {
+            this.constrainGroup(groupId);
         }
     }
 
@@ -96,6 +126,9 @@ export class PanelDragManager {
         if (!panelData) return;
         const panel = panelData.element;
         if (!panel) return;
+
+        // Skip panels in tab groups
+        if (this.panelToGroup.has(panelId)) return;
 
         // Skip hidden panels - they have no valid rect
         if (panel.classList.contains('hidden') || panel.offsetParent === null) return;
@@ -138,16 +171,37 @@ export class PanelDragManager {
         }
     }
 
-    /**
-     * Constrain a panel when it becomes visible
-     */
+    constrainGroup(groupId) {
+        const groupData = this.tabGroups.get(groupId);
+        if (!groupData) return;
+        const el = groupData.element;
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) return;
+
+        const zoom = this.getZoom();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const minVisible = Math.min(rect.width, 100 * zoom);
+
+        let left = rect.left;
+        let top = rect.top;
+        let changed = false;
+
+        if (left > vw - minVisible) { left = vw - minVisible; changed = true; }
+        if (left + minVisible < 0) { left = 0; changed = true; }
+        if (top > vh - 40 * zoom) { top = vh - 40 * zoom; changed = true; }
+        if (top < 0) { top = 0; changed = true; }
+
+        if (changed) {
+            el.style.left = `${Math.round(left / zoom)}px`;
+            el.style.top = `${Math.round(top / zoom)}px`;
+        }
+    }
+
     onPanelShown(panelId) {
         requestAnimationFrame(() => this.constrainPanel(panelId));
     }
 
-    /**
-     * Register a panel for drag management
-     */
     registerPanel(panelId) {
         const panel = document.getElementById(panelId);
         if (!panel) return;
@@ -192,15 +246,16 @@ export class PanelDragManager {
         }
     }
 
-    /**
-     * Handle mouse down on panel header - always active (no move mode needed)
-     */
-    handleMouseDown(e, panelId) {
-        // Only left click
-        if (e.button !== 0) return;
+    // =============================================
+    // Drag Handling (panels + groups + tabs)
+    // =============================================
 
-        // Don't drag if clicking a button inside header
+    handleMouseDown(e, panelId) {
+        if (e.button !== 0) return;
         if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
+
+        // If panel is in a group, don't handle individual drag
+        if (this.panelToGroup.has(panelId)) return;
 
         const panelData = this.panels.get(panelId);
         if (!panelData) return;
@@ -225,10 +280,20 @@ export class PanelDragManager {
         }
     }
 
-    /**
-     * Handle mouse move during drag
-     */
     handleMouseMove(e) {
+        // Tab tear-off drag
+        if (this.tabDragging) {
+            this._handleTabDragMove(e);
+            return;
+        }
+
+        // Group drag
+        if (this.groupDragging) {
+            this._handleGroupDragMove(e);
+            return;
+        }
+
+        // Panel drag
         if (!this.dragging) return;
 
         const panelData = this.panels.get(this.dragging);
@@ -238,7 +303,6 @@ export class PanelDragManager {
         const rect = panel.getBoundingClientRect();
         const zoom = this.getZoom();
 
-        // Convert screen coords to CSS coords (divide by zoom)
         let newX = e.clientX / zoom - this.dragOffset.x;
         let newY = e.clientY / zoom - this.dragOffset.y;
 
@@ -252,12 +316,28 @@ export class PanelDragManager {
         panel.style.top = `${newY}px`;
         panel.style.right = 'auto';
         panel.style.bottom = 'auto';
+
+        // Merge detection - find potential merge targets
+        if (this.canGroup(this.dragging)) {
+            const target = this._findMergeTarget(this.dragging, e.clientX, e.clientY);
+            this._showMergeHighlight(target);
+            this.mergeTarget = target;
+        }
     }
 
-    /**
-     * Handle mouse up to end drag
-     */
-    handleMouseUp() {
+    handleMouseUp(e) {
+        // Tab tear-off complete
+        if (this.tabDragging) {
+            this._handleTabDragEnd(e);
+            return;
+        }
+
+        // Group drag complete
+        if (this.groupDragging) {
+            this._handleGroupDragEnd(e);
+            return;
+        }
+
         if (!this.dragging) return;
 
         const panelData = this.panels.get(this.dragging);
@@ -268,13 +348,459 @@ export class PanelDragManager {
             }
         }
 
+        // Check for merge
+        if (this.mergeTarget && this.canGroup(this.dragging)) {
+            const targetIsGroup = this.tabGroups.has(this.mergeTarget);
+            if (targetIsGroup) {
+                // Add to existing group
+                this.addToTabGroup(this.mergeTarget, this.dragging);
+            } else if (this.panelToGroup.has(this.mergeTarget)) {
+                // Target is in a group - add to that group
+                const groupId = this.panelToGroup.get(this.mergeTarget);
+                this.addToTabGroup(groupId, this.dragging);
+            } else {
+                // Create new group from two panels
+                this.createTabGroup(this.mergeTarget, this.dragging);
+            }
+        }
+
+        this._hideMergeHighlight();
+        this.mergeTarget = null;
         this.saveLayout();
         this.dragging = null;
     }
 
-    /**
-     * Apply saved layout (position + size) to a panel
-     */
+    // =============================================
+    // Tab Group Creation & Management
+    // =============================================
+
+    canGroup(panelId) {
+        return !this.ungroupable.has(panelId);
+    }
+
+    getPanelTitle(panelId) {
+        const el = document.getElementById(panelId);
+        if (!el) return panelId;
+        const title = el.querySelector('.panel-title');
+        return title?.textContent?.trim() || panelId.replace(/-/g, ' ').toUpperCase();
+    }
+
+    createTabGroup(panelId1, panelId2) {
+        const groupId = `tab-group-${this.nextGroupId++}`;
+
+        // Get position from the target panel (the one being dropped onto)
+        const panel1 = document.getElementById(panelId1);
+        const panel2 = document.getElementById(panelId2);
+        if (!panel1 || !panel2) return null;
+
+        const rect1 = panel1.getBoundingClientRect();
+        const zoom = this.getZoom();
+
+        // Create group container
+        const group = document.createElement('div');
+        group.id = groupId;
+        group.className = 'tab-group';
+        group.style.position = 'fixed';
+        group.style.left = `${Math.round(rect1.left / zoom)}px`;
+        group.style.top = `${Math.round(rect1.top / zoom)}px`;
+        group.style.width = `${Math.max(Math.round(rect1.width / zoom), 280)}px`;
+        group.style.zIndex = '1001';
+
+        // Tab bar
+        const tabBar = document.createElement('div');
+        tabBar.className = 'tab-group-bar';
+        group.appendChild(tabBar);
+
+        // Content container
+        const content = document.createElement('div');
+        content.className = 'tab-group-content';
+        group.appendChild(content);
+
+        document.body.appendChild(group);
+
+        const groupData = {
+            panels: [],
+            active: panelId1,
+            element: group,
+            tabBar: tabBar,
+            content: content,
+        };
+        this.tabGroups.set(groupId, groupData);
+
+        // Move panels into group
+        this._addPanelToGroupDOM(groupId, panelId1);
+        this._addPanelToGroupDOM(groupId, panelId2);
+
+        // Tab bar drag handler (for the bar itself, not individual tabs)
+        tabBar.addEventListener('mousedown', (e) => {
+            // If clicking on a tab button, let tab handler deal with it
+            if (e.target.closest('.tab-group-tab')) return;
+            this._handleGroupDragStart(e, groupId);
+        });
+
+        this.renderGroupTabs(groupId);
+        this.switchTab(groupId, panelId1);
+        this.saveTabGroups();
+
+        return groupId;
+    }
+
+    addToTabGroup(groupId, panelId) {
+        const groupData = this.tabGroups.get(groupId);
+        if (!groupData) return;
+        if (groupData.panels.includes(panelId)) return;
+
+        this._addPanelToGroupDOM(groupId, panelId);
+        this.renderGroupTabs(groupId);
+        this.switchTab(groupId, panelId); // Switch to newly added tab
+        this.saveTabGroups();
+    }
+
+    _addPanelToGroupDOM(groupId, panelId) {
+        const groupData = this.tabGroups.get(groupId);
+        if (!groupData) return;
+
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+
+        // Move panel into group content area
+        panel.style.position = 'relative';
+        panel.style.left = '0';
+        panel.style.top = '0';
+        panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+        panel.style.width = '100%';
+        panel.classList.remove('hidden');
+
+        // Hide panel header (tab bar replaces it)
+        const header = panel.querySelector('.panel-header');
+        if (header) header.style.display = 'none';
+
+        groupData.content.appendChild(panel);
+        groupData.panels.push(panelId);
+        this.panelToGroup.set(panelId, groupId);
+    }
+
+    removeFromTabGroup(panelId) {
+        const groupId = this.panelToGroup.get(panelId);
+        if (!groupId) return;
+
+        const groupData = this.tabGroups.get(groupId);
+        if (!groupData) return;
+
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+
+        // Restore panel to body
+        document.body.appendChild(panel);
+        panel.style.position = 'fixed';
+        panel.style.width = '';
+
+        // Restore header
+        const header = panel.querySelector('.panel-header');
+        if (header) header.style.display = '';
+
+        // Position near the group
+        const groupRect = groupData.element.getBoundingClientRect();
+        const zoom = this.getZoom();
+        panel.style.left = `${Math.round((groupRect.left + 30) / zoom)}px`;
+        panel.style.top = `${Math.round((groupRect.top + 30) / zoom)}px`;
+        panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+
+        // Remove from group
+        groupData.panels = groupData.panels.filter(id => id !== panelId);
+        this.panelToGroup.delete(panelId);
+
+        // Switch active tab if needed
+        if (groupData.active === panelId && groupData.panels.length > 0) {
+            groupData.active = groupData.panels[0];
+        }
+
+        // Dissolve group if only 1 panel left
+        if (groupData.panels.length <= 1) {
+            this._dissolveGroup(groupId);
+        } else {
+            this.renderGroupTabs(groupId);
+            this.switchTab(groupId, groupData.active);
+        }
+
+        this.saveLayout();
+        this.saveTabGroups();
+    }
+
+    _dissolveGroup(groupId) {
+        const groupData = this.tabGroups.get(groupId);
+        if (!groupData) return;
+
+        const groupRect = groupData.element.getBoundingClientRect();
+        const zoom = this.getZoom();
+
+        for (const panelId of [...groupData.panels]) {
+            const panel = document.getElementById(panelId);
+            if (!panel) continue;
+
+            document.body.appendChild(panel);
+            panel.style.position = 'fixed';
+            panel.style.left = `${Math.round(groupRect.left / zoom)}px`;
+            panel.style.top = `${Math.round(groupRect.top / zoom)}px`;
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+            panel.style.width = '';
+
+            const header = panel.querySelector('.panel-header');
+            if (header) header.style.display = '';
+
+            panel.classList.remove('hidden');
+            this.panelToGroup.delete(panelId);
+        }
+
+        groupData.element.remove();
+        this.tabGroups.delete(groupId);
+        this.saveTabGroups();
+    }
+
+    switchTab(groupId, panelId) {
+        const groupData = this.tabGroups.get(groupId);
+        if (!groupData) return;
+
+        groupData.active = panelId;
+
+        for (const id of groupData.panels) {
+            const panel = document.getElementById(id);
+            if (!panel) continue;
+            if (id === panelId) {
+                panel.classList.remove('hidden');
+                panel.style.display = '';
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+
+        // Update tab active states
+        const tabs = groupData.tabBar.querySelectorAll('.tab-group-tab');
+        tabs.forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.panel === panelId);
+        });
+    }
+
+    renderGroupTabs(groupId) {
+        const groupData = this.tabGroups.get(groupId);
+        if (!groupData) return;
+
+        groupData.tabBar.innerHTML = '';
+
+        for (const panelId of groupData.panels) {
+            const tab = document.createElement('button');
+            tab.className = 'tab-group-tab';
+            if (panelId === groupData.active) tab.classList.add('active');
+            tab.dataset.panel = panelId;
+            tab.textContent = this.getPanelTitle(panelId);
+
+            // Click to switch tab
+            tab.addEventListener('click', () => {
+                this.switchTab(groupId, panelId);
+            });
+
+            // Mousedown for tab tear-off
+            tab.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
+                if (groupData.panels.length <= 1) return;
+                e.preventDefault();
+                e.stopPropagation();
+                this.tabDragging = {
+                    groupId,
+                    panelId,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    torn: false,
+                };
+            });
+
+            groupData.tabBar.appendChild(tab);
+        }
+    }
+
+    // =============================================
+    // Merge Detection & Highlighting
+    // =============================================
+
+    _findMergeTarget(draggedPanelId, mouseX, mouseY) {
+        // Check standalone panels
+        for (const [panelId, panelData] of this.panels) {
+            if (panelId === draggedPanelId) continue;
+            if (!this.canGroup(panelId)) continue;
+            if (this.panelToGroup.has(panelId)) continue;
+            if (panelData.element.classList.contains('hidden')) continue;
+
+            const rect = panelData.element.getBoundingClientRect();
+            if (mouseX >= rect.left && mouseX <= rect.right &&
+                mouseY >= rect.top && mouseY <= rect.bottom) {
+                return panelId;
+            }
+        }
+
+        // Check tab groups
+        for (const [groupId, groupData] of this.tabGroups) {
+            if (this.panelToGroup.get(draggedPanelId) === groupId) continue;
+            const rect = groupData.element.getBoundingClientRect();
+            if (mouseX >= rect.left && mouseX <= rect.right &&
+                mouseY >= rect.top && mouseY <= rect.bottom) {
+                return groupId;
+            }
+        }
+
+        return null;
+    }
+
+    _showMergeHighlight(targetId) {
+        if (!targetId) {
+            this._hideMergeHighlight();
+            return;
+        }
+
+        let targetEl;
+        if (this.tabGroups.has(targetId)) {
+            targetEl = this.tabGroups.get(targetId).element;
+        } else {
+            targetEl = document.getElementById(targetId);
+        }
+        if (!targetEl) return;
+
+        const rect = targetEl.getBoundingClientRect();
+        const hl = this.mergeHighlight;
+        hl.style.left = `${rect.left}px`;
+        hl.style.top = `${rect.top}px`;
+        hl.style.width = `${rect.width}px`;
+        hl.style.height = `${rect.height}px`;
+        hl.classList.remove('hidden');
+    }
+
+    _hideMergeHighlight() {
+        if (this.mergeHighlight) {
+            this.mergeHighlight.classList.add('hidden');
+        }
+    }
+
+    // =============================================
+    // Group Dragging
+    // =============================================
+
+    _handleGroupDragStart(e, groupId) {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const groupData = this.tabGroups.get(groupId);
+        if (!groupData) return;
+
+        const rect = groupData.element.getBoundingClientRect();
+        const zoom = this.getZoom();
+
+        this.groupDragging = {
+            groupId,
+            offsetX: (e.clientX - rect.left) / zoom,
+            offsetY: (e.clientY - rect.top) / zoom,
+        };
+        groupData.element.classList.add('dragging');
+    }
+
+    _handleGroupDragMove(e) {
+        if (!this.groupDragging) return;
+        const groupData = this.tabGroups.get(this.groupDragging.groupId);
+        if (!groupData) return;
+
+        const zoom = this.getZoom();
+        let newX = e.clientX / zoom - this.groupDragging.offsetX;
+        let newY = e.clientY / zoom - this.groupDragging.offsetY;
+
+        const rect = groupData.element.getBoundingClientRect();
+        const maxX = window.innerWidth / zoom - rect.width / zoom;
+        const maxY = window.innerHeight / zoom - rect.height / zoom;
+
+        newX = Math.max(0, Math.min(newX, maxX));
+        newY = Math.max(0, Math.min(newY, maxY));
+
+        groupData.element.style.left = `${newX}px`;
+        groupData.element.style.top = `${newY}px`;
+    }
+
+    _handleGroupDragEnd() {
+        if (!this.groupDragging) return;
+        const groupData = this.tabGroups.get(this.groupDragging.groupId);
+        if (groupData) {
+            groupData.element.classList.remove('dragging');
+        }
+        this.groupDragging = null;
+        this.saveLayout();
+        this.saveTabGroups();
+    }
+
+    // =============================================
+    // Tab Tear-Off Dragging
+    // =============================================
+
+    _handleTabDragMove(e) {
+        if (!this.tabDragging) return;
+
+        const dx = e.clientX - this.tabDragging.startX;
+        const dy = e.clientY - this.tabDragging.startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // Need to drag at least 40px to tear off
+        if (dist < 40 && !this.tabDragging.torn) {
+            return;
+        }
+
+        if (!this.tabDragging.torn) {
+            this.tabDragging.torn = true;
+            // Create ghost element
+            this.tabGhost = document.createElement('div');
+            this.tabGhost.className = 'tab-tear-ghost';
+            this.tabGhost.textContent = this.getPanelTitle(this.tabDragging.panelId);
+            document.body.appendChild(this.tabGhost);
+        }
+
+        // Position ghost at cursor
+        if (this.tabGhost) {
+            this.tabGhost.style.left = `${e.clientX - 50}px`;
+            this.tabGhost.style.top = `${e.clientY - 15}px`;
+        }
+    }
+
+    _handleTabDragEnd(e) {
+        if (!this.tabDragging) return;
+
+        if (this.tabDragging.torn) {
+            // Tear off the tab
+            const { panelId } = this.tabDragging;
+            this.removeFromTabGroup(panelId);
+
+            // Position torn panel at mouse location
+            const panel = document.getElementById(panelId);
+            if (panel) {
+                const zoom = this.getZoom();
+                panel.style.left = `${Math.round((e.clientX - 100) / zoom)}px`;
+                panel.style.top = `${Math.round((e.clientY - 20) / zoom)}px`;
+            }
+        } else {
+            // Just a click - switch to this tab
+            this.switchTab(this.tabDragging.groupId, this.tabDragging.panelId);
+        }
+
+        // Remove ghost
+        if (this.tabGhost) {
+            this.tabGhost.remove();
+            this.tabGhost = null;
+        }
+
+        this.tabDragging = null;
+    }
+
+    // =============================================
+    // Layout Persistence
+    // =============================================
+
     applyLayout(panelId) {
         const panelData = this.panels.get(panelId);
         if (!panelData) return;
@@ -344,13 +870,15 @@ export class PanelDragManager {
         const zoom = this.getZoom();
 
         for (const [panelId, panelData] of this.panels) {
+            // Skip panels that are in tab groups
+            if (this.panelToGroup.has(panelId)) continue;
+
             const panel = panelData.element;
             if (panel.classList.contains('hidden') || panel.offsetParent === null) continue;
 
             const rect = panel.getBoundingClientRect();
             if (rect.width === 0 && rect.height === 0) continue;
 
-            // Save in unzoomed (CSS) coordinates so positions are zoom-independent
             layout[panelId] = {
                 top: Math.round(rect.top / zoom),
                 left: Math.round(rect.left / zoom),
@@ -366,9 +894,77 @@ export class PanelDragManager {
         }
     }
 
+    saveTabGroups() {
+        const data = {};
+        const zoom = this.getZoom();
+
+        for (const [groupId, groupData] of this.tabGroups) {
+            const rect = groupData.element.getBoundingClientRect();
+            data[groupId] = {
+                panels: [...groupData.panels],
+                active: groupData.active,
+                left: Math.round(rect.left / zoom),
+                top: Math.round(rect.top / zoom),
+                width: Math.round(rect.width / zoom),
+            };
+        }
+
+        try {
+            localStorage.setItem(this.tabGroupStorageKey, JSON.stringify(data));
+        } catch { /* storage full */ }
+    }
+
+    loadTabGroups() {
+        try {
+            const raw = localStorage.getItem(this.tabGroupStorageKey);
+            if (!raw) return;
+            const groups = JSON.parse(raw);
+
+            for (const [, groupInfo] of Object.entries(groups)) {
+                if (!groupInfo.panels || groupInfo.panels.length < 2) continue;
+                // Validate all panels exist and are groupable
+                const validPanels = groupInfo.panels.filter(id =>
+                    document.getElementById(id) && this.canGroup(id) && !this.panelToGroup.has(id)
+                );
+                if (validPanels.length < 2) continue;
+
+                // Create group from first two, add rest
+                const gid = this.createTabGroup(validPanels[0], validPanels[1]);
+                if (!gid) continue;
+
+                for (let i = 2; i < validPanels.length; i++) {
+                    this.addToTabGroup(gid, validPanels[i]);
+                }
+
+                // Restore position
+                const gData = this.tabGroups.get(gid);
+                if (gData && groupInfo.left !== undefined) {
+                    gData.element.style.left = `${groupInfo.left}px`;
+                    gData.element.style.top = `${groupInfo.top}px`;
+                    if (groupInfo.width) gData.element.style.width = `${groupInfo.width}px`;
+                }
+
+                // Restore active tab
+                if (groupInfo.active && validPanels.includes(groupInfo.active)) {
+                    this.switchTab(gid, groupInfo.active);
+                }
+            }
+        } catch { /* corrupt data */ }
+    }
+
+    // =============================================
+    // Reset
+    // =============================================
+
     resetPositions() {
+        // Dissolve all tab groups first
+        for (const [groupId] of [...this.tabGroups]) {
+            this._dissolveGroup(groupId);
+        }
+
         try {
             localStorage.removeItem(this.storageKey);
+            localStorage.removeItem(this.tabGroupStorageKey);
         } catch {
             // Ignore
         }
@@ -380,5 +976,23 @@ export class PanelDragManager {
         }
 
         this.game.ui?.log('Panel layout reset to defaults', 'system');
+    }
+
+    /**
+     * Check if a panel is currently in a tab group
+     */
+    isPanelGrouped(panelId) {
+        return this.panelToGroup.has(panelId);
+    }
+
+    /**
+     * Get group info for a panel
+     */
+    getPanelGroupInfo(panelId) {
+        const groupId = this.panelToGroup.get(panelId);
+        if (!groupId) return null;
+        const groupData = this.tabGroups.get(groupId);
+        if (!groupData) return null;
+        return { groupId, panels: [...groupData.panels], active: groupData.active };
     }
 }

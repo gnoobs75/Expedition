@@ -26,7 +26,8 @@ import { GuildEconomySystem } from '../systems/GuildEconomySystem.js';
 import { TackleSystem } from '../systems/TackleSystem.js';
 import { SurveySystem } from '../systems/SurveySystem.js';
 import { LogisticsSystem } from '../systems/LogisticsSystem.js';
-import { SkillSystem } from '../systems/SkillSystem.js';
+import { SkillGainSystem } from '../systems/SkillGainSystem.js';
+import { SkillTreeSystem } from '../systems/SkillTreeSystem.js';
 import { AchievementSystem } from '../systems/AchievementSystem.js';
 import { HazardSystem } from '../systems/HazardSystem.js';
 import { EngagementRecorder } from '../systems/EngagementRecorder.js';
@@ -40,6 +41,8 @@ import { PlayerStation } from '../entities/PlayerStation.js';
 import { AdminDashboardManager } from '../ui/AdminDashboardManager.js';
 import { EncyclopediaManager } from '../ui/EncyclopediaManager.js';
 import { SkippyManager } from '../ui/SkippyManager.js';
+import { SkillTreeRenderer } from '../ui/SkillTreeRenderer.js';
+import { SkillFlashManager } from '../ui/SkillFlashManager.js';
 import { UIManager } from '../ui/UIManager.js';
 import { AudioManager } from './AudioManager.js';
 import { SaveManager } from './SaveManager.js';
@@ -107,7 +110,11 @@ export class Game {
         this.tackleSystem = null;
         this.surveySystem = null;
         this.logisticsSystem = null;
-        this.skillSystem = null;
+        this.skillSystem = null;        // legacy alias → skillGainSystem
+        this.skillGainSystem = null;
+        this.skillTreeSystem = null;
+        this.skillTreeRenderer = null;
+        this.skillFlashManager = null;
         this.achievementSystem = null;
         this.adminDashboard = null;
         this.encyclopedia = null;
@@ -182,7 +189,9 @@ export class Game {
         this.tackleSystem = new TackleSystem(this);
         this.surveySystem = new SurveySystem(this);
         this.logisticsSystem = new LogisticsSystem(this);
-        this.skillSystem = new SkillSystem(this);
+        this.skillGainSystem = new SkillGainSystem(this);
+        this.skillTreeSystem = new SkillTreeSystem(this);
+        this.skillSystem = this.skillGainSystem; // legacy alias
         this.achievementSystem = new AchievementSystem(this);
         this.hazardSystem = new HazardSystem(this);
         this.engagementRecorder = new EngagementRecorder(this);
@@ -206,8 +215,12 @@ export class Game {
         this.skippy = new SkippyManager(this);
         this.skippy.init();
 
+        // Create skill tree UI (after Skippy)
+        this.skillTreeRenderer = new SkillTreeRenderer(this);
+        this.skillFlashManager = new SkillFlashManager(this);
+
         // Apply skill bonuses to player
-        this.skillSystem.applyBonuses();
+        this.skillGainSystem.applyBonuses();
 
         // Start in tutorial sector for new games
         this.changeSector('tutorial');
@@ -395,11 +408,7 @@ export class Game {
                 }
 
                 this.audio?.play('target-destroyed');
-                // Show floating credit popup at entity screen position
-                if (this.input) {
-                    const screen = this.input.worldToScreen(entity.x, entity.y);
-                    this.ui?.showCreditPopup(entity.bounty, screen.x, screen.y, 'bounty');
-                }
+                // Credit popup is shown by entity destroy() - no duplicate here
                 // Kill mail log entry
                 this.ui?.logKillMail(entity);
 
@@ -1594,7 +1603,9 @@ export class Game {
 
         // 6. Write subsystem localStorage keys so their load() methods pick them up
         const lsMap = {
-            'expedition-skills': data.skills,
+            'expedition-skills': data.skills,   // legacy
+            'expedition-skill-gains': data.skillGains,
+            'expedition-skill-tree': data.skillTree,
             'expedition-achievements': data.achievements,
             'expedition-guild-state': data.guildState,
             'expedition-guild-economy': data.guildEconomy,
@@ -1628,9 +1639,13 @@ export class Game {
         }
 
         // 7. Reload subsystems that read from localStorage
-        if (this.skillSystem) {
-            this.skillSystem.skills = this.skillSystem.load();
-            this.skillSystem.applyBonuses();
+        if (this.skillGainSystem) {
+            this.skillGainSystem.skills = this.skillGainSystem.load();
+            this.skillGainSystem.skillPoints = this.skillGainSystem.skills._sp || 0;
+            this.skillGainSystem.applyBonuses();
+        }
+        if (this.skillTreeSystem) {
+            this.skillTreeSystem.allocated = this.skillTreeSystem.load();
         }
         if (this.achievementSystem) {
             this.achievementSystem.unlocked = this.achievementSystem.load();

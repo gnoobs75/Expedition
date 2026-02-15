@@ -3474,6 +3474,24 @@ body.scanlines::after {
     text-align: right;
 }
 
+.settings-section-title {
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--primary-cyan);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 14px 25px 4px;
+    text-shadow: 0 0 8px var(--glow-cyan-soft);
+}
+
+.settings-hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 4px 25px 12px;
+    line-height: 1.5;
+    margin: 0;
+}
+
 /* =============================================
    Utility Animations
    ============================================= */
@@ -3703,6 +3721,147 @@ select:focus-visible {
     border-right: 2px solid rgba(0, 255, 255, 0.3);
     border-bottom: 2px solid rgba(0, 255, 255, 0.3);
     pointer-events: none;
+}
+
+/* =============================================
+   Tab Group System (EVE-style window stacking)
+   ============================================= */
+
+.tab-group {
+    position: fixed;
+    z-index: 50;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    min-width: 200px;
+}
+
+.tab-group.dragging {
+    opacity: 0.92;
+    z-index: 100;
+    box-shadow:
+        0 0 50px rgba(0, 200, 255, 0.4),
+        0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.tab-group-bar {
+    display: flex;
+    gap: 0;
+    background: linear-gradient(180deg, rgba(10, 25, 50, 0.95) 0%, rgba(5, 15, 30, 0.98) 100%);
+    border-bottom: 1px solid var(--panel-border);
+    border-radius: 4px 4px 0 0;
+    cursor: grab;
+    min-height: 30px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+
+.tab-group-bar::-webkit-scrollbar {
+    display: none;
+}
+
+.tab-group-tab {
+    flex: 0 1 auto;
+    padding: 6px 14px;
+    background: transparent;
+    border: none;
+    border-right: 1px solid rgba(0, 200, 255, 0.1);
+    border-bottom: 2px solid transparent;
+    color: rgba(180, 200, 220, 0.6);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.tab-group-tab:hover {
+    color: rgba(200, 230, 255, 0.9);
+    background: rgba(0, 200, 255, 0.06);
+}
+
+.tab-group-tab.active {
+    color: var(--primary-cyan);
+    border-bottom-color: var(--primary-cyan);
+    background: rgba(0, 200, 255, 0.08);
+    text-shadow: 0 0 8px var(--glow-cyan-soft);
+}
+
+.tab-group-tab:last-child {
+    border-right: none;
+}
+
+.tab-group-content {
+    position: relative;
+    overflow: hidden;
+}
+
+.tab-group-content > .panel {
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+}
+
+.tab-group-content > .panel > .panel-header {
+    display: none !important;
+}
+
+.tab-group-content > .panel.hidden {
+    display: none !important;
+}
+
+/* Merge highlight overlay */
+.tab-merge-highlight {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    border: 2px solid var(--primary-cyan);
+    border-radius: 4px;
+    background: rgba(0, 200, 255, 0.1);
+    box-shadow:
+        0 0 20px rgba(0, 200, 255, 0.3),
+        inset 0 0 20px rgba(0, 200, 255, 0.1);
+    animation: tab-merge-pulse 0.8s ease-in-out infinite alternate;
+}
+
+.tab-merge-highlight.hidden {
+    display: none;
+}
+
+@keyframes tab-merge-pulse {
+    from { box-shadow: 0 0 20px rgba(0, 200, 255, 0.3), inset 0 0 20px rgba(0, 200, 255, 0.1); }
+    to   { box-shadow: 0 0 35px rgba(0, 200, 255, 0.5), inset 0 0 30px rgba(0, 200, 255, 0.15); }
+}
+
+/* Tab tear-off ghost */
+.tab-tear-ghost {
+    position: fixed;
+    z-index: 10000;
+    pointer-events: none;
+    padding: 6px 16px;
+    background: rgba(10, 25, 50, 0.95);
+    border: 1px solid var(--primary-cyan);
+    border-radius: 3px;
+    color: var(--primary-cyan);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    box-shadow: 0 0 15px rgba(0, 200, 255, 0.4);
+    text-shadow: 0 0 6px var(--glow-cyan-soft);
 }
 
 /* =============================================
@@ -11345,6 +11504,7 @@ select:focus-visible {
 }
 
 .skippy-body {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -12849,4 +13009,187 @@ select:focus-visible {
     background: rgba(255, 68, 68, 0.1);
     border-color: rgba(255, 68, 68, 0.5);
     color: #ffaaaa;
+}
+
+/* ==========================================
+   SKILL TREE MODAL
+   ========================================== */
+.skill-tree-modal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(5, 5, 15, 0.95);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+}
+.skill-tree-modal.hidden { display: none; }
+
+.skill-tree-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: rgba(20, 25, 40, 0.9);
+    border-bottom: 1px solid rgba(100, 120, 200, 0.3);
+    height: 48px;
+    box-sizing: border-box;
+}
+.skill-tree-title {
+    font: bold 14px monospace;
+    color: #aabbdd;
+    letter-spacing: 2px;
+}
+.skill-tree-sp {
+    font: 12px monospace;
+    color: #88aacc;
+}
+.skill-tree-actions { display: flex; gap: 8px; }
+.skill-tree-btn {
+    background: rgba(40, 50, 80, 0.6);
+    border: 1px solid rgba(100, 120, 200, 0.4);
+    color: #aabbdd;
+    font: 11px monospace;
+    padding: 4px 12px;
+    cursor: pointer;
+    letter-spacing: 1px;
+}
+.skill-tree-btn:hover {
+    background: rgba(60, 80, 140, 0.6);
+    border-color: rgba(100, 120, 200, 0.7);
+    color: #ccddff;
+}
+
+#skill-tree-canvas {
+    flex: 1;
+    display: block;
+    cursor: default;
+}
+
+/* Tooltip */
+.skill-tree-tooltip {
+    position: fixed;
+    z-index: 10001;
+    background: rgba(10, 12, 25, 0.95);
+    border: 1px solid rgba(100, 120, 200, 0.5);
+    border-radius: 4px;
+    padding: 10px 14px;
+    max-width: 280px;
+    font: 11px monospace;
+    color: #bbccdd;
+    pointer-events: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+}
+.skill-tree-tooltip.hidden { display: none; }
+.stt-name { font: bold 13px monospace; margin-bottom: 3px; }
+.stt-type { font: 10px monospace; color: #667788; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+.stt-desc { color: #99aabb; margin-bottom: 6px; line-height: 1.4; }
+.stt-bonuses { margin-bottom: 6px; }
+.stt-bonus { color: #88dd88; font: 10px monospace; }
+.stt-req { color: #887766; font: 10px monospace; font-style: italic; }
+
+/* Legend */
+.skill-tree-legend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 6px 16px;
+    height: 32px;
+    box-sizing: border-box;
+    background: rgba(15, 18, 30, 0.9);
+    border-top: 1px solid rgba(100, 120, 200, 0.2);
+    font: 10px monospace;
+    color: #667788;
+}
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 1px solid #556;
+}
+.legend-minor { background: rgba(100, 120, 200, 0.4); }
+.legend-notable { background: rgba(100, 120, 200, 0.7); border-radius: 2px; }
+.legend-keystone { background: rgba(200, 160, 60, 0.7); transform: rotate(45deg); border-radius: 1px; width: 9px; height: 9px; }
+.legend-sep { color: #334; }
+
+/* ==========================================
+   SKILL FLASH OVERLAY (Skippy panel)
+   ========================================== */
+.skill-flash-container {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    pointer-events: none;
+    z-index: 5;
+}
+.skill-flash {
+    font: bold 11px monospace;
+    padding: 2px 6px;
+    background: rgba(10, 15, 30, 0.7);
+    border-left: 2px solid #446;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: opacity 0.3s, transform 0.3s;
+}
+.skill-flash.skill-flash-active {
+    opacity: 1;
+    transform: translateX(0);
+}
+.skill-flash.skill-flash-fade {
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: opacity 0.4s, transform 0.4s;
+}
+.skill-flash-levelup {
+    font-size: 13px;
+    border-left-width: 3px;
+    border-left-color: #ffdd44;
+    background: rgba(30, 25, 10, 0.8);
+    animation: skill-flash-glow 0.5s ease-out;
+}
+.skill-flash-name { font-weight: bold; }
+.skill-flash-level { color: #ddeeff; }
+
+@keyframes skill-flash-glow {
+    0% { box-shadow: 0 0 15px rgba(255, 220, 60, 0.6); }
+    100% { box-shadow: none; }
+}
+
+/* Station Skills Tab Updates */
+.skills-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(100, 120, 200, 0.2);
+}
+.skills-sp-display {
+    font: 10px monospace;
+    color: #88aacc;
+}
+.skills-tree-btn-row {
+    text-align: center;
+    padding: 12px 0;
+}
+.skills-open-tree-btn {
+    background: linear-gradient(180deg, rgba(40, 50, 100, 0.6), rgba(20, 30, 60, 0.8));
+    border: 1px solid rgba(100, 120, 200, 0.5);
+    color: #aabbee;
+    font: bold 12px monospace;
+    padding: 8px 24px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: all 0.2s;
+}
+.skills-open-tree-btn:hover {
+    background: linear-gradient(180deg, rgba(60, 70, 140, 0.7), rgba(30, 40, 80, 0.9));
+    border-color: rgba(120, 150, 255, 0.7);
+    color: #ccddff;
+    box-shadow: 0 0 15px rgba(80, 100, 200, 0.3);
 }

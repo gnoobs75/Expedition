@@ -1,41 +1,28 @@
 // =============================================
-// Skippy Avatar - 3D Beer Can with Animated Face
-// "I am Skippy the Magnificent!"
+// Skippy Avatar - Holographic Admiral Sprite
+// Sprite-based with animated holographic effects
 // =============================================
 
 export class SkippyAvatar {
     constructor(container) {
         this.container = container;
-        this.scene = null;
-        this.camera = null;
-        this.renderer = null;
-        this.canGroup = null;
-        this.leftEye = null;
-        this.rightEye = null;
-        this.mouth = null;
-        this.facePlane = null;
+        this.canvas = null;
+        this.ctx = null;
+        this.img = null;
+        this.imgLoaded = false;
         this.animFrameId = null;
-        this.expression = 'idle';
-        this.blinkTimer = 0;
-        this.blinkInterval = 3 + Math.random() * 4;
-        this.isBlinking = false;
-        this.talkTimer = 0;
-        this.isTalking = false;
         this.disposed = false;
 
-        // Running lights
-        this.runningLights = [];
+        // Sprite layout
+        this.spriteX = 0;
+        this.spriteY = 0;
+        this.spriteW = 0;
+        this.spriteH = 0;
 
-        // Antenna
-        this.antennaBeacon = null;
-
-        // Engine glow layers
-        this.engineGlow = null;
-
-        // Scan line
-        this.scanLine = null;
-
-        // Game state for reactive behavior
+        // State
+        this.expression = 'idle';
+        this.isTalking = false;
+        this.talkTimer = 0;
         this.gameState = {
             inCombat: false,
             shieldPct: 1,
@@ -43,351 +30,102 @@ export class SkippyAvatar {
             isDocked: false,
             isSpeaking: false,
         };
+
+        // Animation accumulators
+        this.time = 0;
+        this.lastFrame = 0;
+
+        // Glitch state
+        this.nextGlitch = 2000 + Math.random() * 4000;
+        this.glitchActive = false;
+        this.glitchEnd = 0;
+        this.glitchSlices = [];
+
+        // Flicker state
+        this.flickerActive = false;
+        this.flickerOffsetX = 0;
+        this.flickerOpacity = 1;
+
+        // Expression tint colors
+        this.tintColors = {
+            idle:             'rgba(0,255,255,0.07)',
+            talking:          'rgba(0,255,255,0.10)',
+            smug:             'rgba(0,255,170,0.08)',
+            alarmed:          'rgba(255,30,0,0.12)',
+            annoyed:          'rgba(255,136,0,0.10)',
+            laughing:         'rgba(68,255,68,0.10)',
+            excited:          'rgba(255,255,0,0.08)',
+            bored:            'rgba(100,130,130,0.10)',
+            concerned:        'rgba(255,170,0,0.08)',
+            impressed:        'rgba(0,200,255,0.08)',
+            disappointed:     'rgba(130,130,130,0.08)',
+            mildlyImpressed:  'rgba(0,220,170,0.07)',
+            lecturing:        'rgba(136,136,255,0.08)',
+            neutral:          'rgba(0,220,220,0.06)',
+        };
+
+        // Offscreen canvas for chromatic aberration
+        this._offscreen = null;
+        this._offCtx = null;
     }
 
     init() {
-        const width = this.container.clientWidth || 200;
-        const height = this.container.clientHeight || 200;
+        const width = this.container.clientWidth || 208;
+        const height = this.container.clientHeight || 180;
+        const dpr = Math.min(window.devicePixelRatio, 2);
 
-        // Scene
-        this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x000a14);
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = width * dpr;
+        this.canvas.height = height * dpr;
+        this.canvas.style.width = width + 'px';
+        this.canvas.style.height = height + 'px';
+        this.container.appendChild(this.canvas);
 
-        // Camera
-        this.camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 500);
-        this.camera.position.set(0, 2, 50);
-        this.camera.lookAt(0, 0, 0);
+        this.ctx = this.canvas.getContext('2d');
+        this.ctx.scale(dpr, dpr);
+        this.displayW = width;
+        this.displayH = height;
 
-        // Renderer
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        this.container.appendChild(canvas);
+        // Offscreen for compositing tricks
+        this._offscreen = document.createElement('canvas');
+        this._offscreen.width = width * dpr;
+        this._offscreen.height = height * dpr;
+        this._offCtx = this._offscreen.getContext('2d');
+        this._offCtx.scale(dpr, dpr);
 
-        this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-        this.renderer.setSize(width, height);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        // Load sprite
+        this.img = new Image();
+        this.img.onload = () => {
+            this.imgLoaded = true;
+            this._computeSpriteLayout();
+        };
+        this.img.src = 'assets/art/Skippy.png';
 
-        // Build the beer can
-        this.canGroup = new THREE.Group();
-        this.buildBeerCan();
-        this.scene.add(this.canGroup);
-
-        // Lighting
-        const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-        this.scene.add(ambient);
-
-        const keyLight = new THREE.DirectionalLight(0xccddff, 1.2);
-        keyLight.position.set(3, 5, 8);
-        this.scene.add(keyLight);
-
-        const rimLight = new THREE.DirectionalLight(0x00ffff, 0.4);
-        rimLight.position.set(-4, 2, -3);
-        this.scene.add(rimLight);
-
-        // Point light for face glow
-        this.faceLight = new THREE.PointLight(0x00ffff, 0.6, 30);
-        this.faceLight.position.set(0, 0, 16);
-        this.scene.add(this.faceLight);
-
-        // Start animation
+        this.lastFrame = performance.now();
         this.animate();
     }
 
-    buildBeerCan() {
-        // Can body - main cylinder
-        const bodyGeo = new THREE.CylinderGeometry(10, 10, 28, 24, 1, false);
-        const bodyMat = new THREE.MeshStandardMaterial({
-            color: 0x8899aa,
-            metalness: 0.85,
-            roughness: 0.25,
-        });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        this.canGroup.add(body);
+    _computeSpriteLayout() {
+        if (!this.img) return;
+        const iw = this.img.naturalWidth;
+        const ih = this.img.naturalHeight;
+        const cw = this.displayW;
+        const ch = this.displayH;
 
-        // Top rim
-        const topRimGeo = new THREE.TorusGeometry(10, 0.8, 8, 24);
-        const rimMat = new THREE.MeshStandardMaterial({
-            color: 0xaabbcc,
-            metalness: 0.9,
-            roughness: 0.2,
-        });
-        const topRim = new THREE.Mesh(topRimGeo, rimMat);
-        topRim.position.y = 14;
-        topRim.rotation.x = Math.PI / 2;
-        this.canGroup.add(topRim);
+        // Fit image in container, maintain aspect ratio, leave small margin
+        const margin = 4;
+        const aw = cw - margin * 2;
+        const ah = ch - margin * 2;
+        const scale = Math.min(aw / iw, ah / ih);
 
-        // Bottom rim
-        const bottomRim = new THREE.Mesh(topRimGeo, rimMat);
-        bottomRim.position.y = -14;
-        bottomRim.rotation.x = Math.PI / 2;
-        this.canGroup.add(bottomRim);
-
-        // Tab on top
-        const tabGeo = new THREE.BoxGeometry(4, 0.5, 7);
-        const tabMat = new THREE.MeshStandardMaterial({
-            color: 0xbbccdd,
-            metalness: 0.9,
-            roughness: 0.15,
-        });
-        const tab = new THREE.Mesh(tabGeo, tabMat);
-        tab.position.set(0, 14.8, 2);
-        this.canGroup.add(tab);
-
-        // Label band around middle
-        const labelGeo = new THREE.CylinderGeometry(10.15, 10.15, 14, 24, 1, true);
-        const labelMat = new THREE.MeshStandardMaterial({
-            color: 0x1a3a5c,
-            metalness: 0.3,
-            roughness: 0.6,
-            side: THREE.DoubleSide,
-        });
-        const label = new THREE.Mesh(labelGeo, labelMat);
-        label.position.y = -1;
-        this.canGroup.add(label);
-
-        // Face screen (dark background)
-        const faceGeo = new THREE.PlaneGeometry(14, 10);
-        const faceMat = new THREE.MeshBasicMaterial({
-            color: 0x001122,
-            transparent: true,
-            opacity: 0.95,
-        });
-        this.facePlane = new THREE.Mesh(faceGeo, faceMat);
-        this.facePlane.position.set(0, 1, 10.2);
-        this.canGroup.add(this.facePlane);
-
-        // Left eye
-        const eyeGeo = new THREE.PlaneGeometry(3, 3);
-        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-        this.leftEye = new THREE.Mesh(eyeGeo, eyeMat.clone());
-        this.leftEye.position.set(-3.5, 3.5, 10.3);
-        this.canGroup.add(this.leftEye);
-
-        // Right eye
-        this.rightEye = new THREE.Mesh(eyeGeo, eyeMat.clone());
-        this.rightEye.position.set(3.5, 3.5, 10.3);
-        this.canGroup.add(this.rightEye);
-
-        // Mouth (LED bar)
-        const mouthGeo = new THREE.PlaneGeometry(8, 1.5);
-        const mouthMat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
-        this.mouth = new THREE.Mesh(mouthGeo, mouthMat);
-        this.mouth.position.set(0, -1, 10.3);
-        this.canGroup.add(this.mouth);
-
-        // Eyebrow lines (personality!)
-        const browGeo = new THREE.PlaneGeometry(3.5, 0.5);
-        const browMat = new THREE.MeshBasicMaterial({ color: 0x00cccc });
-        this.leftBrow = new THREE.Mesh(browGeo, browMat.clone());
-        this.leftBrow.position.set(-3.5, 5.5, 10.3);
-        this.canGroup.add(this.leftBrow);
-
-        this.rightBrow = new THREE.Mesh(browGeo, browMat.clone());
-        this.rightBrow.position.set(3.5, 5.5, 10.3);
-        this.canGroup.add(this.rightBrow);
-
-        // Add visual enhancements
-        this.addRunningLights();
-        this.addAntenna();
-        this.addEngineGlow();
-        this.addScanLine();
-    }
-
-    // ---- Running Lights ----
-    addRunningLights() {
-        const lightGeo = new THREE.CircleGeometry(0.6, 6);
-
-        const lightConfigs = [
-            // Port side (red) x2
-            { color: 0xff0000, x: -10.2, y: 4, z: 2, phase: 0 },
-            { color: 0xff0000, x: -10.2, y: -4, z: 2, phase: 0.3 },
-            // Starboard side (green) x2
-            { color: 0x00ff00, x: 10.2, y: 4, z: 2, phase: 0.5 },
-            { color: 0x00ff00, x: 10.2, y: -4, z: 2, phase: 0.8 },
-            // Top strobe (cyan)
-            { color: 0x00ffff, x: 0, y: 13, z: 8, phase: 0 },
-            // Bottom (white)
-            { color: 0xffffff, x: 0, y: -13, z: 8, phase: 0.5 },
-        ];
-
-        for (const cfg of lightConfigs) {
-            const mat = new THREE.MeshBasicMaterial({
-                color: cfg.color,
-                transparent: true,
-                opacity: 0.7,
-                depthWrite: false,
-            });
-            const light = new THREE.Mesh(lightGeo, mat);
-            light.position.set(cfg.x, cfg.y, cfg.z);
-            light.renderOrder = 6;
-            this.canGroup.add(light);
-            this.runningLights.push({ mesh: light, phase: cfg.phase });
-        }
-    }
-
-    // ---- Antenna + Beacon ----
-    addAntenna() {
-        // Shaft
-        const shaftGeo = new THREE.CylinderGeometry(0.3, 0.3, 8, 6);
-        const shaftMat = new THREE.MeshStandardMaterial({
-            color: 0x889999,
-            metalness: 0.8,
-            roughness: 0.3,
-        });
-        const shaft = new THREE.Mesh(shaftGeo, shaftMat);
-        shaft.position.set(3, 18.5, 0);
-        this.canGroup.add(shaft);
-
-        // Beacon tip
-        const tipGeo = new THREE.SphereGeometry(0.7, 8, 8);
-        const tipMat = new THREE.MeshBasicMaterial({
-            color: 0xff4400,
-            transparent: true,
-            opacity: 0.9,
-        });
-        this.antennaBeacon = new THREE.Mesh(tipGeo, tipMat);
-        this.antennaBeacon.position.set(3, 23, 0);
-        this.canGroup.add(this.antennaBeacon);
-    }
-
-    // ---- Engine Glow (Bottom) ----
-    addEngineGlow() {
-        this.engineGlow = {};
-
-        // Core (white, bright)
-        const coreGeo = new THREE.CircleGeometry(3, 12);
-        const coreMat = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.6,
-            depthWrite: false,
-        });
-        this.engineGlow.core = new THREE.Mesh(coreGeo, coreMat);
-        this.engineGlow.core.position.set(0, -15.5, 5);
-        this.engineGlow.core.rotation.x = -Math.PI / 2;
-        this.engineGlow.core.renderOrder = 5;
-        this.canGroup.add(this.engineGlow.core);
-
-        // Outer (cyan)
-        const outerGeo = new THREE.CircleGeometry(5, 12);
-        const outerMat = new THREE.MeshBasicMaterial({
-            color: 0x00ccff,
-            transparent: true,
-            opacity: 0.3,
-            depthWrite: false,
-        });
-        this.engineGlow.outer = new THREE.Mesh(outerGeo, outerMat);
-        this.engineGlow.outer.position.set(0, -15.5, 4.5);
-        this.engineGlow.outer.rotation.x = -Math.PI / 2;
-        this.engineGlow.outer.renderOrder = 4;
-        this.canGroup.add(this.engineGlow.outer);
-
-        // Bloom (dark cyan, large)
-        const bloomGeo = new THREE.CircleGeometry(8, 12);
-        const bloomMat = new THREE.MeshBasicMaterial({
-            color: 0x0066aa,
-            transparent: true,
-            opacity: 0.15,
-            depthWrite: false,
-        });
-        this.engineGlow.bloom = new THREE.Mesh(bloomGeo, bloomMat);
-        this.engineGlow.bloom.position.set(0, -15.5, 4);
-        this.engineGlow.bloom.rotation.x = -Math.PI / 2;
-        this.engineGlow.bloom.renderOrder = 3;
-        this.canGroup.add(this.engineGlow.bloom);
-    }
-
-    // ---- Scan Line ----
-    addScanLine() {
-        const lineGeo = new THREE.PlaneGeometry(13, 0.3);
-        const lineMat = new THREE.MeshBasicMaterial({
-            color: 0x00ffff,
-            transparent: true,
-            opacity: 0.15,
-            depthWrite: false,
-        });
-        this.scanLine = new THREE.Mesh(lineGeo, lineMat);
-        this.scanLine.position.set(0, 1, 10.35);
-        this.scanLine.renderOrder = 8;
-        this.canGroup.add(this.scanLine);
-    }
-
-    updateGameState(state) {
-        if (state) {
-            Object.assign(this.gameState, state);
-        }
+        this.spriteW = iw * scale;
+        this.spriteH = ih * scale;
+        this.spriteX = (cw - this.spriteW) / 2;
+        this.spriteY = (ch - this.spriteH) / 2;
     }
 
     setExpression(type) {
         this.expression = type;
-
-        // Eye colors by expression
-        const eyeColors = {
-            idle: 0x00ffff,
-            talking: 0x00ffff,
-            smug: 0x00ffaa,
-            laughing: 0x44ff44,
-            annoyed: 0xff8800,
-            alarmed: 0xff2200,
-            impressed: 0x44aaff,
-            excited: 0xffff00,
-            bored: 0x668888,
-            concerned: 0xffaa00,
-            disappointed: 0x888888,
-            mildlyImpressed: 0x44ddaa,
-            lecturing: 0x8888ff,
-            neutral: 0x00dddd,
-        };
-
-        const mouthColors = {
-            idle: 0x00ff88,
-            talking: 0x00ffcc,
-            smug: 0x00ff88,
-            laughing: 0x44ff44,
-            annoyed: 0xff6600,
-            alarmed: 0xff0000,
-            impressed: 0x44aaff,
-            excited: 0xffff00,
-            bored: 0x446666,
-            concerned: 0xffaa00,
-            disappointed: 0x666666,
-            mildlyImpressed: 0x44ddaa,
-            lecturing: 0x8888ff,
-            neutral: 0x00dd88,
-        };
-
-        const color = eyeColors[type] || eyeColors.idle;
-        const mColor = mouthColors[type] || mouthColors.idle;
-
-        if (this.leftEye) this.leftEye.material.color.setHex(color);
-        if (this.rightEye) this.rightEye.material.color.setHex(color);
-        if (this.mouth) this.mouth.material.color.setHex(mColor);
-        if (this.faceLight) this.faceLight.color.setHex(color);
-
-        // Brow angles
-        const browAngles = {
-            idle: 0, talking: 0, smug: -0.15, laughing: 0.1,
-            annoyed: -0.3, alarmed: 0.2, impressed: 0.15,
-            excited: 0.1, bored: -0.1, concerned: 0.2,
-            disappointed: -0.2, mildlyImpressed: 0.05,
-            lecturing: -0.1, neutral: 0,
-        };
-        const browAngle = browAngles[type] || 0;
-        if (this.leftBrow) this.leftBrow.rotation.z = browAngle;
-        if (this.rightBrow) this.rightBrow.rotation.z = -browAngle;
-
-        // Eye size adjustments
-        const eyeScales = {
-            idle: 1, talking: 1, smug: 0.85, laughing: 1.2,
-            annoyed: 0.6, alarmed: 1.4, impressed: 1.3,
-            excited: 1.3, bored: 0.7, concerned: 1.1,
-            disappointed: 0.8, mildlyImpressed: 1.1,
-            lecturing: 0.9, neutral: 1,
-        };
-        const scale = eyeScales[type] || 1;
-        if (this.leftEye) this.leftEye.scale.setScalar(scale);
-        if (this.rightEye) this.rightEye.scale.setScalar(scale);
     }
 
     startTalking() {
@@ -397,120 +135,292 @@ export class SkippyAvatar {
 
     stopTalking() {
         this.isTalking = false;
-        // Reset mouth to expression default
-        if (this.mouth) {
-            this.mouth.scale.set(1, 1, 1);
+    }
+
+    updateGameState(state) {
+        if (state) {
+            Object.assign(this.gameState, state);
         }
     }
 
+    // ---- Main render loop ----
     animate = () => {
         if (this.disposed) return;
         this.animFrameId = requestAnimationFrame(this.animate);
 
-        const t = performance.now() * 0.001;
+        const now = performance.now();
+        const dt = (now - this.lastFrame) / 1000;
+        this.lastFrame = now;
+        this.time += dt;
+        if (this.isTalking) this.talkTimer += dt;
 
-        if (!this.canGroup) return;
-
-        // State-reactive bob speed and amplitude
+        const ctx = this.ctx;
+        const w = this.displayW;
+        const h = this.displayH;
+        const t = this.time;
         const combat = this.gameState.inCombat;
-        const docked = this.gameState.isDocked;
-        const bobSpeed = combat ? 3.0 : (docked ? 0.8 : 1.5);
-        const bobAmp = combat ? 0.8 : (docked ? 0.3 : 0.5);
 
-        // Idle bob
-        this.canGroup.position.y = Math.sin(t * bobSpeed) * bobAmp;
+        // 1. Background - dark with subtle radial gradient
+        ctx.save();
+        ctx.clearRect(0, 0, w, h);
+        const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w * 0.7);
+        bgGrad.addColorStop(0, '#000d1a');
+        bgGrad.addColorStop(1, '#000308');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
 
-        // Gentle rotation - more erratic in combat
-        const rotRange = combat ? 0.25 : 0.15;
-        this.canGroup.rotation.y = Math.sin(t * 0.4) * rotRange + (combat ? Math.sin(t * 1.7) * 0.05 : 0);
+        if (!this.imgLoaded) return;
 
-        // Blink logic
-        this.blinkTimer += 0.016; // ~60fps
-        if (!this.isBlinking && this.blinkTimer >= this.blinkInterval) {
-            this.isBlinking = true;
-            this.blinkTimer = 0;
-            this.blinkInterval = 2 + Math.random() * 5;
-            if (this.leftEye) this.leftEye.scale.y = 0.1;
-            if (this.rightEye) this.rightEye.scale.y = 0.1;
+        // Bob offset
+        const bobSpeed = combat ? 3.0 : (this.gameState.isDocked ? 0.8 : 1.5);
+        const bobAmp = combat ? 3.0 : (this.gameState.isDocked ? 1.0 : 1.8);
+        const bobY = Math.sin(t * bobSpeed) * bobAmp;
+
+        // Flicker check (1-3% per frame)
+        const flickerChance = combat ? 0.03 : 0.012;
+        if (Math.random() < flickerChance) {
+            this.flickerActive = true;
+            this.flickerOffsetX = (Math.random() - 0.5) * 3;
+            this.flickerOpacity = 0.4 + Math.random() * 0.4;
             setTimeout(() => {
-                if (this.disposed) return;
-                this.isBlinking = false;
-                const s = this.leftEye?.scale.x || 1;
-                if (this.leftEye) this.leftEye.scale.y = s;
-                if (this.rightEye) this.rightEye.scale.y = s;
-            }, 120);
+                this.flickerActive = false;
+                this.flickerOffsetX = 0;
+                this.flickerOpacity = 1;
+            }, 30 + Math.random() * 50);
         }
 
-        // Talking animation - mouth oscillation
-        if (this.isTalking && this.mouth) {
-            this.talkTimer += 0.016;
-            const mouthOpen = 0.5 + Math.abs(Math.sin(this.talkTimer * 12)) * 1.5;
-            this.mouth.scale.y = mouthOpen;
-            this.mouth.scale.x = 0.9 + Math.sin(this.talkTimer * 8) * 0.15;
+        // Glitch timing
+        const nowMs = now;
+        if (nowMs > this.nextGlitch && !this.glitchActive) {
+            this.glitchActive = true;
+            this.glitchEnd = nowMs + 50 + Math.random() * 80;
+            this.glitchSlices = this._generateGlitchSlices();
+            const interval = combat ? (1000 + Math.random() * 2000) : (2000 + Math.random() * 6000);
+            this.nextGlitch = nowMs + this.glitchEnd - nowMs + interval;
+        }
+        if (this.glitchActive && nowMs > this.glitchEnd) {
+            this.glitchActive = false;
         }
 
-        // Face glow pulse
-        if (this.faceLight) {
-            this.faceLight.intensity = 0.4 + Math.sin(t * 2) * 0.2;
+        // Sprite draw position with bob and flicker
+        const sx = this.spriteX + (this.flickerActive ? this.flickerOffsetX : 0);
+        const sy = this.spriteY + bobY;
+        const sw = this.spriteW;
+        const sh = this.spriteH;
+        const globalAlpha = this.flickerActive ? this.flickerOpacity : 1;
+
+        ctx.save();
+        ctx.globalAlpha = globalAlpha;
+
+        // 2. Edge glow (drawn behind sprite via shadow)
+        ctx.save();
+        ctx.shadowColor = combat ? 'rgba(255,60,60,0.5)' : 'rgba(0,255,255,0.45)';
+        ctx.shadowBlur = this.isTalking ? 18 : 12;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.drawImage(this.img, sx, sy, sw, sh);
+        ctx.restore();
+
+        // 3. Base sprite
+        ctx.drawImage(this.img, sx, sy, sw, sh);
+
+        // 4. Chromatic aberration - red and blue offset passes
+        const caOffset = combat ? 2.0 : 1.2;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighten';
+        ctx.globalAlpha = 0.12;
+        // Red channel - shift right
+        this._drawTintedSprite(ctx, sx + caOffset, sy, sw, sh, 'rgba(255,0,0,0.5)');
+        // Blue channel - shift left
+        this._drawTintedSprite(ctx, sx - caOffset, sy, sw, sh, 'rgba(0,80,255,0.5)');
+        ctx.restore();
+
+        // 5. Expression tint overlay
+        const tintColor = this.tintColors[this.expression] || this.tintColors.idle;
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = tintColor;
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+
+        // Combat red shift overlay
+        if (combat) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-atop';
+            ctx.fillStyle = 'rgba(255,0,0,0.06)';
+            ctx.fillRect(0, 0, w, h);
+            ctx.restore();
         }
 
-        // Face flash when shields low
-        if (this.facePlane && this.gameState.shieldPct < 0.3 && combat) {
-            const flash = Math.sin(t * 8) > 0.3;
-            this.facePlane.material.color.setHex(flash ? 0x220000 : 0x001122);
-        } else if (this.facePlane) {
-            this.facePlane.material.color.setHex(0x001122);
+        // 6. Glitch slices
+        if (this.glitchActive && this.glitchSlices.length > 0) {
+            this._drawGlitchSlices(ctx, sx, sy, sw, sh);
         }
 
-        // Running lights animation
-        for (const light of this.runningLights) {
-            const pulse = Math.max(0, Math.sin(t * 2 + light.phase * Math.PI * 2));
-            light.mesh.material.opacity = 0.3 + pulse * 0.7;
+        ctx.restore(); // restore globalAlpha
+
+        // 7. Scan lines (drawn over everything)
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        for (let ly = 0; ly < h; ly += 3) {
+            ctx.fillRect(0, ly, w, 1);
+        }
+        ctx.restore();
+
+        // 8. Sweep line
+        const sweepCycle = combat ? 1.5 : 3.0;
+        const sweepPos = ((t % sweepCycle) / sweepCycle) * h;
+        ctx.save();
+        const sweepGrad = ctx.createLinearGradient(0, sweepPos - 6, 0, sweepPos + 6);
+        sweepGrad.addColorStop(0, 'rgba(0,255,255,0)');
+        sweepGrad.addColorStop(0.5, combat ? 'rgba(255,100,100,0.18)' : 'rgba(0,255,255,0.18)');
+        sweepGrad.addColorStop(1, 'rgba(0,255,255,0)');
+        ctx.fillStyle = sweepGrad;
+        ctx.fillRect(0, sweepPos - 6, w, 12);
+        ctx.restore();
+
+        // 9. Static noise (sparse)
+        this._drawStaticNoise(ctx, w, h, combat);
+
+        // 10. Talking glow pulse
+        if (this.isTalking) {
+            const talkPulse = 0.5 + Math.abs(Math.sin(this.talkTimer * 8)) * 0.5;
+            // Lower-third brightness boost (mouth area)
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighten';
+            const mouthY = sy + sh * 0.55;
+            const mouthH = sh * 0.35;
+            const talkGrad = ctx.createRadialGradient(
+                sx + sw / 2, mouthY + mouthH / 2, 0,
+                sx + sw / 2, mouthY + mouthH / 2, sw * 0.4
+            );
+            const glowAlpha = (0.06 + talkPulse * 0.08).toFixed(3);
+            talkGrad.addColorStop(0, `rgba(0,255,255,${glowAlpha})`);
+            talkGrad.addColorStop(1, 'rgba(0,255,255,0)');
+            ctx.fillStyle = talkGrad;
+            ctx.fillRect(sx, mouthY, sw, mouthH);
+            ctx.restore();
         }
 
-        // Antenna beacon blink
-        if (this.antennaBeacon) {
-            const blinkSpeed = combat ? 4.0 : 1.3;
-            const on = Math.sin(t * blinkSpeed) > 0;
-            this.antennaBeacon.material.opacity = on ? 0.9 : 0.1;
-            this.antennaBeacon.material.color.setHex(combat ? 0xff0000 : 0xff4400);
+        // 11. Combat beacon flash at top
+        if (combat) {
+            const beaconOn = Math.sin(t * 4) > 0.3;
+            if (beaconOn) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighten';
+                const beaconGrad = ctx.createRadialGradient(w / 2, 6, 0, w / 2, 6, 20);
+                beaconGrad.addColorStop(0, 'rgba(255,30,0,0.35)');
+                beaconGrad.addColorStop(1, 'rgba(255,0,0,0)');
+                ctx.fillStyle = beaconGrad;
+                ctx.fillRect(0, 0, w, 30);
+                ctx.restore();
+            }
         }
 
-        // Engine glow animation
-        if (this.engineGlow) {
-            const pulse = 0.7 + (Math.sin(t * 3) + Math.sin(t * 7.3)) * 0.15;
-            const isWarping = this.gameState.isWarping;
+        // 12. Vignette (subtle darkening at edges)
+        ctx.save();
+        const vigGrad = ctx.createRadialGradient(w / 2, h / 2, w * 0.25, w / 2, h / 2, w * 0.7);
+        vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        vigGrad.addColorStop(1, 'rgba(0,0,0,0.35)');
+        ctx.fillStyle = vigGrad;
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
 
-            // Core
-            this.engineGlow.core.material.opacity = (isWarping ? 0.9 : 0.6) * pulse;
-            // Outer - color shifts purple when warping
-            this.engineGlow.outer.material.opacity = (isWarping ? 0.5 : 0.3) * pulse;
-            this.engineGlow.outer.material.color.setHex(isWarping ? 0x8844ff : 0x00ccff);
-            // Bloom
-            this.engineGlow.bloom.material.opacity = (isWarping ? 0.3 : 0.15) * pulse;
-        }
-
-        // Scan line sweep
-        if (this.scanLine) {
-            const cycle = (t % 3) / 3; // 0-1 over 3 seconds
-            const yPos = -4 + cycle * 10; // sweep from y=-4 to y=6
-            this.scanLine.position.y = 1 + yPos;
-            this.scanLine.material.opacity = 0.1 + Math.sin(t * 5) * 0.05;
-        }
-
-        this.renderer.render(this.scene, this.camera);
+        // 13. Thin border glow
+        ctx.save();
+        ctx.strokeStyle = combat ? 'rgba(255,50,50,0.25)' : 'rgba(0,255,255,0.15)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+        ctx.restore();
     };
+
+    // ---- Draw sprite with a color tint (for chromatic aberration) ----
+    _drawTintedSprite(ctx, x, y, w, h, tint) {
+        // Draw sprite to offscreen, then overlay tint, then draw to main
+        const oc = this._offCtx;
+        const cw = this.displayW;
+        const ch = this.displayH;
+        oc.clearRect(0, 0, cw, ch);
+
+        // Draw sprite
+        oc.globalCompositeOperation = 'source-over';
+        oc.globalAlpha = 1;
+        oc.drawImage(this.img, x, y, w, h);
+
+        // Tint it - multiply with color
+        oc.globalCompositeOperation = 'source-atop';
+        oc.fillStyle = tint;
+        oc.fillRect(0, 0, cw, ch);
+
+        // Draw result onto main canvas (inherits main canvas composite mode + alpha)
+        ctx.drawImage(this._offscreen, 0, 0, this._offscreen.width, this._offscreen.height, 0, 0, cw, ch);
+    }
+
+    // ---- Glitch slice generation ----
+    _generateGlitchSlices() {
+        const sliceCount = 3 + Math.floor(Math.random() * 4);
+        const slices = [];
+        for (let i = 0; i < sliceCount; i++) {
+            slices.push({
+                yPct: Math.random(),       // Position as % of sprite height
+                hPct: 0.02 + Math.random() * 0.06, // Height as % of sprite
+                offset: (Math.random() - 0.5) * 12, // Horizontal pixel offset
+            });
+        }
+        return slices;
+    }
+
+    // ---- Draw glitch slices ----
+    _drawGlitchSlices(ctx, sx, sy, sw, sh) {
+        ctx.save();
+        for (const slice of this.glitchSlices) {
+            const sliceY = sy + slice.yPct * sh;
+            const sliceH = slice.hPct * sh;
+
+            // Source rect from the sprite's position in the image
+            const srcY = slice.yPct * this.img.naturalHeight;
+            const srcH = slice.hPct * this.img.naturalHeight;
+
+            // Draw offset slice
+            ctx.drawImage(
+                this.img,
+                0, srcY, this.img.naturalWidth, srcH,       // source rect
+                sx + slice.offset, sliceY, sw, sliceH       // dest rect (offset)
+            );
+
+            // Cyan tint on glitch slice
+            ctx.globalCompositeOperation = 'lighten';
+            ctx.fillStyle = 'rgba(0,255,255,0.08)';
+            ctx.fillRect(sx + slice.offset, sliceY, sw, sliceH);
+            ctx.globalCompositeOperation = 'source-over';
+        }
+        ctx.restore();
+    }
+
+    // ---- Static noise ----
+    _drawStaticNoise(ctx, w, h, combat) {
+        const density = combat ? 35 : 18;
+        ctx.save();
+        for (let i = 0; i < density; i++) {
+            const nx = Math.random() * w;
+            const ny = Math.random() * h;
+            const brightness = 150 + Math.floor(Math.random() * 105);
+            ctx.fillStyle = `rgba(${brightness},${brightness + 30},${brightness + 50},${(0.15 + Math.random() * 0.25).toFixed(2)})`;
+            ctx.fillRect(nx, ny, 1, 1);
+        }
+        ctx.restore();
+    }
 
     dispose() {
         this.disposed = true;
         if (this.animFrameId) {
             cancelAnimationFrame(this.animFrameId);
         }
-        if (this.renderer) {
-            this.renderer.dispose();
-        }
-        // Remove canvas
         const canvas = this.container.querySelector('canvas');
         if (canvas) canvas.remove();
+        this._offscreen = null;
+        this._offCtx = null;
+        this.img = null;
     }
 }

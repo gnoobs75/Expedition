@@ -58,11 +58,21 @@ export class SectorMapManager {
         // Strategic overlays
         this.strategicOverlays = { faction: false, trade: false, threat: false, resources: false, events: false };
 
+        // Entity type filters (all visible by default)
+        this.entityFilters = {
+            asteroid: true, planet: true, station: true, gate: true,
+            enemy: true, npc: true, guild: true, fleet: true
+        };
+
+        // Cursor world position tracking
+        this.cursorWorld = null; // {x, y} or null
+
         // Cache DOM elements
         this.cacheElements();
         this.createTooltip();
         this.setupEventListeners();
         this.setupOverlayToggles();
+        this.setupEntityFilters();
     }
 
     setupOverlayToggles() {
@@ -75,6 +85,32 @@ export class SectorMapManager {
                 });
             }
         }
+    }
+
+    setupEntityFilters() {
+        const bar = document.getElementById('entity-filter-bar');
+        if (!bar) return;
+        const types = [
+            { id: 'asteroid', label: 'Rocks', color: '#aa8844' },
+            { id: 'planet', label: 'Planets', color: '#6688aa' },
+            { id: 'station', label: 'Stations', color: '#00cc44' },
+            { id: 'gate', label: 'Gates', color: '#0088ff' },
+            { id: 'enemy', label: 'Hostiles', color: '#ff4444' },
+            { id: 'npc', label: 'NPCs', color: '#88cc88' },
+            { id: 'guild', label: 'Guild', color: '#cc88ff' },
+            { id: 'fleet', label: 'Fleet', color: '#44ffaa' },
+        ];
+        bar.innerHTML = types.map(t =>
+            `<button class="ef-btn active" data-type="${t.id}" style="--ef-color:${t.color}">` +
+            `<span class="ef-dot" style="background:${t.color}"></span>${t.label}</button>`
+        ).join('');
+        bar.addEventListener('click', (e) => {
+            const btn = e.target.closest('.ef-btn');
+            if (!btn) return;
+            const type = btn.dataset.type;
+            this.entityFilters[type] = !this.entityFilters[type];
+            btn.classList.toggle('active', this.entityFilters[type]);
+        });
     }
 
     cacheElements() {
@@ -293,13 +329,17 @@ export class SectorMapManager {
         entities.sort((a, b) => (sortOrder[a.type] || 4) - (sortOrder[b.type] || 4));
 
         for (const entity of entities) {
+            // Entity filter check
+            const filterType = (entity.type === 'warpgate' || entity.type === 'gate') ? 'gate' :
+                               (entity.type === 'player-station') ? 'station' : entity.type;
+            if (!this.entityFilters[filterType]) continue;
             this.drawEntity(ctx, entity, scale, ox, oy, w, h);
         }
 
         // Fleet ships
         const fleetShips = this.game.fleet?.ships || [];
         for (const fs of fleetShips) {
-            if (fs.alive && fs.currentSector === sector.id) {
+            if (fs.alive && fs.currentSector === sector.id && this.entityFilters.fleet) {
                 this.drawEntity(ctx, fs, scale, ox, oy, w, h);
             }
         }
@@ -319,6 +359,12 @@ export class SectorMapManager {
 
         // Legend
         this.drawLocalLegend(ctx, w, h);
+
+        // Minimap inset
+        this.drawMinimap(ctx, sector, player, w, h, scale, ox, oy);
+
+        // Cursor info bar
+        this.drawCursorInfo(ctx, player, w, h);
     }
 
     drawBackgroundStars(ctx, w, h, ox, oy, scale) {
@@ -1103,6 +1149,112 @@ export class SectorMapManager {
     }
 
     // ==========================================
+    // MINIMAP & CURSOR INFO
+    // ==========================================
+
+    drawMinimap(ctx, sector, player, w, h, mainScale, mainOx, mainOy) {
+        const size = 120;
+        const pad = 8;
+        const mx = w - size - pad;
+        const my = pad + 90; // below info panel
+        const ss = CONFIG.SECTOR_SIZE;
+        const miniScale = size / ss;
+
+        // Background
+        ctx.fillStyle = 'rgba(0, 8, 16, 0.8)';
+        ctx.fillRect(mx, my, size, size);
+        ctx.strokeStyle = 'rgba(0, 200, 255, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(mx, my, size, size);
+
+        // Entity dots (simplified)
+        const entities = (sector?.entities || []).filter(e => e.alive);
+        for (const e of entities) {
+            const filterType = (e.type === 'warpgate' || e.type === 'gate') ? 'gate' :
+                               (e.type === 'player-station') ? 'station' : e.type;
+            if (!this.entityFilters[filterType]) continue;
+            const ex = mx + e.x * miniScale;
+            const ey = my + e.y * miniScale;
+            if (ex < mx || ex > mx + size || ey < my || ey > my + size) continue;
+
+            let color = '#555';
+            if (e.type === 'asteroid') color = '#665533';
+            else if (e.type === 'station' || e.type === 'player-station') color = '#00cc44';
+            else if (e.type === 'gate' || e.type === 'warpgate') color = '#0088ff';
+            else if (e.type === 'enemy') color = '#ff4444';
+            else if (e.type === 'npc') color = '#88aa88';
+            else if (e.type === 'guild') color = '#aa77cc';
+
+            ctx.fillStyle = color;
+            ctx.fillRect(ex - 0.5, ey - 0.5, 1.5, 1.5);
+        }
+
+        // Fleet dots
+        const fleetShips = this.game.fleet?.ships || [];
+        if (this.entityFilters.fleet) {
+            for (const fs of fleetShips) {
+                if (fs.alive && fs.currentSector === sector?.id) {
+                    ctx.fillStyle = '#44ffaa';
+                    ctx.fillRect(mx + fs.x * miniScale - 0.5, my + fs.y * miniScale - 0.5, 1.5, 1.5);
+                }
+            }
+        }
+
+        // Player dot
+        if (player && player.alive) {
+            const px = mx + player.x * miniScale;
+            const py = my + player.y * miniScale;
+            ctx.fillStyle = '#00ffff';
+            ctx.beginPath();
+            ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Viewport rectangle
+        const viewL = (-mainOx / mainScale) * miniScale;
+        const viewT = (-mainOy / mainScale) * miniScale;
+        const viewW = (w / mainScale) * miniScale;
+        const viewH = (h / mainScale) * miniScale;
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
+        ctx.strokeRect(mx + viewL, my + viewT, viewW, viewH);
+        ctx.setLineDash([]);
+
+        // Label
+        ctx.fillStyle = 'rgba(0, 200, 255, 0.4)';
+        ctx.font = '8px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText('MINIMAP', mx + size - 3, my + size - 3);
+    }
+
+    drawCursorInfo(ctx, player, w, h) {
+        if (!this.cursorWorld || this.isDragging) return;
+
+        const cx = this.cursorWorld.x;
+        const cy = this.cursorWorld.y;
+        // Only show if cursor is within sector bounds (roughly)
+        if (cx < -500 || cy < -500 || cx > CONFIG.SECTOR_SIZE + 500 || cy > CONFIG.SECTOR_SIZE + 500) return;
+
+        let text = `X: ${Math.round(cx)}  Y: ${Math.round(cy)}`;
+        if (player && player.alive) {
+            const dx = cx - player.x;
+            const dy = cy - player.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            text += `  |  ${formatDistance(dist)} from ship`;
+        }
+
+        const barH = 18;
+        const barY = h - barH;
+        ctx.fillStyle = 'rgba(0, 8, 16, 0.7)';
+        ctx.fillRect(0, barY, w, barH);
+        ctx.fillStyle = 'rgba(0, 180, 255, 0.5)';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(text, w / 2, barY + 12);
+    }
+
+    // ==========================================
     // LOCAL MAP INTERACTIONS
     // ==========================================
 
@@ -1122,6 +1274,18 @@ export class SectorMapManager {
 
     handleLocalMouseMove(e) {
         this.mousePos = { x: e.offsetX, y: e.offsetY };
+
+        // Track cursor world position
+        if (this.localCanvas) {
+            const w = this.localCanvas.width;
+            const scale = (this.localZoom * w) / CONFIG.SECTOR_SIZE;
+            const ox = w / 2 - this.localPan.x * scale;
+            const oy = this.localCanvas.height / 2 - this.localPan.y * scale;
+            this.cursorWorld = {
+                x: (e.offsetX - ox) / scale,
+                y: (e.offsetY - oy) / scale
+            };
+        }
 
         if (!this.isDragging) {
             const entity = this.findEntityAtScreenPos(e.offsetX, e.offsetY);

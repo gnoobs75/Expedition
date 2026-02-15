@@ -35,10 +35,26 @@ export class SkillTreeRenderer {
         this.tooltip = null;
         this.animFrame = null;
 
-        // Pan & zoom (for potential future use)
+        // Pan & zoom
         this.offsetX = 0;
         this.offsetY = 0;
         this.scale = 1;
+        this.minScale = 0.4;
+        this.maxScale = 5;
+
+        // Drag-to-pan state
+        this.isPanning = false;
+        this.hasDragged = false;
+        this.lastPanX = 0;
+        this.lastPanY = 0;
+
+        // Search
+        this.searchQuery = '';
+        this.searchMatches = null; // null = no search active, Set = matched node IDs
+
+        // Stats panel
+        this.statsPanelVisible = false;
+        this.statsPanel = null;
 
         this.createModal();
     }
@@ -50,23 +66,44 @@ export class SkillTreeRenderer {
         this.modal.innerHTML = `
             <div class="skill-tree-header">
                 <div class="skill-tree-title">SKILL CONSTELLATION</div>
+                <div class="skill-tree-search-wrap">
+                    <input id="skill-tree-search" type="text" class="skill-tree-search"
+                           placeholder="Search nodes..." spellcheck="false" autocomplete="off" />
+                </div>
                 <div class="skill-tree-sp" id="skill-tree-sp">SP: 0</div>
                 <div class="skill-tree-actions">
+                    <button id="skill-tree-stats-btn" class="skill-tree-btn">STATS</button>
+                    <button id="skill-tree-reset-view" class="skill-tree-btn">RESET VIEW</button>
                     <button id="skill-tree-respec" class="skill-tree-btn">RESPEC ALL</button>
                     <button id="skill-tree-close" class="skill-tree-btn">&times;</button>
                 </div>
             </div>
+            <div class="skill-tree-nav" id="skill-tree-nav"></div>
             <canvas id="skill-tree-canvas"></canvas>
+            <div id="skill-tree-stats-panel" class="skill-tree-stats-panel"></div>
             <div id="skill-tree-tooltip" class="skill-tree-tooltip hidden"></div>
             <div class="skill-tree-legend">
-                <span class="legend-item"><span class="legend-dot legend-minor"></span>Minor (2-3 pts)</span>
-                <span class="legend-item"><span class="legend-dot legend-notable"></span>Notable (5 pts)</span>
-                <span class="legend-item"><span class="legend-dot legend-keystone"></span>Keystone (1 pt)</span>
+                <span class="legend-item"><span class="legend-dot legend-minor"></span>Minor</span>
+                <span class="legend-item"><span class="legend-dot legend-notable"></span>Notable</span>
+                <span class="legend-item"><span class="legend-dot legend-keystone"></span>Keystone</span>
                 <span class="legend-sep">|</span>
-                <span class="legend-item">Left-click: Allocate</span>
-                <span class="legend-item">Right-click: Deallocate</span>
+                <span class="legend-item">LMB: Allocate</span>
+                <span class="legend-item">RMB: Deallocate</span>
+                <span class="legend-sep">|</span>
+                <span class="legend-item">Scroll: Zoom</span>
+                <span class="legend-item">Drag: Pan</span>
+                <span id="skill-tree-zoom-pct" class="legend-item" style="color:#556688"></span>
             </div>
         `;
+
+        // Populate constellation nav bar
+        const nav = this.modal.querySelector('#skill-tree-nav');
+        let navHTML = '';
+        for (const [id, cons] of Object.entries(CONSTELLATIONS)) {
+            navHTML += `<button class="skill-tree-nav-btn" data-cons="${id}"><span class="stn-dot" style="background:${cons.color}"></span>${cons.name}</button>`;
+        }
+        navHTML += `<button class="skill-tree-nav-btn stn-all active" data-cons="all">ALL</button>`;
+        nav.innerHTML = navHTML;
 
         document.body.appendChild(this.modal);
 
@@ -80,7 +117,43 @@ export class SkillTreeRenderer {
             this.game.skillTreeSystem?.respec();
             this.render();
         });
+        this.modal.querySelector('#skill-tree-reset-view').addEventListener('click', () => this.resetView());
 
+        this.zoomPctEl = this.modal.querySelector('#skill-tree-zoom-pct');
+        this.statsPanel = this.modal.querySelector('#skill-tree-stats-panel');
+
+        // Constellation nav
+        this.modal.querySelector('#skill-tree-nav').addEventListener('click', (e) => {
+            const btn = e.target.closest('.skill-tree-nav-btn');
+            if (!btn) return;
+            const consId = btn.dataset.cons;
+            this.modal.querySelectorAll('.skill-tree-nav-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (consId === 'all') this.resetView();
+            else this.zoomToConstellation(consId);
+        });
+
+        // Search input
+        const searchInput = this.modal.querySelector('#skill-tree-search');
+        searchInput.addEventListener('input', (e) => this.onSearch(e.target.value));
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                searchInput.value = '';
+                this.onSearch('');
+                searchInput.blur();
+            }
+            e.stopPropagation();
+        });
+
+        // Stats panel toggle
+        this.modal.querySelector('#skill-tree-stats-btn').addEventListener('click', () => {
+            this.statsPanelVisible = !this.statsPanelVisible;
+            this.statsPanel.classList.toggle('visible', this.statsPanelVisible);
+            this.modal.querySelector('#skill-tree-stats-btn').classList.toggle('active', this.statsPanelVisible);
+            if (this.statsPanelVisible) this.updateStatsPanel();
+        });
+
+        // Canvas interaction
         this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
         this.canvas.addEventListener('click', (e) => this.onClick(e));
         this.canvas.addEventListener('contextmenu', (e) => {
@@ -91,6 +164,16 @@ export class SkillTreeRenderer {
             this.hoveredNode = null;
             this.tooltip.classList.add('hidden');
         });
+
+        // Zoom (mouse wheel)
+        this.canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
+
+        // Pan (drag)
+        this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+        this._onPanMove = (e) => this.onPanMove(e);
+        this._onPanUp = (e) => this.onMouseUp(e);
+        window.addEventListener('mousemove', this._onPanMove);
+        window.addEventListener('mouseup', this._onPanUp);
 
         // ESC to close
         document.addEventListener('keydown', (e) => {
@@ -122,9 +205,10 @@ export class SkillTreeRenderer {
     resize() {
         const rect = this.modal.getBoundingClientRect();
         const headerH = 48;
+        const navH = 34;
         const legendH = 32;
         const w = rect.width;
-        const h = rect.height - headerH - legendH;
+        const h = rect.height - headerH - navH - legendH;
         this.canvas.width = w * window.devicePixelRatio;
         this.canvas.height = h * window.devicePixelRatio;
         this.canvas.style.width = w + 'px';
@@ -179,19 +263,25 @@ export class SkillTreeRenderer {
         if (!this.visible) return;
 
         const ctx = this.ctx;
-        const w = this.canvas.width / window.devicePixelRatio;
-        const h = this.canvas.height / window.devicePixelRatio;
+        const dpr = window.devicePixelRatio;
+        const w = this.canvas.width / dpr;
+        const h = this.canvas.height / dpr;
 
+        // Screen-space: clear and draw fixed background
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, w, h);
-
-        // Background
         ctx.fillStyle = '#0a0a14';
         ctx.fillRect(0, 0, w, h);
-
-        // Subtle star field
         this.drawStarfield(ctx, w, h);
 
-        // Compute layout
+        // World-space: apply zoom & pan transform for all tree content
+        ctx.setTransform(
+            this.scale * dpr, 0,
+            0, this.scale * dpr,
+            this.offsetX * dpr, this.offsetY * dpr
+        );
+
+        // Compute layout (in world/base space)
         this.computeLayout();
 
         // Draw constellation labels
@@ -200,14 +290,31 @@ export class SkillTreeRenderer {
         // Draw connections first (under nodes)
         this.drawConnections(ctx);
 
+        // Draw path preview for locked hovered node
+        this.drawPathPreview(ctx);
+
         // Draw nodes
         this.drawNodes(ctx);
+
+        // Draw node names when zoomed in
+        this.drawNodeNames(ctx);
+
+        // Reset to screen-space for HUD overlays
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Zoom indicator
+        if (this.zoomPctEl) {
+            this.zoomPctEl.textContent = this.scale !== 1 ? `${Math.round(this.scale * 100)}%` : '';
+        }
 
         // Update SP display
         const sp = this.game.skillGainSystem?.skillPoints || 0;
         const allocated = this.game.skillTreeSystem?.getTotalAllocated() || 0;
         const spEl = this.modal.querySelector('#skill-tree-sp');
         if (spEl) spEl.textContent = `SP Available: ${sp} | Allocated: ${allocated}`;
+
+        // Update stats panel if visible
+        if (this.statsPanelVisible) this.updateStatsPanel();
     }
 
     drawStarfield(ctx, w, h) {
@@ -312,9 +419,11 @@ export class SkillTreeRenderer {
             const color = cons?.color || '#ffffff';
 
             const r = pos.screenR * (isHovered ? 1.2 : 1);
+            const isSearchDimmed = this.searchMatches && !this.searchMatches.has(nodeId);
 
             // Node shape based on type
             ctx.save();
+            if (isSearchDimmed) ctx.globalAlpha = 0.12;
 
             if (node.type === 'keystone') {
                 // Diamond shape
@@ -423,6 +532,297 @@ export class SkillTreeRenderer {
         return `rgb(${Math.floor(r * factor)},${Math.floor(g * factor)},${Math.floor(b * factor)})`;
     }
 
+    // =========================================
+    // Constellation Navigation
+    // =========================================
+
+    zoomToConstellation(consId) {
+        this.computeLayout();
+        const nodes = Object.entries(this.nodePositions).filter(([id]) =>
+            SKILL_TREE_NODES[id]?.constellation === consId
+        );
+        if (nodes.length === 0) return;
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (const [_, pos] of nodes) {
+            minX = Math.min(minX, pos.x - 30);
+            maxX = Math.max(maxX, pos.x + 30);
+            minY = Math.min(minY, pos.y - 30);
+            maxY = Math.max(maxY, pos.y + 30);
+        }
+
+        const bw = maxX - minX;
+        const bh = maxY - minY;
+        const cw = this.canvas.width / window.devicePixelRatio;
+        const ch = this.canvas.height / window.devicePixelRatio;
+        const padding = 80;
+        const scaleX = (cw - padding * 2) / bw;
+        const scaleY = (ch - padding * 2) / bh;
+        this.scale = Math.min(scaleX, scaleY, this.maxScale);
+
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
+        this.offsetX = cw / 2 - cx * this.scale;
+        this.offsetY = ch / 2 - cy * this.scale;
+
+        this.render();
+    }
+
+    // =========================================
+    // Path Preview (locked node prerequisites)
+    // =========================================
+
+    findPathToNode(targetId) {
+        const tree = this.game.skillTreeSystem;
+        if (!tree) return new Set();
+
+        const needed = new Set();
+        const visited = new Set();
+        const collect = (nodeId) => {
+            if (visited.has(nodeId)) return;
+            visited.add(nodeId);
+            const node = SKILL_TREE_NODES[nodeId];
+            if (!node) return;
+            if ((tree.allocated[nodeId] || 0) > 0 || node.type === 'start') return;
+            needed.add(nodeId);
+            for (const reqId of node.requires) collect(reqId);
+        };
+        collect(targetId);
+        return needed;
+    }
+
+    drawPathPreview(ctx) {
+        if (!this.hoveredNode) return;
+        const tree = this.game.skillTreeSystem;
+        if (!tree) return;
+
+        const node = SKILL_TREE_NODES[this.hoveredNode];
+        if (!node) return;
+        const points = tree.allocated[this.hoveredNode] || 0;
+        if (points > 0 || node.type === 'start') return;
+
+        const needed = this.findPathToNode(this.hoveredNode);
+        if (needed.size === 0) return;
+
+        // Highlight connections along the prerequisite path
+        for (const nodeId of needed) {
+            const pos = this.nodePositions[nodeId];
+            const n = SKILL_TREE_NODES[nodeId];
+            if (!pos || !n) continue;
+
+            for (const reqId of n.requires) {
+                const reqPos = this.nodePositions[reqId];
+                if (!reqPos) continue;
+                const reqNode = SKILL_TREE_NODES[reqId];
+                const reqAllocated = (tree.allocated[reqId] || 0) > 0 || reqNode?.type === 'start';
+                if (!needed.has(reqId) && !reqAllocated) continue;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(reqPos.x, reqPos.y);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.strokeStyle = '#ffdd44';
+                ctx.lineWidth = 2.5;
+                ctx.globalAlpha = 0.6;
+                ctx.setLineDash([6, 4]);
+                ctx.shadowColor = '#ffdd44';
+                ctx.shadowBlur = 8;
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+            }
+        }
+
+        // Highlight rings on needed nodes (not the hovered one itself)
+        for (const nodeId of needed) {
+            if (nodeId === this.hoveredNode) continue;
+            const pos = this.nodePositions[nodeId];
+            if (!pos) continue;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, pos.screenR + 5, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ffdd44';
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = 0.45;
+            ctx.setLineDash([3, 3]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+    }
+
+    // =========================================
+    // Node Names (visible when zoomed in)
+    // =========================================
+
+    drawNodeNames(ctx) {
+        if (this.scale < 1.8) return;
+
+        for (const [nodeId, node] of Object.entries(SKILL_TREE_NODES)) {
+            if (node.type === 'start') continue;
+            const pos = this.nodePositions[nodeId];
+            if (!pos) continue;
+
+            if (this.searchMatches && !this.searchMatches.has(nodeId)) continue;
+
+            const cons = CONSTELLATIONS[node.constellation];
+            ctx.save();
+            ctx.font = '7px monospace';
+            ctx.fillStyle = cons?.color || '#88aacc';
+            ctx.globalAlpha = Math.min(0.85, (this.scale - 1.8) * 0.8 + 0.4);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(node.name, pos.x, pos.y + pos.screenR + 3);
+            ctx.restore();
+        }
+    }
+
+    // =========================================
+    // Search
+    // =========================================
+
+    onSearch(query) {
+        this.searchQuery = query.trim().toLowerCase();
+        if (!this.searchQuery) {
+            this.searchMatches = null;
+        } else {
+            this.searchMatches = new Set();
+            for (const [nodeId, node] of Object.entries(SKILL_TREE_NODES)) {
+                if (node.name.toLowerCase().includes(this.searchQuery)) {
+                    this.searchMatches.add(nodeId); continue;
+                }
+                if (node.tooltip.toLowerCase().includes(this.searchQuery)) {
+                    this.searchMatches.add(nodeId); continue;
+                }
+                for (const stat of Object.keys(node.bonuses)) {
+                    if (this.formatStatName(stat).toLowerCase().includes(this.searchQuery)) {
+                        this.searchMatches.add(nodeId); break;
+                    }
+                }
+            }
+        }
+        this.render();
+    }
+
+    // =========================================
+    // Stats Summary Panel
+    // =========================================
+
+    updateStatsPanel() {
+        const tree = this.game.skillTreeSystem;
+        if (!tree || !this.statsPanel) return;
+
+        const bonuses = {};
+        for (const [nodeId, node] of Object.entries(SKILL_TREE_NODES)) {
+            const pts = tree.allocated[nodeId] || 0;
+            if (pts <= 0) continue;
+            for (const [stat, val] of Object.entries(node.bonuses)) {
+                bonuses[stat] = (bonuses[stat] || 0) + val * pts;
+            }
+        }
+
+        const categories = {
+            'Combat': ['damageBonus', 'trackingBonus', 'fireRateBonus', 'rangeBonus', 'critChance', 'missileDamageBonus', 'droneDamageBonus'],
+            'Mining': ['miningYieldBonus', 'miningSpeedBonus', 'refineryBonus', 'rareOreChance'],
+            'Navigation': ['warpSpeedBonus', 'maxSpeedBonus', 'accelerationBonus', 'warpSpoolBonus', 'evasionBonus', 'fleetWarpBonus'],
+            'Defense': ['shieldBonus', 'armorBonus', 'hullBonus', 'capacitorBonus', 'capacitorRegenBonus', 'shieldResistBonus', 'armorResistBonus', 'capacitorDrain'],
+            'Trade': ['priceBonus', 'cargoBonus', 'taxReduction', 'insuranceBonus'],
+            'Tactical': ['ewarBonus', 'ewarResist', 'fleetBonus', 'fleetTankBonus', 'scanBonus', 'scanRange']
+        };
+
+        let html = '<div class="stp-title">ACTIVE BONUSES</div>';
+        let hasAny = false;
+
+        for (const [catName, stats] of Object.entries(categories)) {
+            const active = stats.filter(s => bonuses[s] && bonuses[s] !== 0);
+            if (active.length === 0) continue;
+            hasAny = true;
+            html += `<div class="stp-category">${catName}</div>`;
+            for (const stat of active) {
+                const val = bonuses[stat];
+                const sign = val >= 0 ? '+' : '';
+                const color = val >= 0 ? '#88dd88' : '#dd8888';
+                html += `<div class="stp-stat" style="color:${color}">${sign}${(val * 100).toFixed(1)}% ${this.formatStatName(stat)}</div>`;
+            }
+        }
+
+        if (!hasAny) html += '<div class="stp-empty">No points allocated yet.</div>';
+        this.statsPanel.innerHTML = html;
+    }
+
+    /** Convert screen-space canvas coords to world/base coords */
+    screenToWorld(sx, sy) {
+        return {
+            x: (sx - this.offsetX) / this.scale,
+            y: (sy - this.offsetY) / this.scale
+        };
+    }
+
+    resetView() {
+        this.offsetX = 0;
+        this.offsetY = 0;
+        this.scale = 1;
+        this.render();
+    }
+
+    onWheel(e) {
+        e.preventDefault();
+        const rect = this.canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+        const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.scale * zoomFactor));
+
+        // Zoom toward cursor: keep the world point under cursor fixed
+        const wx = (mx - this.offsetX) / this.scale;
+        const wy = (my - this.offsetY) / this.scale;
+        this.offsetX = mx - wx * newScale;
+        this.offsetY = my - wy * newScale;
+        this.scale = newScale;
+
+        this.render();
+    }
+
+    onMouseDown(e) {
+        if (e.button === 0 || e.button === 1) {
+            this.isPanning = true;
+            this.hasDragged = false;
+            this.lastPanX = e.clientX;
+            this.lastPanY = e.clientY;
+        }
+    }
+
+    onPanMove(e) {
+        if (!this.isPanning || !this.visible) return;
+
+        const dx = e.clientX - this.lastPanX;
+        const dy = e.clientY - this.lastPanY;
+
+        if (!this.hasDragged && (Math.abs(dx) + Math.abs(dy)) > 5) {
+            this.hasDragged = true;
+            this.canvas.style.cursor = 'grabbing';
+        }
+
+        if (this.hasDragged) {
+            this.offsetX += dx;
+            this.offsetY += dy;
+            this.lastPanX = e.clientX;
+            this.lastPanY = e.clientY;
+            this.render();
+        }
+    }
+
+    onMouseUp(e) {
+        if (this.isPanning) {
+            this.isPanning = false;
+            if (this.hasDragged) {
+                this.canvas.style.cursor = 'default';
+            }
+        }
+    }
+
     getNodeAt(mx, my) {
         for (const [nodeId, pos] of Object.entries(this.nodePositions)) {
             const dx = mx - pos.x;
@@ -436,11 +836,14 @@ export class SkillTreeRenderer {
     }
 
     onMouseMove(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
+        if (this.hasDragged) return; // suppress hover during pan
 
-        const nodeId = this.getNodeAt(mx, my);
+        const rect = this.canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const world = this.screenToWorld(sx, sy);
+
+        const nodeId = this.getNodeAt(world.x, world.y);
         if (nodeId !== this.hoveredNode) {
             this.hoveredNode = nodeId;
             this.render();
@@ -455,14 +858,17 @@ export class SkillTreeRenderer {
             this.positionTooltip(e.clientX, e.clientY);
         }
 
-        this.canvas.style.cursor = nodeId ? 'pointer' : 'default';
+        this.canvas.style.cursor = nodeId ? 'pointer' : 'grab';
     }
 
     onClick(e) {
+        if (this.hasDragged) return; // was a pan, not a click
+
         const rect = this.canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        const nodeId = this.getNodeAt(mx, my);
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const world = this.screenToWorld(sx, sy);
+        const nodeId = this.getNodeAt(world.x, world.y);
 
         if (nodeId) {
             const tree = this.game.skillTreeSystem;
@@ -477,10 +883,13 @@ export class SkillTreeRenderer {
     }
 
     onRightClick(e) {
+        if (this.hasDragged) return;
+
         const rect = this.canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        const nodeId = this.getNodeAt(mx, my);
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const world = this.screenToWorld(sx, sy);
+        const nodeId = this.getNodeAt(world.x, world.y);
 
         if (nodeId) {
             const tree = this.game.skillTreeSystem;
@@ -520,6 +929,19 @@ export class SkillTreeRenderer {
         if (node.requires.length > 0 && node.type !== 'start') {
             const reqNames = node.requires.map(r => SKILL_TREE_NODES[r]?.name || r).join(', ');
             html += `<div class="stt-req">Requires: ${reqNames}</div>`;
+        }
+
+        // Path cost for unreachable nodes
+        if (points === 0 && node.type !== 'start' && !tree.canAllocate(nodeId)) {
+            const needed = this.findPathToNode(nodeId);
+            if (needed.size > 0) {
+                let totalCost = 0;
+                for (const nid of needed) {
+                    const n = SKILL_TREE_NODES[nid];
+                    if (n) totalCost += n.maxPoints;
+                }
+                html += `<div class="stt-path-cost">Path: ${totalCost} SP across ${needed.size} node${needed.size > 1 ? 's' : ''}</div>`;
+            }
         }
 
         this.tooltip.innerHTML = html;

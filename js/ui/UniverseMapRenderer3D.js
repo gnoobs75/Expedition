@@ -78,6 +78,14 @@ export class UniverseMapRenderer3D {
 
         // Sphere config
         this.GLOBE_RADIUS = 200;
+
+        // Search state
+        this.searchQuery = '';
+        this.searchHighlightId = null;
+
+        // UI overlay elements
+        this.searchEl = null;
+        this.routeInfoEl = null;
     }
 
     // ==========================================
@@ -134,6 +142,10 @@ export class UniverseMapRenderer3D {
         this.createSectorNodes();
         this.createGateConnections();
         this.createTooltip();
+
+        // UI overlays
+        this.createSearchBar();
+        this.createRouteInfo();
 
         // Event listeners
         this.setupEventListeners();
@@ -510,6 +522,91 @@ export class UniverseMapRenderer3D {
     // EVENT LISTENERS
     // ==========================================
 
+    createSearchBar() {
+        this.searchEl = document.createElement('div');
+        this.searchEl.className = 'universe-search-bar';
+        this.searchEl.innerHTML = `<input type="text" class="universe-search-input" placeholder="Search sector..." spellcheck="false" autocomplete="off" />`;
+        this.container.appendChild(this.searchEl);
+
+        const input = this.searchEl.querySelector('input');
+        input.addEventListener('input', (e) => this.onSectorSearch(e.target.value));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { input.value = ''; this.onSectorSearch(''); input.blur(); }
+            if (e.key === 'Enter' && this.searchHighlightId) this.focusOnSector(this.searchHighlightId);
+            e.stopPropagation();
+        });
+    }
+
+    createRouteInfo() {
+        this.routeInfoEl = document.createElement('div');
+        this.routeInfoEl.className = 'universe-route-info hidden';
+        this.container.appendChild(this.routeInfoEl);
+    }
+
+    onSectorSearch(query) {
+        this.searchQuery = query.trim().toLowerCase();
+        this.searchHighlightId = null;
+
+        // Reset all sector node opacities
+        for (const [sectorId, mesh] of Object.entries(this.sectorMeshes)) {
+            const isCurrent = sectorId === this.game.currentSector?.id;
+            mesh.material.opacity = isCurrent ? 1.0 : 0.85;
+        }
+
+        if (!this.searchQuery) return;
+
+        // Find matching sectors
+        let firstMatch = null;
+        for (const [sectorId, data] of Object.entries(this.sectorData)) {
+            const mesh = this.sectorMeshes[sectorId];
+            if (!mesh) continue;
+
+            if (data.name.toLowerCase().includes(this.searchQuery)) {
+                mesh.material.opacity = 1.0;
+                mesh.material.emissiveIntensity = 0.8;
+                if (!firstMatch) firstMatch = sectorId;
+            } else {
+                mesh.material.opacity = 0.15;
+            }
+        }
+
+        this.searchHighlightId = firstMatch;
+    }
+
+    focusOnSector(sectorId) {
+        const pos = this.sectorPositions[sectorId];
+        if (!pos) return;
+
+        // Calculate rotation to face this sector
+        const dir = pos.clone().normalize();
+        this.rotationY = Math.atan2(dir.x, dir.z);
+        this.rotationX = Math.asin(Math.max(-0.95, Math.min(0.95, dir.y)));
+        this.cameraDistance = Math.min(this.cameraDistance, 450);
+        this.isAutoRotating = false;
+        this.updateCameraPosition();
+    }
+
+    updateRouteInfo() {
+        if (!this.routeInfoEl) return;
+        const route = this.game.autopilot?.routeQueue;
+        if (!route || route.length === 0) {
+            this.routeInfoEl.classList.add('hidden');
+            return;
+        }
+
+        const dest = route[route.length - 1];
+        const destData = this.sectorData[dest];
+        const jumpsLeft = route.length;
+        const diffColor = '#' + (DIFFICULTY_COLORS[destData?.difficulty] || 0x888888).toString(16).padStart(6, '0');
+
+        this.routeInfoEl.classList.remove('hidden');
+        this.routeInfoEl.innerHTML = `
+            <span class="ri-label">ROUTE</span>
+            <span class="ri-dest" style="color:${diffColor}">${destData?.name || dest}</span>
+            <span class="ri-jumps">${jumpsLeft} jump${jumpsLeft > 1 ? 's' : ''}</span>
+        `;
+    }
+
     setupEventListeners() {
         const canvas = this.renderer.domElement;
 
@@ -519,8 +616,48 @@ export class UniverseMapRenderer3D {
         canvas.addEventListener('mouseleave', () => this.onMouseLeave());
         canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
         canvas.addEventListener('contextmenu', (e) => this.onRightClick(e));
-        // Left click (non-drag)
         canvas.addEventListener('click', (e) => this.onClick(e));
+
+        // Double-click to focus on sector
+        canvas.addEventListener('dblclick', (e) => {
+            const sectorId = this.pickSector(e);
+            if (sectorId) this.focusOnSector(sectorId);
+        });
+
+        // Keyboard controls for globe rotation
+        document.addEventListener('keydown', (e) => {
+            if (!this.animationId) return; // only when active
+            const searchFocused = document.activeElement?.classList.contains('universe-search-input');
+            if (searchFocused) return;
+
+            const rotSpeed = 0.05;
+            switch (e.key) {
+                case 'ArrowLeft':
+                    this.rotationY -= rotSpeed;
+                    this.isAutoRotating = false;
+                    this.updateCameraPosition();
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                    this.rotationY += rotSpeed;
+                    this.isAutoRotating = false;
+                    this.updateCameraPosition();
+                    e.preventDefault();
+                    break;
+                case 'ArrowUp':
+                    this.rotationX = Math.min(Math.PI / 2.2, this.rotationX + rotSpeed);
+                    this.isAutoRotating = false;
+                    this.updateCameraPosition();
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                    this.rotationX = Math.max(-Math.PI / 2.2, this.rotationX - rotSpeed);
+                    this.isAutoRotating = false;
+                    this.updateCameraPosition();
+                    e.preventDefault();
+                    break;
+            }
+        });
     }
 
     onMouseDown(e) {
@@ -879,6 +1016,9 @@ export class UniverseMapRenderer3D {
 
         // Update current sector highlighting (may change after gate jumps)
         this.updateCurrentSector();
+
+        // Update route info panel
+        this.updateRouteInfo();
     }
 
     animateGateDots() {
@@ -958,6 +1098,14 @@ export class UniverseMapRenderer3D {
         if (this.tooltipEl) {
             this.tooltipEl.remove();
             this.tooltipEl = null;
+        }
+        if (this.searchEl) {
+            this.searchEl.remove();
+            this.searchEl = null;
+        }
+        if (this.routeInfoEl) {
+            this.routeInfoEl.remove();
+            this.routeInfoEl = null;
         }
 
         if (this.renderer) {

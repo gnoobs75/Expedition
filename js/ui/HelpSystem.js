@@ -96,7 +96,7 @@ const HELP_CONTENT = {
     },
     'fleet-panel': {
         title: 'Fleet Management',
-        text: 'Manage your fleet ships. Assign control groups, issue commands (follow, attack, mine). Fleet ships follow you through warp gates.',
+        text: 'Manage your fleet ships. Assign control groups, issue commands (follow, attack, mine). Fleet ships follow you through Elder Wormholes.',
         keys: [
             { key: 'F', desc: 'Toggle panel' },
             { key: 'Ctrl+1-5', desc: 'Assign group' },

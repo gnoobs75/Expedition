@@ -73,15 +73,15 @@ const ACHIEVEMENTS = {
 
     // Navigation
     first_jump: {
-        name: 'Gate Jumper',
-        desc: 'Jump through your first gate',
+        name: 'Wormhole Jumper',
+        desc: 'Jump through your first Elder Wormhole',
         icon: '\u26A1',
         category: 'Navigation',
         check: s => s.jumps >= 1,
     },
     frequent_flyer: {
         name: 'Frequent Flyer',
-        desc: 'Jump through 20 gates',
+        desc: 'Jump through 20 Elder Wormholes',
         icon: '\u2708',
         category: 'Navigation',
         check: s => s.jumps >= 20,
@@ -95,7 +95,7 @@ const ACHIEVEMENTS = {
     },
     speed_demon: {
         name: 'Speed Demon',
-        desc: 'Jump through 50 gates',
+        desc: 'Jump through 50 Elder Wormholes',
         icon: '\u21C9',
         category: 'Navigation',
         check: s => s.jumps >= 50,

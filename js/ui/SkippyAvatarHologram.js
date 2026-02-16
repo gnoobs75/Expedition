@@ -48,6 +48,43 @@ export class SkippyAvatarHologram {
         this.flickerOffsetX = 0;
         this.flickerOpacity = 1;
 
+        // Face feature animation state (holographic overlay on sprite)
+        this.faceState = {
+            eyeGlow: 0,          // 0-1 intensity
+            eyeColor: { r: 0, g: 255, b: 255 },
+            targetEyeColor: { r: 0, g: 255, b: 255 },
+            eyeScaleX: 1.0,
+            eyeScaleY: 1.0,
+            targetEyeScaleX: 1.0,
+            targetEyeScaleY: 1.0,
+            browAngle: 0,
+            targetBrowAngle: 0,
+            mouthOpen: 0,        // 0-1
+            mouthWidth: 1.0,
+            blinkTimer: 0,
+            blinkInterval: 3 + Math.random() * 4,
+            isBlinking: false,
+            blinkPhase: 0,
+        };
+
+        // Expression face configs (matches beer can expressions)
+        this.faceExpressions = {
+            idle:             { eyeColor: { r: 0, g: 255, b: 255 }, scaleX: 1.0, scaleY: 1.0, browAngle: 0 },
+            talking:          { eyeColor: { r: 0, g: 255, b: 255 }, scaleX: 1.0, scaleY: 1.0, browAngle: 0 },
+            smug:             { eyeColor: { r: 0, g: 255, b: 170 }, scaleX: 0.8, scaleY: 0.7, browAngle: 0.15 },
+            laughing:         { eyeColor: { r: 68, g: 255, b: 68 }, scaleX: 1.2, scaleY: 0.5, browAngle: 0.2 },
+            annoyed:          { eyeColor: { r: 255, g: 136, b: 0 }, scaleX: 0.9, scaleY: 0.6, browAngle: -0.3 },
+            excited:          { eyeColor: { r: 255, g: 255, b: 0 }, scaleX: 1.3, scaleY: 1.3, browAngle: 0.25 },
+            bored:            { eyeColor: { r: 100, g: 136, b: 136 }, scaleX: 1.0, scaleY: 0.5, browAngle: 0 },
+            impressed:        { eyeColor: { r: 0, g: 200, b: 255 }, scaleX: 1.2, scaleY: 1.2, browAngle: 0.2 },
+            disappointed:     { eyeColor: { r: 136, g: 136, b: 136 }, scaleX: 0.8, scaleY: 0.8, browAngle: -0.1 },
+            mildlyImpressed:  { eyeColor: { r: 0, g: 220, b: 170 }, scaleX: 1.1, scaleY: 1.05, browAngle: 0.1 },
+            neutral:          { eyeColor: { r: 0, g: 220, b: 220 }, scaleX: 1.0, scaleY: 1.0, browAngle: 0 },
+            alarmed:          { eyeColor: { r: 255, g: 50, b: 0 }, scaleX: 1.4, scaleY: 1.4, browAngle: -0.35 },
+            concerned:        { eyeColor: { r: 255, g: 170, b: 0 }, scaleX: 1.1, scaleY: 1.1, browAngle: -0.2 },
+            lecturing:        { eyeColor: { r: 136, g: 136, b: 255 }, scaleX: 0.9, scaleY: 0.9, browAngle: -0.15 },
+        };
+
         // Expression tint colors
         this.tintColors = {
             idle:             'rgba(0,255,255,0.07)',
@@ -212,12 +249,15 @@ export class SkippyAvatarHologram {
         const t = this.time;
         const combat = this.gameState.inCombat;
 
-        // 1. Background
+        // Update face animation state
+        this._updateFaceState(dt);
+
+        // 1. Background (subtle transparent - hologram floats over game)
         ctx.save();
         ctx.clearRect(0, 0, w, h);
         const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w * 0.7);
-        bgGrad.addColorStop(0, '#000d1a');
-        bgGrad.addColorStop(1, '#000308');
+        bgGrad.addColorStop(0, 'rgba(0,8,18,0.4)');
+        bgGrad.addColorStop(1, 'rgba(0,2,6,0.15)');
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, w, h);
         ctx.restore();
@@ -303,6 +343,9 @@ export class SkippyAvatarHologram {
             ctx.restore();
         }
 
+        // 5b. Face features (holographic eyes, brows, mouth)
+        this._drawFaceFeatures(ctx, sx, sy, sw, sh);
+
         // 6. Glitch slices
         if (this.glitchActive && this.glitchSlices.length > 0) {
             this._drawGlitchSlices(ctx, sx, sy, sw, sh);
@@ -376,13 +419,144 @@ export class SkippyAvatarHologram {
         ctx.fillRect(0, 0, w, h);
         ctx.restore();
 
-        // 13. Border glow
-        ctx.save();
-        ctx.strokeStyle = combat ? 'rgba(255,50,50,0.25)' : 'rgba(0,255,255,0.15)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
-        ctx.restore();
+        // 13. Border glow (removed - floating hologram has no frame)
     };
+
+    _updateFaceState(dt) {
+        const fs = this.faceState;
+        const expr = this.faceExpressions[this.expression] || this.faceExpressions.idle;
+        const lerpSpeed = 5 * dt;
+
+        // Lerp eye color
+        fs.eyeColor.r += (expr.eyeColor.r - fs.eyeColor.r) * lerpSpeed;
+        fs.eyeColor.g += (expr.eyeColor.g - fs.eyeColor.g) * lerpSpeed;
+        fs.eyeColor.b += (expr.eyeColor.b - fs.eyeColor.b) * lerpSpeed;
+
+        // Lerp eye scale
+        fs.eyeScaleX += (expr.scaleX - fs.eyeScaleX) * lerpSpeed;
+        fs.eyeScaleY += (expr.scaleY - fs.eyeScaleY) * lerpSpeed;
+
+        // Lerp brow angle
+        fs.browAngle += (expr.browAngle - fs.browAngle) * lerpSpeed;
+
+        // Blink logic
+        fs.blinkTimer += dt;
+        if (!fs.isBlinking && fs.blinkTimer > fs.blinkInterval) {
+            fs.isBlinking = true;
+            fs.blinkPhase = 0;
+            fs.blinkTimer = 0;
+            fs.blinkInterval = 2.5 + Math.random() * 4;
+        }
+        if (fs.isBlinking) {
+            fs.blinkPhase += dt * 8;
+            if (fs.blinkPhase > Math.PI) {
+                fs.isBlinking = false;
+                fs.blinkPhase = 0;
+            }
+        }
+
+        // Mouth animation
+        if (this.isTalking) {
+            const talkFreq = 8;
+            fs.mouthOpen = 0.3 + Math.abs(Math.sin(this.talkTimer * talkFreq)) * 0.7;
+            fs.mouthWidth = 1.0 + Math.sin(this.talkTimer * talkFreq * 0.7) * 0.15;
+        } else {
+            fs.mouthOpen *= 0.85; // smooth close
+            fs.mouthWidth += (1.0 - fs.mouthWidth) * lerpSpeed;
+        }
+
+        // Eye glow pulsing
+        fs.eyeGlow = 0.6 + Math.sin(this.time * 2.5) * 0.15;
+        if (this.gameState.inCombat) fs.eyeGlow += 0.2;
+    }
+
+    _drawFaceFeatures(ctx, sx, sy, sw, sh) {
+        const fs = this.faceState;
+        const combat = this.gameState.inCombat;
+
+        // Face position offsets relative to sprite
+        // Large hat ends ~28%, tiny face 29-38%, eyes ~33%, mouth ~37%
+        const eyeY = sy + sh * 0.33;
+        const eyeSpacing = sw * 0.065;
+        const eyeCenterX = sx + sw * 0.44; // face center slightly left
+        const mouthY = sy + sh * 0.375;
+
+        const er = Math.round(fs.eyeColor.r);
+        const eg = Math.round(fs.eyeColor.g);
+        const eb = Math.round(fs.eyeColor.b);
+        const eyeColorStr = `${er},${eg},${eb}`;
+
+        // Scale features to sprite size (face is small relative to full body)
+        const faceScale = sw / 130; // normalize to expected sprite width
+        // Blink factor: 1 = open, 0 = closed
+        const blinkFactor = fs.isBlinking ? Math.max(0, Math.cos(fs.blinkPhase)) : 1;
+        const eyeH = 2.5 * faceScale * fs.eyeScaleY * blinkFactor;
+        const eyeW = 3 * faceScale * fs.eyeScaleX;
+
+        // Draw holographic eyes (glowing ellipses)
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighten';
+
+        for (const side of [-1, 1]) {
+            const ex = eyeCenterX + side * eyeSpacing;
+
+            // Outer glow
+            const eyeGrad = ctx.createRadialGradient(ex, eyeY, 0, ex, eyeY, eyeW * 1.5);
+            eyeGrad.addColorStop(0, `rgba(${eyeColorStr},${(fs.eyeGlow * 0.2).toFixed(2)})`);
+            eyeGrad.addColorStop(1, `rgba(${eyeColorStr},0)`);
+            ctx.fillStyle = eyeGrad;
+            ctx.fillRect(ex - eyeW * 1.8, eyeY - eyeW * 1.8, eyeW * 3.6, eyeW * 3.6);
+
+            // Eye core
+            if (eyeH > 0.5) {
+                ctx.beginPath();
+                ctx.ellipse(ex, eyeY, eyeW, eyeH, 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${eyeColorStr},${(fs.eyeGlow * 0.7).toFixed(2)})`;
+                ctx.fill();
+
+                // Bright pupil center
+                ctx.beginPath();
+                ctx.ellipse(ex, eyeY, eyeW * 0.35, eyeH * 0.5, 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255,255,255,${(fs.eyeGlow * 0.5).toFixed(2)})`;
+                ctx.fill();
+            }
+
+            // Brow line (holographic)
+            ctx.save();
+            ctx.translate(ex, eyeY - eyeH - 2.5 * faceScale);
+            ctx.rotate(side * fs.browAngle);
+            ctx.fillStyle = `rgba(${eyeColorStr},${(fs.eyeGlow * 0.3).toFixed(2)})`;
+            ctx.fillRect(-eyeW * 0.7, -0.5, eyeW * 1.4, 1.2 * faceScale);
+            ctx.restore();
+        }
+
+        // Mouth (holographic arc/line)
+        if (fs.mouthOpen > 0.05) {
+            const mouthW = sw * 0.04 * fs.mouthWidth;
+            const mouthH = (1.0 + fs.mouthOpen * 3) * faceScale;
+            const mouthGrad = ctx.createRadialGradient(
+                eyeCenterX, mouthY, 0,
+                eyeCenterX, mouthY, mouthW * 1.5
+            );
+            mouthGrad.addColorStop(0, `rgba(${eyeColorStr},${(fs.eyeGlow * 0.4).toFixed(2)})`);
+            mouthGrad.addColorStop(1, `rgba(${eyeColorStr},0)`);
+            ctx.fillStyle = mouthGrad;
+            ctx.fillRect(eyeCenterX - mouthW * 1.5, mouthY - mouthH, mouthW * 3, mouthH * 2);
+
+            // Mouth shape
+            ctx.beginPath();
+            ctx.ellipse(eyeCenterX, mouthY, mouthW, mouthH * 0.6, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${eyeColorStr},${(fs.eyeGlow * 0.45).toFixed(2)})`;
+            ctx.fill();
+        } else {
+            // Subtle closed mouth line
+            ctx.fillStyle = `rgba(${eyeColorStr},${(fs.eyeGlow * 0.2).toFixed(2)})`;
+            const mouthW = sw * 0.035;
+            ctx.fillRect(eyeCenterX - mouthW, mouthY - 0.5, mouthW * 2, 1);
+        }
+
+        ctx.restore();
+    }
 
     _drawTintedSprite(ctx, x, y, w, h, tint) {
         const oc = this._offCtx;

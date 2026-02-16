@@ -10,9 +10,9 @@ export class WarpGate extends Entity {
     constructor(game, options = {}) {
         super(game, {
             ...options,
-            name: options.name || 'Warp Gate',
+            name: options.name || 'Elder Wormhole',
             radius: options.radius || 100,
-            color: CONFIG.COLORS.warp,
+            color: options.color || CONFIG.COLORS.warp,
         });
 
         this.type = 'gate';
@@ -23,6 +23,9 @@ export class WarpGate extends Entity {
 
         // Wormhole gates have distinct visuals
         this.isWormhole = options.isWormhole || false;
+
+        // Secret elder wormholes (Skippy-only shortcuts)
+        this.secret = options.secret || false;
 
         // Gate properties
         this.activationRange = 150;
@@ -81,12 +84,12 @@ export class WarpGate extends Entity {
      */
     use(entity) {
         if (!this.destinationSectorId) {
-            this.game.ui?.log('Gate destination unknown', 'system');
+            this.game.ui?.log('Elder Wormhole destination unknown', 'system');
             return false;
         }
 
         if (!this.canUse(entity)) {
-            this.game.ui?.log('Too far from gate', 'system');
+            this.game.ui?.log('Too far from Elder Wormhole', 'system');
             return false;
         }
 
@@ -124,10 +127,10 @@ export class WarpGate extends Entity {
         const outerRing = new THREE.Mesh(outerRingGeometry, outerRingMaterial);
         group.add(outerRing);
 
-        // Color scheme: purple for wormholes, blue for normal gates
-        const energyColor = this.isWormhole ? 0x8844ff : 0x4488ff;
-        const portalColor = this.isWormhole ? 0x4422aa : 0x2244aa;
-        const glowColor = this.isWormhole ? 0xaa66ff : 0x88aaff;
+        // Color scheme: gold for secret, purple for wormholes, blue for normal
+        const energyColor = this.secret ? 0xFFB020 : (this.isWormhole ? 0x8844ff : 0x4488ff);
+        const portalColor = this.secret ? 0xCC8800 : (this.isWormhole ? 0x4422aa : 0x2244aa);
+        const glowColor = this.secret ? 0xFFD040 : (this.isWormhole ? 0xaa66ff : 0x88aaff);
 
         // Inner energy ring
         const innerRingGeometry = new THREE.RingGeometry(

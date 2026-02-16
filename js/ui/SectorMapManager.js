@@ -95,7 +95,7 @@ export class SectorMapManager {
             { id: 'asteroid', label: 'Rocks', color: '#aa8844' },
             { id: 'planet', label: 'Planets', color: '#6688aa' },
             { id: 'station', label: 'Stations', color: '#00cc44' },
-            { id: 'gate', label: 'Gates', color: '#0088ff' },
+            { id: 'gate', label: 'Wormholes', color: '#0088ff' },
             { id: 'enemy', label: 'Hostiles', color: '#ff4444' },
             { id: 'npc', label: 'NPCs', color: '#88cc88' },
             { id: 'guild', label: 'Guild', color: '#cc88ff' },
@@ -847,7 +847,7 @@ export class SectorMapManager {
         ctx.fillStyle = '#66aaff';
         ctx.font = '9px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(entity.name || 'Gate', sx, sy - r - 8);
+        ctx.fillText(entity.name || 'Elder Wormhole', sx, sy - r - 8);
         if (destSector) {
             ctx.fillStyle = 'rgba(102, 170, 255, 0.5)';
             ctx.fillText(`\u2192 ${destSector.name}`, sx, sy - r - 18);
@@ -1054,7 +1054,7 @@ export class SectorMapManager {
             if (entity.specialty) lines.push(`Specialty: ${entity.specialty}`);
         } else if (entity.type === 'gate' || entity.type === 'warpgate') {
             const dest = entity.destinationName || entity.destinationSectorId || 'unknown';
-            lines.push(`Gate \u2192 ${dest}`);
+            lines.push(`Elder Wormhole \u2192 ${dest}`);
         } else if (entity.type === 'enemy' || entity.type === 'npc' || entity.type === 'guild' || entity.type === 'fleet') {
             if (entity.role) lines.push(`Role: ${entity.role}`);
             if (entity.shipClass) lines.push(`Class: ${entity.shipClass}`);
@@ -1148,7 +1148,7 @@ export class SectorMapManager {
             { color: '#88cc88', shape: 'dot', label: 'NPC Miner' },
             { color: '#4488ff', shape: 'shield', label: 'Security' },
             { color: '#00cc44', shape: 'diamond', label: 'Station' },
-            { color: '#0088ff', shape: 'circle', label: 'Gate' },
+            { color: '#0088ff', shape: 'circle', label: 'Wormhole' },
         ];
 
         const startX = w - 110;
@@ -1980,7 +1980,7 @@ export class SectorMapManager {
 
         ctx.fillStyle = '#556677';
         ctx.textAlign = 'left';
-        ctx.fillText('Click a sector to select its gate | Hover for details', legendX, legendY + 32);
+        ctx.fillText('Click a sector to select its wormhole | Hover for details', legendX, legendY + 32);
     }
 
     // ==========================================
@@ -2000,7 +2000,7 @@ export class SectorMapManager {
         const gate = this.findGateToSector(sectorId);
         if (gate) {
             this.game.selectTarget(gate);
-            this.game.ui?.log(`Selected gate to ${sectorId}. Press S to warp.`, 'system');
+            this.game.ui?.log(`Selected Elder Wormhole to ${sectorId}. Press S to warp.`, 'system');
             this.hide();
         } else {
             // Multi-sector route for non-adjacent sectors

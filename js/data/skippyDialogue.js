@@ -21,7 +21,7 @@ export const SKIPPY_DIALOGUE = {
             { text: "Congratulations, you've discovered rocks in space. Truly groundbreaking, if you'll pardon the pun. Now dock at a station and sell that ore before you do something stupid with it.", priority: 7, milestone: 'first_mine' },
         ],
         firstJump: [
-            { text: "Your first gate jump! I'm almost proud. Almost. Check the sector map with M to plan your next move. Or just wander aimlessly, like the monkey you are.", priority: 7, milestone: 'first_jump' },
+            { text: "Your first Elder Wormhole jump! I'm almost proud. Almost. Check the sector map with M to plan your next move. Or just wander aimlessly, like the monkey you are.", priority: 7, milestone: 'first_jump' },
         ],
         firstDeath: [
             { text: "And there it is. Your first death. I timed it. I expected faster, honestly. Buy insurance next time, monkey. The INSURANCE tab at stations exists for a reason.", priority: 9, milestone: 'first_death' },
@@ -143,6 +143,14 @@ export const SKIPPY_DIALOGUE = {
             { text: "Anomaly detected on scanners! Could be valuable, could be deadly. Only one way to find out, monkey.", priority: 5 },
             { text: "I'm picking up an anomalous reading. My magnificence compels me to recommend investigation.", priority: 5 },
             { text: "Interesting... an anomaly signature. Even in this backwater sector, space has surprises.", priority: 5 },
+        ],
+        secretWormholeDiscovered: [
+            { text: "Well well well. Killing that {factionName} boss just triggered something fascinating. I've hacked into an Elder Wormhole that's been dormant for millions of years. You're welcome.", priority: 10 },
+            { text: "Oh THIS is interesting. That {factionName} flagship was guarding access codes to a secret Elder conduit. I just cracked them because I'm magnificent. New shortcut unlocked, monkey.", priority: 10 },
+        ],
+        secretWormholeNearby: [
+            { text: "I'm detecting an Elder Conduit signature in this sector. Gold shimmer, can't miss it. Only WE can use it - my encryption, my rules.", priority: 8 },
+            { text: "Secret Elder Wormhole nearby! I hacked this one personally. The locals can't even see it. Being a genius AI has its perks.", priority: 8 },
         ],
     },
 
@@ -270,7 +278,7 @@ export const SKIPPY_DIALOGUE = {
             { text: "Flying without insurance? That's either brave or stupid. I'm betting stupid. INSURANCE tab, station, go.", priority: 6 },
         ],
         exploreMore: [
-            { text: "You've been hanging around the same sector forever. There are {totalSectors} sectors to explore, monkey. Use the gates!", priority: 5 },
+            { text: "You've been hanging around the same sector forever. There are {totalSectors} sectors to explore, monkey. Use the Elder Wormholes!", priority: 5 },
         ],
         tryTrading: [
             { text: "Have you tried the COMMERCE guild? Transport contracts pay well, and you don't even have to shoot anything.", priority: 5, milestone: 'suggest_commerce' },
@@ -351,7 +359,7 @@ export const SKIPPY_DIALOGUE = {
             { text: "Fleet management: press F to open the fleet panel. Your hired pilots from the CANTINA fly alongside you. They follow, fight, and die for you. Try to appreciate that. Ctrl+1 through Ctrl+5 assigns control groups.", priority: 7, milestone: 'tut_fleet' },
         ],
         fleetCommands: [
-            { text: "Fleet commands: your pilots follow you automatically. They'll engage hostiles, assist in mining, and jump through gates with you. The more pilots, the stronger your operation. Think of it as outsourcing competence.", priority: 5, milestone: 'tut_fleet_commands' },
+            { text: "Fleet commands: your pilots follow you automatically. They'll engage hostiles, assist in mining, and jump through Elder Wormholes with you. The more pilots, the stronger your operation. Think of it as outsourcing competence.", priority: 5, milestone: 'tut_fleet_commands' },
         ],
         fleetExpansion: [
             { text: "Building an empire means expanding beyond one ship. Hire pilots at the CANTINA - each has different skills and traits. A diverse fleet covers more ground. Mining ships gather ore while combat ships protect them. Delegation, monkey.", priority: 5, milestone: 'tut_fleet_expansion' },
@@ -384,19 +392,19 @@ export const SKIPPY_DIALOGUE = {
 
         // -- Navigation & Exploration --
         sectorMapGuide: [
-            { text: "Press M for the sector map. Click any sector to plot an autopilot route through gates. Yellow lines show your planned path. Each sector has a difficulty rating - stick to safe sectors until you're ready for the deadly ones.", priority: 6, milestone: 'tut_sector_map' },
+            { text: "Press M for the sector map. Click any sector to plot an autopilot route through Elder Wormholes. Yellow lines show your planned path. Each sector has a difficulty rating - stick to safe sectors until you're ready for the deadly ones.", priority: 6, milestone: 'tut_sector_map' },
         ],
         gateNavigation: [
-            { text: "Gates connect sectors. Select a gate and press S to warp to it. Once in range, you'll jump automatically. The autopilot system can chain jumps - click a distant sector on the map and let it handle the route.", priority: 5, milestone: 'tut_gates' },
+            { text: "Elder Wormholes connect sectors. Select a wormhole and press S to warp to it. Once in range, you'll jump automatically. The autopilot system can chain jumps - click a distant sector on the map and let it handle the route.", priority: 5, milestone: 'tut_gates' },
         ],
         dockingGuide: [
             { text: "To dock: fly near a station within 300 meters and press Enter. Or right-click it for a context menu. Docking is free and instantly repairs your shields. Inside, you get access to all station services.", priority: 5, milestone: 'tut_docking' },
         ],
         bookmarksGuide: [
-            { text: "Press B for bookmarks, Ctrl+B to save your current location. Bookmark good mining spots, gate routes, or anything worth returning to. It's like leaving breadcrumbs, except in space, and you're a monkey, not Hansel.", priority: 4, milestone: 'tut_bookmarks' },
+            { text: "Press B for bookmarks, Ctrl+B to save your current location. Bookmark good mining spots, wormhole routes, or anything worth returning to. It's like leaving breadcrumbs, except in space, and you're a monkey, not Hansel.", priority: 4, milestone: 'tut_bookmarks' },
         ],
         dscanGuide: [
-            { text: "Press V for the Directional Scanner. D-Scan shows you what's around before you warp in blind. Use it to check for hostiles, stations, or gates. Situational awareness, monkey. It saves lives. Mostly yours.", priority: 5, milestone: 'tut_dscan' },
+            { text: "Press V for the Directional Scanner. D-Scan shows you what's around before you warp in blind. Use it to check for hostiles, stations, or wormholes. Situational awareness, monkey. It saves lives. Mostly yours.", priority: 5, milestone: 'tut_dscan' },
         ],
 
         // -- Advanced Systems --
@@ -410,7 +418,7 @@ export const SKIPPY_DIALOGUE = {
             { text: "Press Y for the combat log. Every hit, miss, and damage number recorded. Use it to analyze fights and figure out what went wrong. Spoiler: what went wrong is usually you.", priority: 4, milestone: 'tut_combat_log' },
         ],
         shipLog: [
-            { text: "Press L for the ship log. It records everything that happens - docking, kills, mining, gate jumps. Filter by category if you want. It's your entire career history. Riveting reading, I'm sure.", priority: 3, milestone: 'tut_ship_log' },
+            { text: "Press L for the ship log. It records everything that happens - docking, kills, mining, wormhole jumps. Filter by category if you want. It's your entire career history. Riveting reading, I'm sure.", priority: 3, milestone: 'tut_ship_log' },
         ],
         statsPanel: [
             { text: "Press K for statistics. Kills, deaths, ore mined, bounties collected, sectors visited, play time. All tracked. All judged. Mostly by me.", priority: 3, milestone: 'tut_stats' },
@@ -509,6 +517,8 @@ export const SKIPPY_EXPRESSIONS = {
     'navigation:dangerousSector': 'concerned',
     'navigation:safeSector': 'bored',
     'navigation:hazardZone': 'concerned',
+    'navigation:secretWormholeDiscovered': 'excited',
+    'navigation:secretWormholeNearby': 'smug',
     'navigation:anomalyFound': 'impressed',
     'tactical:pirateRaid': 'alarmed',
     'tactical:capacitorWarning': 'annoyed',

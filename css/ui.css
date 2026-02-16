@@ -12073,19 +12073,41 @@ select:focus-visible {
     display: flex;
     flex-direction: column;
     min-height: 300px;
-    resize: vertical;
-    overflow: hidden;
+    resize: none;
+    overflow: visible;
+    /* Strip panel chrome - floating hologram */
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+/* Remove corner accent decorations */
+#skippy-panel::before,
+#skippy-panel::after {
+    display: none !important;
 }
 
 #skippy-panel .panel-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
+    background: transparent !important;
+    border-bottom: none !important;
+    padding: 2px 4px;
+    cursor: grab;
+}
+
+#skippy-panel .panel-header::after {
+    display: none;
 }
 
 #skippy-panel .panel-title {
-    font-size: var(--text-base);
-    letter-spacing: 1.5px;
+    display: none;
+}
+
+#skippy-panel .skippy-speaking-dot {
+    display: none;
 }
 
 .skippy-controls {
@@ -12094,14 +12116,20 @@ select:focus-visible {
 }
 
 .skippy-ctrl-btn {
-    background: none;
-    border: 1px solid rgba(0, 255, 255, 0.15);
-    color: var(--text-secondary, #8899aa);
+    background: rgba(0, 5, 15, 0.4);
+    border: 1px solid rgba(0, 255, 255, 0.1);
+    color: rgba(0, 255, 255, 0.35);
     cursor: pointer;
-    font-size: var(--text-base);
-    padding: 1px 5px;
+    font-size: 10px;
+    padding: 1px 4px;
     border-radius: 2px;
     line-height: 1;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+#skippy-panel:hover .skippy-ctrl-btn {
+    opacity: 1;
 }
 
 .skippy-ctrl-btn:hover {
@@ -12118,21 +12146,24 @@ select:focus-visible {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 6px;
+    gap: 4px;
+    padding: 2px;
     flex: 1;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .skippy-avatar-container {
     width: 208px;
     height: 180px;
-    background: rgba(0, 5, 15, 0.8);
-    border: 1px solid rgba(0, 255, 255, 0.15);
-    border-radius: 3px;
-    overflow: hidden;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
     position: relative;
+    /* Holographic glow around the avatar itself */
+    filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.25))
+            drop-shadow(0 0 20px rgba(0, 200, 255, 0.1));
 }
 
 .skippy-avatar-container canvas {
@@ -12153,24 +12184,26 @@ select:focus-visible {
     min-height: 36px;
     flex: 1;
     padding: 6px 8px;
-    background: rgba(0, 10, 20, 0.7);
-    border: 1px solid rgba(0, 255, 255, 0.12);
-    border-radius: 3px;
+    background: rgba(0, 8, 18, 0.5);
+    border: none;
+    border-radius: 2px;
     font-size: var(--text-base);
     line-height: 1.4;
-    color: #ccddee;
+    color: rgba(0, 230, 255, 0.85);
     overflow-y: auto;
     word-wrap: break-word;
+    text-shadow: 0 0 6px rgba(0, 255, 255, 0.4);
+    filter: drop-shadow(0 0 3px rgba(0, 255, 255, 0.15));
 }
 
 .skippy-text.speaking {
-    border-color: rgba(0, 255, 255, 0.6);
     animation: skippy-speak-glow 0.8s ease-in-out infinite;
+    color: rgba(0, 255, 255, 0.95);
 }
 
 @keyframes skippy-speak-glow {
-    0%, 100% { box-shadow: 0 0 4px rgba(0, 255, 255, 0.1); }
-    50% { box-shadow: 0 0 10px rgba(0, 255, 255, 0.3); }
+    0%, 100% { filter: drop-shadow(0 0 3px rgba(0, 255, 255, 0.15)); background: rgba(0, 8, 18, 0.5); }
+    50% { filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.35)); background: rgba(0, 12, 25, 0.6); }
 }
 
 .skippy-history {
@@ -12178,28 +12211,30 @@ select:focus-visible {
     max-height: 80px;
     overflow-y: auto;
     font-size: var(--text-base);
-    color: #556677;
+    color: rgba(0, 180, 220, 0.35);
     padding: 0 4px;
+    text-shadow: 0 0 4px rgba(0, 255, 255, 0.1);
 }
 
 .skippy-history-entry {
     padding: 2px 0;
-    border-bottom: 1px solid rgba(0, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(0, 255, 255, 0.03);
     line-height: 1.3;
 }
 
 .skippy-history-entry:first-child {
-    color: #778899;
+    color: rgba(0, 200, 240, 0.5);
 }
 
-/* Combat mode - red alert glow */
-#skippy-panel.combat-mode {
-    border-color: rgba(255, 68, 68, 0.6);
-    box-shadow: 0 0 12px rgba(255, 0, 0, 0.3), inset 0 0 8px rgba(255, 0, 0, 0.05);
+/* Combat mode - red alert glow on hologram */
+#skippy-panel.combat-mode .skippy-avatar-container {
+    filter: drop-shadow(0 0 10px rgba(255, 40, 40, 0.4))
+            drop-shadow(0 0 25px rgba(255, 0, 0, 0.2));
 }
 
-#skippy-panel.combat-mode .panel-header {
-    border-bottom-color: rgba(255, 68, 68, 0.4);
+#skippy-panel.combat-mode .skippy-text {
+    color: rgba(255, 150, 150, 0.9);
+    text-shadow: 0 0 6px rgba(255, 50, 50, 0.4);
 }
 
 /* Speaking indicator dot */

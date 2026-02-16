@@ -3107,7 +3107,7 @@ export class UIManager {
                 items.push(`<div class="menu-item${canManage ? '' : ' disabled'}" data-action="manage-pos" data-entity-id="${entity.id}">Manage Station</div>`);
             }
 
-            // Jump (only for gates)
+            // Jump (only for Elder Wormholes)
             if (entity.type === 'gate' && entity.destinationSectorId) {
                 const canJump = entity.canUse?.(this.game.player);
                 const jumpClass = canJump ? '' : ' disabled';
@@ -3320,8 +3320,8 @@ export class UIManager {
                 if (target.type === 'gate' && target.canUse?.(this.game.player)) {
                     target.use(this.game.player);
                 } else {
-                    this.log('Too far from gate - approach within activation range', 'system');
-                    this.toast('Too far from gate', 'warning');
+                    this.log('Too far from Elder Wormhole - approach within activation range', 'system');
+                    this.toast('Too far from Elder Wormhole', 'warning');
                     this.game.audio?.play('warning');
                 }
                 break;
@@ -3862,7 +3862,7 @@ export class UIManager {
         html += `</div>`;
 
         html += `<div class="stat-section"><div class="stat-section-title">NAVIGATION</div>`;
-        html += `<div class="stat-row"><span>Gate Jumps</span><span class="stat-val">${s.jumps}</span></div>`;
+        html += `<div class="stat-row"><span>Wormhole Jumps</span><span class="stat-val">${s.jumps}</span></div>`;
         html += `<div class="stat-row"><span>Sectors Visited</span><span class="stat-val">${s.sectorsVisited.length} / 7</span></div>`;
         html += `<div class="stat-row"><span>Play Time</span><span class="stat-val">${timeStr}</span></div>`;
         html += `</div>`;
@@ -4302,12 +4302,12 @@ export class UIManager {
             `;
         }
 
-        // Gate info (if gate)
+        // Elder Wormhole info
         if (entity.type === 'gate') {
             const destination = entity.destinationSectorId || 'Unknown';
             html += `
                 <div class="viewer-section">
-                    <div class="viewer-section-title">Gate Information</div>
+                    <div class="viewer-section-title">Elder Wormhole Information</div>
                     <div class="viewer-stat">
                         <span class="viewer-stat-label">Destination</span>
                         <span class="viewer-stat-value">${destination}</span>
@@ -4738,7 +4738,7 @@ export class UIManager {
     }
 
     /**
-     * Update warp gate destination labels
+     * Update Elder Wormhole destination labels
      */
     updateGateLabels() {
         const container = this.elements.gateLabels;

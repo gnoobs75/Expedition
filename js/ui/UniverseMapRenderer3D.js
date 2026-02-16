@@ -43,6 +43,7 @@ export class UniverseMapRenderer3D {
         this.globeGroup = null;      // Wireframe sphere
         this.nodesGroup = null;      // Sector node meshes
         this.gatesGroup = null;      // Gate connection lines
+        this.secretGroup = null;     // Secret Elder Wormhole interior lines
         this.routeGroup = null;      // Route overlay
         this.labelsGroup = null;     // Sector name sprites
         this.starsGroup = null;      // Background stars
@@ -56,7 +57,7 @@ export class UniverseMapRenderer3D {
         this.cameraDistance = 550;
         this.rotationX = 0.3;        // Slight tilt to see top
         this.rotationY = -0.5;
-        this.autoRotateSpeed = 0.0008;
+        this.autoRotateSpeed = 0.0004;
         this.isAutoRotating = true;
 
         // Mouse interaction
@@ -143,6 +144,7 @@ export class UniverseMapRenderer3D {
             this.createGlobe();
             this.createSectorNodes();
             this.createGateConnections();
+            this.createSecretWormholeConnections();
             this.createTooltip();
 
             // UI overlays
@@ -459,10 +461,10 @@ export class UniverseMapRenderer3D {
             line.userData = { isGate: true, from: gate.from, to: gate.to, wormhole: isWormhole };
             this.gatesGroup.add(line);
 
-            // Animated flow dots along the connection
-            const dotCount = isWormhole ? 6 : 4;
+            // Subtle animated flow dot along the connection
+            const dotCount = isWormhole ? 2 : 1;
             for (let i = 0; i < dotCount; i++) {
-                const dotGeom = new THREE.SphereGeometry(isWormhole ? 2.5 : 1.5, 8, 6);
+                const dotGeom = new THREE.SphereGeometry(isWormhole ? 2.0 : 1.2, 6, 4);
                 const dotMat = new THREE.MeshBasicMaterial({
                     color: color,
                     opacity: 0,
@@ -481,6 +483,83 @@ export class UniverseMapRenderer3D {
         }
 
         this.scene.add(this.gatesGroup);
+    }
+
+    /**
+     * Create secret Elder Wormhole connections - gold dashed lines through globe interior
+     */
+    createSecretWormholeConnections() {
+        this.secretGroup = new THREE.Group();
+        const secretWormholes = UNIVERSE_LAYOUT.secretWormholes || [];
+        const unlocked = this.game.unlockedSecretWormholes || new Set();
+
+        for (const wh of secretWormholes) {
+            const fromPos = this.sectorPositions[wh.from];
+            const toPos = this.sectorPositions[wh.to];
+            if (!fromPos || !toPos) continue;
+
+            const isUnlocked = unlocked.has(wh.unlockedBy);
+
+            // Straight line through globe interior (not surface arc)
+            const segments = 48;
+            const points = [];
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                points.push(new THREE.Vector3().lerpVectors(fromPos, toPos, t));
+            }
+
+            const geom = new THREE.BufferGeometry().setFromPoints(points);
+            geom.computeLineDistances(); // Required for dashed material
+
+            const color = isUnlocked ? 0xffb020 : 0x664400;
+            const mat = new THREE.LineDashedMaterial({
+                color: color,
+                opacity: isUnlocked ? 0.5 : 0.15,
+                transparent: true,
+                dashSize: 8,
+                gapSize: 6,
+            });
+            const line = new THREE.Line(geom, mat);
+            line.userData = {
+                isSecretWormhole: true,
+                wormholeId: wh.id,
+                faction: wh.unlockedBy,
+                unlocked: isUnlocked,
+            };
+            this.secretGroup.add(line);
+
+            // Flow dot for unlocked wormholes
+            if (isUnlocked) {
+                const dotGeom = new THREE.SphereGeometry(2.5, 8, 6);
+                const dotMat = new THREE.MeshBasicMaterial({
+                    color: 0xffb020,
+                    opacity: 0,
+                    transparent: true,
+                });
+                const dot = new THREE.Mesh(dotGeom, dotMat);
+                dot.userData = {
+                    isSecretDot: true,
+                    interiorPoints: points,
+                };
+                this.secretGroup.add(dot);
+            }
+        }
+
+        this.scene.add(this.secretGroup);
+    }
+
+    /**
+     * Rebuild secret wormhole visuals (call after unlock state changes)
+     */
+    refreshSecretWormholes() {
+        if (this.secretGroup) {
+            this.scene.remove(this.secretGroup);
+            this.secretGroup.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            });
+        }
+        this.createSecretWormholeConnections();
     }
 
     /**
@@ -730,7 +809,7 @@ export class UniverseMapRenderer3D {
         const gate = this.findGateToSector(sectorId);
         if (gate) {
             this.game.selectTarget(gate);
-            this.game.ui?.log(`Selected gate to ${this.sectorData[sectorId]?.name}`, 'system');
+            this.game.ui?.log(`Selected Elder Wormhole to ${this.sectorData[sectorId]?.name}`, 'system');
         } else {
             this.game.autopilot?.planRoute(sectorId);
         }
@@ -869,13 +948,21 @@ export class UniverseMapRenderer3D {
         const currentId = this.game.currentSector?.id;
         if (!currentId || currentId === targetId) return 0;
 
-        // BFS
+        // BFS (includes unlocked secret wormholes)
         const adj = {};
         for (const g of UNIVERSE_LAYOUT.gates) {
             if (!adj[g.from]) adj[g.from] = [];
             if (!adj[g.to]) adj[g.to] = [];
             adj[g.from].push(g.to);
             adj[g.to].push(g.from);
+        }
+        for (const wh of (UNIVERSE_LAYOUT.secretWormholes || [])) {
+            if (this.game.isSecretWormholeUnlocked?.(wh.unlockedBy)) {
+                if (!adj[wh.from]) adj[wh.from] = [];
+                if (!adj[wh.to]) adj[wh.to] = [];
+                adj[wh.from].push(wh.to);
+                adj[wh.to].push(wh.from);
+            }
         }
 
         const visited = new Set([currentId]);
@@ -896,10 +983,18 @@ export class UniverseMapRenderer3D {
     findGateToSector(targetSectorId) {
         const currentSectorId = this.game.currentSector?.id;
         const gates = UNIVERSE_LAYOUT.gates;
-        const hasConnection = gates.some(g =>
+        let hasConnection = gates.some(g =>
             (g.from === currentSectorId && g.to === targetSectorId) ||
             (g.to === currentSectorId && g.from === targetSectorId)
         );
+        // Also check unlocked secret wormholes
+        if (!hasConnection) {
+            hasConnection = (UNIVERSE_LAYOUT.secretWormholes || []).some(wh =>
+                this.game.isSecretWormholeUnlocked?.(wh.unlockedBy) &&
+                ((wh.from === currentSectorId && wh.to === targetSectorId) ||
+                 (wh.to === currentSectorId && wh.from === targetSectorId))
+            );
+        }
         if (!hasConnection) return null;
 
         const entities = this.game.currentSector?.entities || [];
@@ -1026,6 +1121,9 @@ export class UniverseMapRenderer3D {
         // Animate gate flow dots
         this.animateGateDots();
 
+        // Animate secret wormhole dots
+        this.animateSecretDots();
+
         // Animate current sector beacon pulse
         this.animateBeacon();
 
@@ -1047,7 +1145,7 @@ export class UniverseMapRenderer3D {
             if (!child.userData.isDot) continue;
 
             const { dotIndex, dotCount, wormhole, arcPoints } = child.userData;
-            const speed = wormhole ? 0.25 : 0.15;
+            const speed = wormhole ? 0.08 : 0.05;
             const t = ((dotIndex / dotCount) + this.animTime * speed) % 1;
 
             // Interpolate position along arc
@@ -1057,7 +1155,27 @@ export class UniverseMapRenderer3D {
             const frac = idx - i0;
 
             child.position.lerpVectors(arcPoints[i0], arcPoints[i1], frac);
-            child.material.opacity = Math.sin(t * Math.PI) * 0.6;
+            child.material.opacity = Math.sin(t * Math.PI) * 0.35;
+        }
+    }
+
+    animateSecretDots() {
+        if (!this.secretGroup) return;
+        for (const child of this.secretGroup.children) {
+            if (!child.userData.isSecretDot) continue;
+
+            const points = child.userData.interiorPoints;
+            const speed = 0.06;
+            const t = (this.animTime * speed) % 1;
+
+            // Interpolate position along interior line
+            const idx = t * (points.length - 1);
+            const i0 = Math.floor(idx);
+            const i1 = Math.min(i0 + 1, points.length - 1);
+            const frac = idx - i0;
+
+            child.position.lerpVectors(points[i0], points[i1], frac);
+            child.material.opacity = Math.sin(t * Math.PI) * 0.45;
         }
     }
 
@@ -1065,9 +1183,9 @@ export class UniverseMapRenderer3D {
         for (const child of this.nodesGroup.children) {
             if (!child.userData.isBeacon) continue;
 
-            const pulse = 0.3 + Math.sin(this.animTime * 2) * 0.3;
+            const pulse = 0.2 + Math.sin(this.animTime * 0.8) * 0.15;
             child.material.opacity = pulse;
-            const scale = 1 + Math.sin(this.animTime * 1.5) * 0.15;
+            const scale = 1 + Math.sin(this.animTime * 0.6) * 0.06;
             child.scale.setScalar(scale);
         }
     }
@@ -1076,9 +1194,9 @@ export class UniverseMapRenderer3D {
         if (!this.routeGroup) return;
         for (const child of this.routeGroup.children) {
             if (!child.userData.isDestGlow) continue;
-            const pulse = 0.5 + Math.sin(this.animTime * 3) * 0.3;
-            child.material.opacity = pulse * 0.4;
-            child.scale.setScalar(0.9 + pulse * 0.2);
+            const pulse = 0.5 + Math.sin(this.animTime * 1.2) * 0.2;
+            child.material.opacity = pulse * 0.3;
+            child.scale.setScalar(0.95 + pulse * 0.1);
         }
     }
 
@@ -1126,6 +1244,14 @@ export class UniverseMapRenderer3D {
         if (this.routeInfoEl) {
             this.routeInfoEl.remove();
             this.routeInfoEl = null;
+        }
+
+        // Secret wormhole group cleanup
+        if (this.secretGroup) {
+            this.secretGroup.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            });
         }
 
         if (this.renderer) {

@@ -48,7 +48,7 @@ export class Universe {
             this.connections.get(gate.to).push(gate.from);
         }
 
-        console.log(`Created ${this.sectors.size} sectors with ${UNIVERSE_LAYOUT.gates.length} gate connections`);
+        console.log(`Created ${this.sectors.size} sectors with ${UNIVERSE_LAYOUT.gates.length} Elder Wormhole connections`);
     }
 
     /**

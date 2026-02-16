@@ -534,7 +534,7 @@ export class AutopilotSystem {
     }
 
     /**
-     * Jump through a warp gate
+     * Jump through an Elder Wormhole
      */
     jumpGate(gate) {
         if (!gate.destinationSectorId) return;
@@ -552,7 +552,7 @@ export class AutopilotSystem {
         const warpDestText = document.getElementById('warp-destination-text');
         if (warpDestText) warpDestText.textContent = `WARPING TO: ${destName}`;
 
-        // Gate activation burst - energy particles at gate before jump
+        // Elder Wormhole activation burst - energy particles before jump
         const effects = this.game.renderer?.effects;
         if (effects) {
             effects.spawn('explosion', gate.x, gate.y, {
@@ -574,7 +574,7 @@ export class AutopilotSystem {
             }, 200);
         }
 
-        // Brief camera shake for gate activation
+        // Brief camera shake for wormhole activation
         this.game.camera?.shake(4, 0.3);
 
         // Show warp tunnel with phased animation
@@ -589,7 +589,7 @@ export class AutopilotSystem {
         setTimeout(() => {
             this.game.changeSector(gate.destinationSectorId);
 
-            // Find the return gate and position player near it
+            // Find the return wormhole and position player near it
             const returnGate = this.game.currentSector.entities.find(
                 e => e.type === 'gate' && e.destinationSectorId === sourceSectorId
             );
@@ -613,7 +613,7 @@ export class AutopilotSystem {
             player.velocity.set(0, 0);
             player.currentSpeed = 0;
 
-            // Fleet ships follow through gate
+            // Fleet ships follow through wormhole
             this.game.fleetSystem?.followThroughGate();
         }, 1000);
 
@@ -648,22 +648,30 @@ export class AutopilotSystem {
         this.game.ui?.toast(`Autopilot: ${path.length - 1} jump${path.length > 2 ? 's' : ''}`, 'info');
         this.game.audio?.play('click');
 
-        // Start navigating to the first gate
+        // Start navigating to the first Elder Wormhole
         this.navigateToNextGate();
     }
 
     /**
-     * BFS pathfinding on the sector gate graph
+     * BFS pathfinding on the sector wormhole graph
      */
     findPath(fromId, toId) {
         const gates = UNIVERSE_LAYOUT.gates;
-        // Build adjacency list
+        // Build adjacency list (includes unlocked secret wormholes)
         const adj = {};
         for (const g of gates) {
             if (!adj[g.from]) adj[g.from] = [];
             if (!adj[g.to]) adj[g.to] = [];
             adj[g.from].push(g.to);
             adj[g.to].push(g.from);
+        }
+        for (const wh of (UNIVERSE_LAYOUT.secretWormholes || [])) {
+            if (this.game.isSecretWormholeUnlocked?.(wh.unlockedBy)) {
+                if (!adj[wh.from]) adj[wh.from] = [];
+                if (!adj[wh.to]) adj[wh.to] = [];
+                adj[wh.from].push(wh.to);
+                adj[wh.to].push(wh.from);
+            }
         }
 
         // BFS
@@ -684,7 +692,7 @@ export class AutopilotSystem {
     }
 
     /**
-     * Navigate to the next gate in the route
+     * Navigate to the next Elder Wormhole in the route
      */
     navigateToNextGate() {
         if (this.routeIndex >= this.route.length - 1) {
@@ -699,23 +707,23 @@ export class AutopilotSystem {
 
         const nextSectorId = this.route[this.routeIndex + 1];
 
-        // Find the gate to the next sector
+        // Find the Elder Wormhole to the next sector
         const gate = this.game.currentSector?.entities.find(
             e => e.type === 'gate' && e.destinationSectorId === nextSectorId
         );
 
         if (gate) {
-            // Warp to the gate
+            // Warp to the Elder Wormhole
             this.game.selectTarget(gate);
             this.warpTo(gate);
         } else {
-            this.game.ui?.log('Route gate not found - autopilot cancelled', 'system');
+            this.game.ui?.log('Route wormhole not found - autopilot cancelled', 'system');
             this.clearRoute();
         }
     }
 
     /**
-     * Called after completing a gate jump to continue the route
+     * Called after completing a wormhole jump to continue the route
      */
     onGateJumpComplete() {
         if (this.route.length === 0) return;

@@ -63,11 +63,11 @@ export const BOUNTY_TARGETS = {
     // ---- Tier 2: Destroyer-class targets (75,000 ISK) ----
     'soren_voidfang': {
         name: 'Soren Voidfang',
-        title: 'The Gate Stalker',
+        title: 'The Wormhole Stalker',
         tier: 2,
         shipClass: 'svipul',
         bounty: 75000,
-        description: 'Camps warp gates and ambushes travelers. His tactical destroyer shifts modes mid-fight, making him unpredictable in combat.',
+        description: 'Camps Elder Wormholes and ambushes travelers. His tactical destroyer shifts modes mid-fight, making him unpredictable in combat.',
         patrolSectors: ['frontier', 'dark-sector', 'deep-space'],
         specialLoot: [
             { itemId: 'warp-disruptor-1', chance: 0.20 },

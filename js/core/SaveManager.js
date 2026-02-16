@@ -305,6 +305,9 @@ export class SaveManager {
             missions: game.missionSystem?.saveState() || null,
             coalitionWar: game.coalitionWarSystem?.saveState() || null,
 
+            // Secret Elder Wormhole unlocks
+            unlockedSecretWormholes: Array.from(game.unlockedSecretWormholes || []),
+
             // Player-owned stations
             playerStations: (game.playerStations || []).map(pos => pos.serialize()),
 

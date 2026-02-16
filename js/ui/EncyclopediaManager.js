@@ -1331,7 +1331,7 @@ export class EncyclopediaManager {
                 </div>
                 <div class="enc-sector-specialty">${station?.specialty || 'unknown'}</div>
                 <div class="enc-sector-desc">${station?.description || ''}</div>
-                <div class="enc-sector-connections">Gates: ${connections.map(c => {
+                <div class="enc-sector-connections">Elder Wormholes: ${connections.map(c => {
                     const s = UNIVERSE_LAYOUT.sectors.find(x => x.id === c);
                     return s?.name || c;
                 }).join(', ')}</div>
@@ -1410,7 +1410,7 @@ export class EncyclopediaManager {
                     </div>
 
                     <div class="enc-stat-section">
-                        <h3>Gate Connections</h3>
+                        <h3>Elder Wormhole Connections</h3>
                         <div class="enc-sector-tags">
                             ${connections.map(c => {
                                 const s = UNIVERSE_LAYOUT.sectors.find(x => x.id === c);

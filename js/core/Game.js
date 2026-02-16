@@ -89,6 +89,9 @@ export class Game {
         // Player-owned stations (POS)
         this.playerStations = [];
 
+        // Secret Elder Wormhole unlocks (Set of faction keys)
+        this.unlockedSecretWormholes = new Set();
+
         // Insurance state
         this.insurance = this.loadInsurance();
 
@@ -456,6 +459,13 @@ export class Game {
                 if (entity.faction && FACTIONS[entity.faction]) {
                     const standingDelta = entity.type === 'enemy' ? 0.1 : -0.3; // Pirates give +, NPCs give -
                     this.modifyStanding(entity.faction, standingDelta);
+                }
+
+                // Check for secret Elder Wormhole unlock (faction boss kill)
+                // Boss = battleship or capital class ship with a faction
+                if (entity.faction && (entity.shipClass === 'battleship' || entity.shipClass === 'capital'
+                    || entity.size === 'battleship' || entity.size === 'capital')) {
+                    this.unlockSecretWormhole(entity.faction);
                 }
             }
 
@@ -1023,6 +1033,23 @@ export class Game {
     addFactionTreasury(amount) {
         this.faction.treasury += amount;
         this.events.emit('faction:treasury-changed', this.faction.treasury);
+    }
+
+    /**
+     * Unlock a secret Elder Wormhole by defeating a faction
+     */
+    unlockSecretWormhole(factionKey) {
+        if (this.unlockedSecretWormholes.has(factionKey)) return false;
+        const wormhole = UNIVERSE_LAYOUT.secretWormholes?.find(w => w.unlockedBy === factionKey);
+        if (!wormhole) return false;
+
+        this.unlockedSecretWormholes.add(factionKey);
+        this.events.emit('secret-wormhole:unlocked', { faction: factionKey, wormhole });
+        return true;
+    }
+
+    isSecretWormholeUnlocked(factionKey) {
+        return this.unlockedSecretWormholes.has(factionKey);
     }
 
     /**
@@ -1665,7 +1692,12 @@ export class Game {
             }
         }
 
-        // 3b. Faction
+        // 3b. Secret Elder Wormhole unlocks
+        if (data.unlockedSecretWormholes) {
+            this.unlockedSecretWormholes = new Set(data.unlockedSecretWormholes);
+        }
+
+        // 3c. Faction
         if (data.faction) {
             this.faction = { ...data.faction };
         }

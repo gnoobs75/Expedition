@@ -692,6 +692,46 @@ export const UNIVERSE_LAYOUT = {
         { from: 'mw-bravo', to: 'kristang-forge' },
         { from: 'mw-foxtrot', to: 'esselgin-prime' },
     ],
+
+    // === SECRET ELDER WORMHOLES (Skippy-only shortcuts) ===
+    // Unlocked progressively by defeating faction leaders
+    secretWormholes: [
+        {
+            id: 'elder-conduit-alpha',
+            from: 'hub',
+            to: 'kristang-arena',
+            unlockedBy: 'kristang',
+            name: 'Elder Conduit Alpha',
+        },
+        {
+            id: 'elder-conduit-beta',
+            from: 'hub',
+            to: 'bosphuraq-nest',
+            unlockedBy: 'bosphuraq',
+            name: 'Elder Conduit Beta',
+        },
+        {
+            id: 'elder-conduit-gamma',
+            from: 'ruhar-prime',
+            to: 'thuranin-labs',
+            unlockedBy: 'thuranin',
+            name: 'Elder Conduit Gamma',
+        },
+        {
+            id: 'elder-conduit-delta',
+            from: 'hub',
+            to: 'maxolhx-throne',
+            unlockedBy: 'maxolhx',
+            name: 'Elder Conduit Delta',
+        },
+        {
+            id: 'elder-conduit-epsilon',
+            from: 'tutorial',
+            to: 'rindhalu-sanctum',
+            unlockedBy: 'rindhalu',
+            name: 'Elder Conduit Epsilon',
+        },
+    ],
 };
 
 // Quick lookup map: sectorId -> sector data (built once at load time)

@@ -60,6 +60,8 @@ export class SkippyManager {
             'navigation:safeSector': 120000,
             'navigation:hazardZone': 90000,
             'navigation:anomalyFound': 60000,
+            'navigation:secretWormholeDiscovered': 5000,
+            'navigation:secretWormholeNearby': 120000,
             'tactical:pirateRaid': 60000,
             'tactical:capacitorWarning': 60000,
             'tactical:cargoValuable': 180000,
@@ -771,6 +773,28 @@ export class SkippyManager {
             this.triggerDialogue('manufacturing');
         });
 
+        // Secret Elder Wormhole unlocked
+        e.on('secret-wormhole:unlocked', (data) => {
+            const factionNames = {
+                kristang: 'Kristang', bosphuraq: 'Bosphuraq', thuranin: 'Thuranin',
+                maxolhx: 'Maxolhx', rindhalu: 'Rindhalu',
+            };
+            const factionName = factionNames[data?.faction] || data?.faction || 'unknown';
+            this.triggerDialogue('navigation', 'secretWormholeDiscovered', { factionName });
+        });
+
+        // Secret wormhole nearby check on sector change
+        e.on('sector:change', () => {
+            setTimeout(() => {
+                const secrets = this.game.currentSector?.entities?.filter(
+                    ent => ent.type === 'gate' && ent.secret
+                ) || [];
+                if (secrets.length > 0) {
+                    this.triggerDialogue('navigation', 'secretWormholeNearby');
+                }
+            }, 5000);
+        });
+
         // Credits changed - wealth milestones
         e.on('credits:changed', (credits) => {
             if (credits >= 1000000 && !this.hasMilestone('wealth_1m')) {
@@ -1386,7 +1410,7 @@ export class SkippyManager {
         },
         {
             id: 'look_around',
-            say: "Use your mouse wheel to zoom in and out. The overview panel on the right shows everything nearby - asteroids, stations, gates, and hostiles. Red means danger, monkey. Learn to read that list.",
+            say: "Use your mouse wheel to zoom in and out. The overview panel on the right shows everything nearby - asteroids, stations, wormholes, and hostiles. Red means danger, monkey. Learn to read that list.",
             expression: 'lecturing',
             check: (g) => g.player && g.stats?.playTime > 15,
             complete: "Good. Situational awareness is the difference between a captain and a corpse.",
@@ -1606,7 +1630,7 @@ export class SkippyManager {
         // =============================================
         {
             id: 'gate_discovery',
-            say: "See that swirling portal? That's a jump gate to the Central Hub - the real galaxy awaits! Select the gate and press S to warp to it. Your fleet is ready. When you arrive, you'll find more sectors, more resources, and yes - pirates. Time to graduate, monkey.",
+            say: "See that swirling portal? That's an Elder Wormhole to the Central Hub - the real galaxy awaits! Select the wormhole and press S to warp to it. Your fleet is ready. When you arrive, you'll find more sectors, more resources, and yes - pirates. Time to graduate, monkey.",
             expression: 'lecturing',
             check: (g) => g.stats?.jumps >= 1,
             complete: "Welcome to the Central Hub! Training wheels are off. The real galaxy starts now, monkey. Bring your fleet - never jump alone.",

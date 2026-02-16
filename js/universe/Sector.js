@@ -67,7 +67,7 @@ export class Sector {
             this.generateStation();
         }
 
-        // Generate warp gates
+        // Generate Elder Wormholes
         this.generateGates();
 
         // Generate enemies based on difficulty
@@ -182,7 +182,7 @@ export class Sector {
     }
 
     /**
-     * Generate warp gates to connected sectors - positioned at outer edges
+     * Generate Elder Wormholes to connected sectors - positioned at outer edges
      */
     generateGates() {
         const connectedSectors = UNIVERSE_LAYOUT.gates
@@ -221,11 +221,40 @@ export class Sector {
                 y: centerY + Math.sin(angle) * dist,
                 destinationSectorId: destId,
                 destinationName: destSector?.name || destId,
-                name: isWormhole ? `Wormhole to ${destSector?.name || destId}` : `Gate to ${destSector?.name || destId}`,
+                name: `Elder Wormhole to ${destSector?.name || destId}`,
                 isWormhole,
             });
 
             this.entities.push(gate);
+        }
+
+        // Secret Elder Wormholes (Skippy-only shortcuts, spawn if unlocked)
+        const secretWormholes = UNIVERSE_LAYOUT.secretWormholes || [];
+        for (const wh of secretWormholes) {
+            if (wh.from !== this.id && wh.to !== this.id) continue;
+            if (!this.game.isSecretWormholeUnlocked(wh.unlockedBy)) continue;
+
+            const destId = wh.from === this.id ? wh.to : wh.from;
+            const destSector = UNIVERSE_LAYOUT.sectors.find(s => s.id === destId);
+
+            // Position based on destination direction (offset from regular gates)
+            let angle = destSector
+                ? Math.atan2(destSector.y - this.gridY, destSector.x - this.gridX) + 0.3
+                : this.random.next() * Math.PI * 2;
+            const sDist = CONFIG.SECTOR_SIZE * 0.35;
+
+            const secretGate = new WarpGate(this.game, {
+                x: centerX + Math.cos(angle) * sDist,
+                y: centerY + Math.sin(angle) * sDist,
+                destinationSectorId: destId,
+                destinationName: destSector?.name || destId,
+                name: wh.name,
+                isWormhole: true,
+                secret: true,
+                color: 0xFFB020,
+            });
+
+            this.entities.push(secretGate);
         }
     }
 

@@ -715,7 +715,7 @@ export class SplashScreen {
                 <h2>OPTIONS</h2>
                 <button class="splash-back-btn" id="splash-options-back">BACK</button>
             </div>
-            <div style="font-family: 'Courier New', monospace; color: rgba(0,255,255,0.7); font-size: 12px;">
+            <div style="font-family: 'Courier New', monospace; color: rgba(0,255,255,0.7); font-size: 13px;">
                 <div style="margin-bottom: 12px;">
                     <label style="display:flex;align-items:center;gap:10px;">
                         Master Volume

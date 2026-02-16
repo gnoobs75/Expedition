@@ -89,20 +89,20 @@ export class HackingMinigame {
         // Title
         const title = document.createElement('div');
         title.textContent = `SYSTEM BREACH - LEVEL ${this.difficulty}`;
-        title.style.cssText = 'color: #00ccff; font-size: 14px; font-weight: bold; margin-bottom: 4px; letter-spacing: 2px;';
+        title.style.cssText = 'color: #00ccff; font-size: 15px; font-weight: bold; margin-bottom: 4px; letter-spacing: 2px;';
         panel.appendChild(title);
 
         // Instructions
         const instructions = document.createElement('div');
         instructions.textContent = 'Memorize the pattern. Recreate it to breach.';
-        instructions.style.cssText = 'color: #668899; font-size: 11px; margin-bottom: 12px;';
+        instructions.style.cssText = 'color: #668899; font-size: 13px; margin-bottom: 12px;';
         panel.appendChild(instructions);
 
         // Timer display
         const timerEl = document.createElement('div');
         timerEl.id = 'hacking-timer';
         timerEl.textContent = `TIME: ${this.timeLeft}s`;
-        timerEl.style.cssText = 'color: #ffcc00; font-size: 12px; font-weight: bold; margin-bottom: 10px;';
+        timerEl.style.cssText = 'color: #ffcc00; font-size: 13px; font-weight: bold; margin-bottom: 10px;';
         panel.appendChild(timerEl);
 
         // Grid container
@@ -118,7 +118,7 @@ export class HackingMinigame {
         const status = document.createElement('div');
         status.id = 'hacking-status';
         status.textContent = 'Memorizing...';
-        status.style.cssText = 'color: #ffcc00; font-size: 11px; margin-bottom: 10px; min-height: 16px;';
+        status.style.cssText = 'color: #ffcc00; font-size: 13px; margin-bottom: 10px; min-height: 16px;';
         panel.appendChild(status);
 
         // Buttons row
@@ -128,13 +128,13 @@ export class HackingMinigame {
         const submitBtn = document.createElement('button');
         submitBtn.id = 'hacking-submit';
         submitBtn.textContent = 'SUBMIT';
-        submitBtn.style.cssText = 'background: #002233; color: #00ccff; border: 1px solid #00ccff; border-radius: 3px; padding: 6px 20px; cursor: pointer; font-family: "Courier New", monospace; font-size: 12px; font-weight: bold; letter-spacing: 1px; display: none;';
+        submitBtn.style.cssText = 'background: #002233; color: #00ccff; border: 1px solid #00ccff; border-radius: 3px; padding: 6px 20px; cursor: pointer; font-family: "Courier New", monospace; font-size: 13px; font-weight: bold; letter-spacing: 1px; display: none;';
         submitBtn.addEventListener('click', () => this._submit());
         btnRow.appendChild(submitBtn);
 
         const cancelBtn = document.createElement('button');
         cancelBtn.textContent = 'ABORT';
-        cancelBtn.style.cssText = 'background: #330000; color: #ff4444; border: 1px solid #ff4444; border-radius: 3px; padding: 6px 20px; cursor: pointer; font-family: "Courier New", monospace; font-size: 12px; font-weight: bold; letter-spacing: 1px;';
+        cancelBtn.style.cssText = 'background: #330000; color: #ff4444; border: 1px solid #ff4444; border-radius: 3px; padding: 6px 20px; cursor: pointer; font-family: "Courier New", monospace; font-size: 13px; font-weight: bold; letter-spacing: 1px;';
         cancelBtn.addEventListener('click', () => this._fail('Aborted'));
         btnRow.appendChild(cancelBtn);
 

@@ -941,7 +941,7 @@ export class UIManager {
                 const el = document.getElementById(p.id);
                 const grouped = this.panelDragManager?.isPanelGrouped(p.id);
                 const visible = grouped || (el && !el.classList.contains('hidden'));
-                const groupTag = grouped ? ' <span style="color:var(--text-dim);font-size:10px">[TAB]</span>' : '';
+                const groupTag = grouped ? ' <span style="color:var(--text-dim);font-size:12px">[TAB]</span>' : '';
                 html += `<div class="panels-popup-item" data-panel-id="${p.id}">
                     <div class="panels-popup-cb ${visible ? 'checked' : ''}">${visible ? '\u2713' : ''}</div>
                     <span class="panels-popup-label">${p.label}${groupTag}</span>

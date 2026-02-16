@@ -223,19 +223,19 @@ export class FleetPanelManager {
         // Doctrine selector + Formation status row
         html += `<div class="fleet-doctrine-bar">
             <div class="fleet-doctrine-select">
-                <label style="color:#888;font-size:10px">DOCTRINE:</label>
+                <label style="color:#888;font-size:12px">DOCTRINE:</label>
                 <select class="fleet-doctrine-dropdown">
                     ${Object.entries(DOCTRINES).map(([k, d]) =>
                         `<option value="${k}" ${k === doctrineKey ? 'selected' : ''}>${d.label}</option>`
                     ).join('')}
                 </select>
-                <span class="fleet-doctrine-desc" style="color:#aaa;font-size:9px">${doctrine?.description || ''}</span>
+                <span class="fleet-doctrine-desc" style="color:#aaa;font-size:11px">${doctrine?.description || ''}</span>
             </div>
             <div class="fleet-formation-status">
-                <span style="color:#888;font-size:10px">FORMATION:</span>
+                <span style="color:#888;font-size:12px">FORMATION:</span>
                 <span style="color:#66ccff">${currentFormationKey.toUpperCase()}</span>
-                ${formBonus ? `<span style="color:#44ff88;font-size:9px">${formBonus.description}</span>` : ''}
-                <span style="color:${formationStatus.inFormation === formationStatus.total ? '#44ff88' : '#ffcc44'};font-size:10px">${formationStatus.inFormation}/${formationStatus.total} in position</span>
+                ${formBonus ? `<span style="color:#44ff88;font-size:11px">${formBonus.description}</span>` : ''}
+                <span style="color:${formationStatus.inFormation === formationStatus.total ? '#44ff88' : '#ffcc44'};font-size:12px">${formationStatus.inFormation}/${formationStatus.total} in position</span>
             </div>
         </div>`;
 
@@ -247,7 +247,7 @@ export class FleetPanelManager {
             const hangarCap = flagship.hangarCapacity || 5;
             html += `<div class="flagship-section">
                 <div class="flagship-header">&#9733; FLAGSHIP: ${flagship.name || 'Command Ship'}</div>
-                <div style="display:flex;gap:12px;font-size:11px;color:#ccc;margin-bottom:4px">
+                <div style="display:flex;gap:12px;font-size:13px;color:#ccc;margin-bottom:4px">
                     <span>HP: <span style="color:${fHp > 60 ? '#44ff88' : fHp > 30 ? '#ffcc44' : '#ff4444'}">${fHp}%</span></span>
                     <span>Hangar: ${hangar.length}/${hangarCap}</span>
                     <span class="flagship-command-status">CMD Range: ${flagship.commandRange || 2000}m</span>
@@ -256,7 +256,7 @@ export class FleetPanelManager {
                 for (const h of hangar) {
                     html += `<div class="flagship-hangar-ship">
                         <span>${h.name || h.shipClass || 'Ship'}</span>
-                        <button class="fleet-btn tiny" data-action="undock-hangar" data-index="${h.index || 0}" style="font-size:9px;padding:1px 6px">UNDOCK</button>
+                        <button class="fleet-btn tiny" data-action="undock-hangar" data-index="${h.index || 0}" style="font-size:11px;padding:1px 6px">UNDOCK</button>
                     </div>`;
                 }
             }

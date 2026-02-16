@@ -9,7 +9,7 @@ export class ManufacturingPanelManager {
         container.innerHTML = '';
 
         const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'padding: 10px; color: #ccc; font-family: "Courier New", monospace; font-size: 12px; overflow-y: auto; max-height: 500px;';
+        wrapper.style.cssText = 'padding: 10px; color: #ccc; font-family: "Courier New", monospace; font-size: 13px; overflow-y: auto; max-height: 500px;';
 
         // Section 1: Blueprint Shop
         this._renderShopSection(wrapper);
@@ -29,7 +29,7 @@ export class ManufacturingPanelManager {
 
         const header = document.createElement('div');
         header.textContent = '-- BLUEPRINT SHOP --';
-        header.style.cssText = 'color: #ffcc44; font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px;';
+        header.style.cssText = 'color: #ffcc44; font-size: 14px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px;';
         section.appendChild(header);
 
         const mfg = this.game.manufacturingSystem;
@@ -58,7 +58,7 @@ export class ManufacturingPanelManager {
 
         const header = document.createElement('div');
         header.textContent = '-- MY BLUEPRINTS --';
-        header.style.cssText = 'color: #44ccff; font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px;';
+        header.style.cssText = 'color: #44ccff; font-size: 14px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px;';
         section.appendChild(header);
 
         const mfg = this.game.manufacturingSystem;
@@ -87,7 +87,7 @@ export class ManufacturingPanelManager {
 
         const header = document.createElement('div');
         header.textContent = '-- ACTIVE JOBS --';
-        header.style.cssText = 'color: #ff8844; font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px;';
+        header.style.cssText = 'color: #ff8844; font-size: 14px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px;';
         section.appendChild(header);
 
         const mfg = this.game.manufacturingSystem;
@@ -120,13 +120,13 @@ export class ManufacturingPanelManager {
 
         const name = document.createElement('span');
         name.textContent = bp.name || bp.id;
-        name.style.cssText = 'color: #fff; font-weight: bold; font-size: 12px;';
+        name.style.cssText = 'color: #fff; font-weight: bold; font-size: 13px;';
         titleRow.appendChild(name);
 
         if (bp.outputName) {
             const output = document.createElement('span');
             output.textContent = `=> ${bp.outputName}`;
-            output.style.cssText = 'color: #88ff88; font-size: 11px;';
+            output.style.cssText = 'color: #88ff88; font-size: 13px;';
             titleRow.appendChild(output);
         }
 
@@ -136,7 +136,7 @@ export class ManufacturingPanelManager {
         if (bp.description) {
             const desc = document.createElement('div');
             desc.textContent = bp.description;
-            desc.style.cssText = 'color: #888; font-size: 11px; margin-bottom: 6px;';
+            desc.style.cssText = 'color: #888; font-size: 13px; margin-bottom: 6px;';
             card.appendChild(desc);
         }
 
@@ -144,7 +144,7 @@ export class ManufacturingPanelManager {
         if (bp.craftTime) {
             const time = document.createElement('div');
             time.textContent = `Craft Time: ${bp.craftTime}s`;
-            time.style.cssText = 'color: #aaa; font-size: 11px; margin-bottom: 4px;';
+            time.style.cssText = 'color: #aaa; font-size: 13px; margin-bottom: 4px;';
             card.appendChild(time);
         }
 
@@ -152,14 +152,14 @@ export class ManufacturingPanelManager {
         if (bp.materials && bp.materials.length > 0) {
             const matHeader = document.createElement('div');
             matHeader.textContent = 'Materials:';
-            matHeader.style.cssText = 'color: #aaa; font-size: 11px; margin-bottom: 2px;';
+            matHeader.style.cssText = 'color: #aaa; font-size: 13px; margin-bottom: 2px;';
             card.appendChild(matHeader);
 
             const mfg = this.game.manufacturingSystem;
 
             for (const mat of bp.materials) {
                 const matRow = document.createElement('div');
-                matRow.style.cssText = 'padding-left: 10px; font-size: 11px; margin-bottom: 1px;';
+                matRow.style.cssText = 'padding-left: 10px; font-size: 13px; margin-bottom: 1px;';
 
                 const matInfo = MATERIAL_DATABASE ? MATERIAL_DATABASE[mat.id] : null;
                 const matName = matInfo ? matInfo.name : mat.id;
@@ -222,13 +222,13 @@ export class ManufacturingPanelManager {
 
         const name = document.createElement('span');
         name.textContent = job.blueprintName || job.blueprintId || 'Unknown';
-        name.style.cssText = 'color: #ff8844; font-weight: bold; font-size: 12px;';
+        name.style.cssText = 'color: #ff8844; font-weight: bold; font-size: 13px;';
         topRow.appendChild(name);
 
         const pct = job.craftTime > 0 ? Math.min(100, (job.progress / job.craftTime) * 100) : 0;
         const pctLabel = document.createElement('span');
         pctLabel.textContent = `${pct.toFixed(1)}%`;
-        pctLabel.style.cssText = 'color: #ffcc44; font-size: 11px;';
+        pctLabel.style.cssText = 'color: #ffcc44; font-size: 13px;';
         topRow.appendChild(pctLabel);
 
         card.appendChild(topRow);
@@ -246,7 +246,7 @@ export class ManufacturingPanelManager {
         const remaining = Math.max(0, job.craftTime - job.progress);
         const timeLabel = document.createElement('div');
         timeLabel.textContent = `Time remaining: ${remaining.toFixed(0)}s`;
-        timeLabel.style.cssText = 'color: #888; font-size: 11px; margin-bottom: 6px;';
+        timeLabel.style.cssText = 'color: #888; font-size: 13px; margin-bottom: 6px;';
         card.appendChild(timeLabel);
 
         // Cancel button
@@ -319,6 +319,6 @@ export class ManufacturingPanelManager {
     }
 
     _buttonStyle(color, bg) {
-        return `background: ${bg}; color: ${color}; border: 1px solid ${color}; border-radius: 3px; padding: 4px 12px; cursor: pointer; font-family: "Courier New", monospace; font-size: 11px; font-weight: bold; letter-spacing: 1px;`;
+        return `background: ${bg}; color: ${color}; border: 1px solid ${color}; border-radius: 3px; padding: 4px 12px; cursor: pointer; font-family: "Courier New", monospace; font-size: 13px; font-weight: bold; letter-spacing: 1px;`;
     }
 }

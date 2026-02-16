@@ -135,7 +135,7 @@ export class FittingTemplateManager {
 
     renderTemplateSection(container) {
         const section = document.createElement('div');
-        section.style.cssText = 'padding: 8px; color: #ccc; font-family: "Courier New", monospace; font-size: 12px;';
+        section.style.cssText = 'padding: 8px; color: #ccc; font-family: "Courier New", monospace; font-size: 13px;';
 
         // Header
         const header = document.createElement('div');
@@ -143,13 +143,13 @@ export class FittingTemplateManager {
 
         const title = document.createElement('span');
         title.textContent = '-- FITTING TEMPLATES --';
-        title.style.cssText = 'color: #44ccff; font-weight: bold; font-size: 13px;';
+        title.style.cssText = 'color: #44ccff; font-weight: bold; font-size: 14px;';
         header.appendChild(title);
 
         // Save current fitting button
         const saveBtn = document.createElement('button');
         saveBtn.textContent = '+ SAVE CURRENT';
-        saveBtn.style.cssText = 'background: #002233; color: #44ccff; border: 1px solid #44ccff; border-radius: 3px; padding: 3px 10px; cursor: pointer; font-family: "Courier New", monospace; font-size: 11px; font-weight: bold;';
+        saveBtn.style.cssText = 'background: #002233; color: #44ccff; border: 1px solid #44ccff; border-radius: 3px; padding: 3px 10px; cursor: pointer; font-family: "Courier New", monospace; font-size: 13px; font-weight: bold;';
         saveBtn.addEventListener('click', () => this._promptSaveTemplate(container));
         header.appendChild(saveBtn);
 
@@ -181,20 +181,20 @@ export class FittingTemplateManager {
 
         const nameEl = document.createElement('span');
         nameEl.textContent = template.name;
-        nameEl.style.cssText = 'color: #fff; font-weight: bold; font-size: 12px;';
+        nameEl.style.cssText = 'color: #fff; font-weight: bold; font-size: 13px;';
         topRow.appendChild(nameEl);
 
         const meta = document.createElement('span');
         const date = new Date(template.timestamp);
         meta.textContent = `${template.shipClass} | ${date.toLocaleDateString()}`;
-        meta.style.cssText = 'color: #888; font-size: 10px;';
+        meta.style.cssText = 'color: #888; font-size: 12px;';
         topRow.appendChild(meta);
 
         card.appendChild(topRow);
 
         // Module summary
         const summary = document.createElement('div');
-        summary.style.cssText = 'color: #aaa; font-size: 11px; margin-bottom: 6px;';
+        summary.style.cssText = 'color: #aaa; font-size: 13px; margin-bottom: 6px;';
         const highCount = (template.modules.high || []).filter(m => m && m.id).length;
         const midCount = (template.modules.mid || []).filter(m => m && m.id).length;
         const lowCount = (template.modules.low || []).filter(m => m && m.id).length;
@@ -208,7 +208,7 @@ export class FittingTemplateManager {
                 if (mod && mod.id) {
                     const modEl = document.createElement('div');
                     modEl.textContent = `  [${slotType.toUpperCase()}] ${mod.name || mod.id}`;
-                    modEl.style.cssText = 'color: #777; font-size: 10px; padding-left: 6px;';
+                    modEl.style.cssText = 'color: #777; font-size: 12px; padding-left: 6px;';
                     card.appendChild(modEl);
                 }
             }
@@ -220,7 +220,7 @@ export class FittingTemplateManager {
 
         const loadBtn = document.createElement('button');
         loadBtn.textContent = 'LOAD';
-        loadBtn.style.cssText = 'background: #002200; color: #44ff88; border: 1px solid #44ff88; border-radius: 3px; padding: 3px 10px; cursor: pointer; font-family: "Courier New", monospace; font-size: 11px; font-weight: bold;';
+        loadBtn.style.cssText = 'background: #002200; color: #44ff88; border: 1px solid #44ff88; border-radius: 3px; padding: 3px 10px; cursor: pointer; font-family: "Courier New", monospace; font-size: 13px; font-weight: bold;';
         loadBtn.addEventListener('click', () => {
             this.loadTemplate(template.id);
         });
@@ -228,7 +228,7 @@ export class FittingTemplateManager {
 
         const delBtn = document.createElement('button');
         delBtn.textContent = 'DELETE';
-        delBtn.style.cssText = 'background: #330000; color: #ff4444; border: 1px solid #ff4444; border-radius: 3px; padding: 3px 10px; cursor: pointer; font-family: "Courier New", monospace; font-size: 11px; font-weight: bold;';
+        delBtn.style.cssText = 'background: #330000; color: #ff4444; border: 1px solid #ff4444; border-radius: 3px; padding: 3px 10px; cursor: pointer; font-family: "Courier New", monospace; font-size: 13px; font-weight: bold;';
         delBtn.addEventListener('click', () => {
             this.deleteTemplate(template.id);
             // Re-render parent

@@ -15,18 +15,18 @@
     --font-mono: 'Share Tech Mono', 'Courier New', monospace;
     --font-body: 'Rajdhani', 'Segoe UI', sans-serif;
 
-    /* Type Scale */
-    --text-2xs: 12px;
-    --text-xs: 13px;
-    --text-sm: 14px;
-    --text-base: 15px;
-    --text-md: 16px;
+    /* Type Scale (bumped for readability) */
+    --text-2xs: 11px;
+    --text-xs: 12px;
+    --text-sm: 13px;
+    --text-base: 14px;
+    --text-md: 15px;
     --text-lg: 18px;
     --text-xl: 20px;
-    --text-2xl: 22px;
-    --text-3xl: 26px;
-    --text-4xl: 34px;
-    --text-hero: 48px;
+    --text-2xl: 24px;
+    --text-3xl: 28px;
+    --text-4xl: 36px;
+    --text-hero: 52px;
 
     /* UI Scale */
     --ui-scale: 1;
@@ -64,11 +64,12 @@
     --panel-border-bright: rgba(0, 255, 255, 0.7);
     --panel-inner-glow: rgba(0, 255, 255, 0.08);
 
-    /* Text Colors */
-    --text-primary: #eaf2fa;
-    --text-secondary: #9db0c4;
-    --text-dim: #708498;
+    /* Text Colors (boosted contrast) */
+    --text-primary: #f0f6ff;
+    --text-secondary: #b0c4d8;
+    --text-dim: #8899aa;
     --text-bright: #ffffff;
+    --text-muted: #667788;
 
     /* Status Colors */
     --shield-color: #00aaff;
@@ -89,6 +90,15 @@
     --transition-fast: 0.15s;
     --transition-normal: 0.25s;
     --transition-slow: 0.4s;
+
+    /* Scan Line Overlay (subtle CRT effect) */
+    --scanline-bg: repeating-linear-gradient(
+        0deg,
+        transparent 0px,
+        transparent 2px,
+        rgba(0, 255, 255, 0.012) 2px,
+        rgba(0, 255, 255, 0.012) 4px
+    );
 }
 
 /* =============================================
@@ -105,9 +115,12 @@ body {
     overflow: hidden;
     background: #000;
     font-family: var(--font-body);
-    font-size: 14px;
+    font-size: var(--text-base);
     color: var(--text-primary);
     user-select: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
 }
 
 /* =============================================
@@ -138,7 +151,7 @@ button:focus-visible, .buy-btn:focus-visible, .sell-btn:focus-visible,
 }
 
 button:disabled, .buy-btn:disabled, .sell-btn:disabled {
-    opacity: 0.35;
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
@@ -159,7 +172,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     opacity: 0;
     transition: opacity 0.15s;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.6), 0 0 10px var(--glow-cyan-soft);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
     line-height: 1.4;
 }
@@ -167,7 +180,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 .global-tooltip:not(.hidden) { opacity: 1; }
 
 .global-tooltip-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: var(--text-primary);
     margin-bottom: 4px;
@@ -180,14 +193,14 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     display: flex;
     justify-content: space-between;
     gap: 10px;
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-bottom: 2px;
 }
 
 .global-tooltip-label { color: var(--text-dim); }
 .global-tooltip-value { color: var(--text-primary); }
 .global-tooltip-hint {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     margin-top: 4px;
     font-style: italic;
@@ -233,7 +246,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 .confirm-dialog-header {
     padding: 12px 16px;
     border-bottom: 1px solid rgba(0, 255, 255, 0.2);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: var(--text-primary);
     text-transform: uppercase;
@@ -245,7 +258,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 #confirm-message {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-body);
     color: var(--text-secondary);
     margin-bottom: 20px;
@@ -260,7 +273,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 
 .confirm-btn {
     padding: 8px 20px;
-    font-size: 13px;
+    font-size: var(--text-base);
     text-transform: uppercase;
     letter-spacing: 1px;
     border-radius: 3px;
@@ -334,8 +347,8 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     position: absolute;
     top: 2px;
     right: 3px;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.35);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.55);
     z-index: 10;
     pointer-events: none;
     letter-spacing: 0.5px;
@@ -358,7 +371,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     position: absolute;
     bottom: 2px;
     left: 3px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: 700;
     color: #ffd740;
     background: rgba(0, 0, 0, 0.6);
@@ -388,7 +401,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     bottom: 3px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.8);
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
     z-index: 15;
@@ -411,7 +424,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     flex-shrink: 0;
     width: 16px;
     text-align: center;
-    font-size: 14px;
+    font-size: var(--text-base);
 }
 
 .toast-progress {
@@ -445,12 +458,12 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 
 .empty-state-icon {
     font-size: 32px;
-    opacity: 0.25;
+    opacity: 0.45;
     margin-bottom: 8px;
 }
 
 .empty-state-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
     margin-bottom: 4px;
     letter-spacing: 1px;
@@ -458,7 +471,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .empty-state-hint {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     line-height: 1.4;
     opacity: 0.7;
@@ -638,11 +651,11 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .panel-title {
-    font-size: 13px;
+    font-size: var(--text-md);
     font-family: var(--font-display);
     font-weight: 600;
     letter-spacing: 3px;
-    color: var(--text-primary);
+    color: var(--text-bright);
     text-shadow: 0 0 15px var(--glow-cyan);
     text-transform: uppercase;
 }
@@ -672,6 +685,8 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 .panel-content {
     padding: 12px;
     position: relative;
+    background-image: var(--scanline-bg);
+    background-size: 100% 4px;
 }
 
 /* =============================================
@@ -742,7 +757,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 
 /* Panels toggle button */
 .panels-toggle-btn {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 1.5px;
     padding: 4px 10px;
@@ -762,7 +777,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 
 .panels-toggle-btn.active {
     background: rgba(0, 255, 255, 0.15);
-    border-color: rgba(0, 255, 255, 0.5);
+    border-color: rgba(0, 255, 255, 0.6);
     color: #00ffff;
 }
 
@@ -785,10 +800,10 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .panels-popup-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 1.5px;
-    color: rgba(0, 255, 255, 0.5);
+    color: rgba(0, 255, 255, 0.6);
     padding: 0 4px 6px;
     border-bottom: 1px solid rgba(0, 255, 255, 0.1);
     margin-bottom: 4px;
@@ -817,18 +832,18 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #00ffff;
     flex-shrink: 0;
 }
 
 .panels-popup-cb.checked {
     background: rgba(0, 255, 255, 0.15);
-    border-color: rgba(0, 255, 255, 0.5);
+    border-color: rgba(0, 255, 255, 0.6);
 }
 
 .panels-popup-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
 }
 
@@ -844,7 +859,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .status-group label {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -1020,7 +1035,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     right: 6px;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     font-weight: bold;
     color: #fff;
@@ -1042,7 +1057,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 #speed-display .unit {
-    font-size: 14px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: var(--text-secondary);
     text-shadow: none;
@@ -1087,12 +1102,12 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .heading-unit {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
 }
 
 .heading-cardinal {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: var(--primary-cyan);
     margin-left: 3px;
@@ -1112,7 +1127,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 #credits-display .label {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: rgba(255, 221, 68, 0.7);
     letter-spacing: 1px;
@@ -1139,14 +1154,14 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .danger-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 1px;
-    color: rgba(150, 150, 150, 0.5);
+    color: rgba(150, 170, 190, 0.7);
 }
 
 #danger-level {
-    font-size: 14px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     font-weight: bold;
     letter-spacing: 1px;
@@ -1203,7 +1218,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .target-name {
-    font-size: 16px;
+    font-size: var(--text-lg);
     font-family: var(--font-display);
     font-weight: bold;
     margin-bottom: 6px;
@@ -1211,7 +1226,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .target-type {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: var(--text-secondary);
     margin-bottom: 12px;
@@ -1220,7 +1235,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .target-distance {
-    font-size: 14px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     color: var(--text-primary);
     margin-bottom: 12px;
@@ -1288,7 +1303,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     position: absolute;
     right: 3px;
     top: -1px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(200, 220, 240, 0.6);
     pointer-events: none;
     line-height: 8px;
@@ -1321,19 +1336,19 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .scanner-row:hover {
-    background: rgba(0, 255, 255, 0.05);
+    background: rgba(0, 255, 255, 0.08);
 }
 
 .scanner-label {
-    font-size: 13px;
+    font-size: var(--text-sm);
     font-family: var(--font-display);
-    color: rgba(100, 180, 220, 0.6);
+    color: rgba(100, 180, 220, 0.75);
     letter-spacing: 0.5px;
     text-transform: uppercase;
 }
 
 .scanner-value {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(180, 220, 255, 0.9);
     font-family: var(--font-mono);
     text-align: right;
@@ -1351,7 +1366,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .ewar-badge {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 6px;
     border-radius: 3px;
     letter-spacing: 0.5px;
@@ -1389,7 +1404,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     align-items: center;
     gap: 4px;
     padding: 1px 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(150, 200, 230, 0.7);
 }
 
@@ -1424,7 +1439,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .threat-header {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 100, 100, 0.7);
     letter-spacing: 1px;
     padding: 2px 0;
@@ -1435,7 +1450,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     justify-content: space-between;
     align-items: center;
     padding: 1px 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(200, 180, 180, 0.8);
     border-left: 2px solid rgba(255, 68, 68, 0.4);
     margin: 1px 0;
@@ -1443,7 +1458,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .threat-row:hover {
-    background: rgba(255, 68, 68, 0.1);
+    background: rgba(255, 68, 68, 0.15);
 }
 
 .threat-row .threat-name {
@@ -1477,7 +1492,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .ov-tip-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     color: #ffffff;
     margin-bottom: 4px;
@@ -1486,7 +1501,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .ov-tip-row {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(180, 200, 220, 0.8);
     line-height: 1.5;
 }
@@ -1525,7 +1540,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     border: 1px solid var(--panel-border);
     color: var(--text-secondary);
     padding: 5px 10px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -1557,7 +1572,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 #overview-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
 }
 
@@ -1572,7 +1587,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     position: sticky;
     top: 0;
     text-transform: uppercase;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
 }
 
@@ -1616,7 +1631,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 .overview-icon {
     width: 20px;
     text-align: center;
-    font-size: 14px;
+    font-size: var(--text-base);
     position: relative;
 }
 
@@ -1661,8 +1676,8 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .power-label {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.5);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.7);
     letter-spacing: 0.5px;
 }
 
@@ -1699,8 +1714,8 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .power-value {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.6);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.75);
     font-family: var(--font-mono);
 }
 
@@ -1748,7 +1763,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .section-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -1830,7 +1845,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .module-slot.disabled {
-    opacity: 0.4;
+    opacity: 0.55;
     cursor: not-allowed;
 }
 
@@ -1903,8 +1918,8 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     left: 50%;
     top: -12px;
     transform: translateX(-50%);
-    font-size: 13px;
-    color: rgba(0, 255, 255, 0.5);
+    font-size: var(--text-base);
+    color: rgba(0, 255, 255, 0.6);
     letter-spacing: 1px;
     white-space: nowrap;
     pointer-events: none;
@@ -1946,11 +1961,11 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .log-tab-btn {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 8px;
     background: rgba(100, 120, 150, 0.15);
     border: 1px solid rgba(100, 120, 150, 0.2);
-    color: rgba(200, 210, 230, 0.5);
+    color: rgba(200, 210, 230, 0.7);
     cursor: pointer;
     border-radius: 2px;
     font-family: var(--font-display);
@@ -1995,7 +2010,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .log-message {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-body);
     padding: 5px 8px;
     background: rgba(0, 0, 0, 0.2);
@@ -2018,7 +2033,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 .log-message .timestamp {
     color: var(--text-dim);
     margin-right: 10px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
 }
 
@@ -2090,7 +2105,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .log-killmail {
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-top: 3px;
     padding: 4px 6px;
     background: rgba(0, 0, 0, 0.3);
@@ -2142,7 +2157,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 
 .menu-header {
     padding: 8px 18px 6px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     font-weight: bold;
     color: var(--primary-cyan);
@@ -2153,7 +2168,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 
 .menu-item {
     padding: 12px 18px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -2205,7 +2220,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .submenu-arrow {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     margin-right: 8px;
     transition: color var(--transition-fast);
@@ -2259,7 +2274,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 
 .submenu-item {
     padding: 10px 16px;
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     transition: all var(--transition-fast);
     border-left: 2px solid transparent;
@@ -2494,7 +2509,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .warp-text-sector {
-    font-size: 14px;
+    font-size: var(--text-base);
     letter-spacing: 6px;
     color: rgba(100, 180, 255, 0.6);
     text-transform: uppercase;
@@ -2541,7 +2556,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 .traffic-log {
     display: flex;
     gap: 15px;
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 0.5px;
     color: rgba(150, 170, 190, 0.6);
     white-space: nowrap;
@@ -2592,7 +2607,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .ticker-item {
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 0.5px;
     color: rgba(180, 200, 220, 0.7);
     display: inline-flex;
@@ -2666,11 +2681,13 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .modal-header span {
-    font-size: 20px;
+    font-size: var(--text-xl);
     font-family: var(--font-display);
-    letter-spacing: 4px;
+    font-weight: 600;
+    letter-spacing: 5px;
     text-shadow: 0 0 25px var(--glow-cyan);
     text-transform: uppercase;
+    color: var(--text-bright);
 }
 
 .modal-close, #undock-btn {
@@ -2678,7 +2695,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     border: 1px solid var(--primary-cyan);
     color: var(--primary-cyan);
     padding: 10px 25px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 3px;
     cursor: pointer;
@@ -2706,7 +2723,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     border: none;
     border-bottom: 3px solid transparent;
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
     cursor: pointer;
@@ -2715,7 +2732,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .tab-btn:hover {
-    background: rgba(0, 255, 255, 0.05);
+    background: rgba(0, 255, 255, 0.1);
     color: var(--text-primary);
 }
 
@@ -2730,6 +2747,8 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     flex: 1;
     overflow-y: auto;
     padding: 16px;
+    background-image: var(--scanline-bg);
+    background-size: 100% 4px;
 }
 
 .tab-content {
@@ -2747,10 +2766,11 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .tab-content h3 {
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-family: var(--font-display);
+    font-weight: 600;
     letter-spacing: 3px;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     margin-bottom: 18px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--panel-border);
@@ -2784,13 +2804,13 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .item-name {
-    font-size: 14px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: var(--text-primary);
 }
 
 .item-desc {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     letter-spacing: 0.5px;
 }
@@ -2805,7 +2825,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 
 .buy-btn, .sell-btn, .board-btn {
     padding: 8px 18px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
     cursor: pointer;
@@ -2863,7 +2883,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .dscan-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: rgba(100, 180, 220, 0.6);
     letter-spacing: 1px;
@@ -2872,7 +2892,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .dscan-value {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-primary);
     font-family: var(--font-mono);
     width: 60px;
@@ -2899,7 +2919,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     background: linear-gradient(180deg, rgba(0, 255, 255, 0.15) 0%, rgba(0, 255, 255, 0.05) 100%);
     border: 1px solid var(--primary-cyan);
     color: var(--primary-cyan);
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 2px;
     cursor: pointer;
     transition: all var(--transition-normal);
@@ -2931,7 +2951,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(100, 180, 220, 0.3);
     color: rgba(150, 200, 230, 0.7);
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     border-radius: 3px;
     transition: all var(--transition-fast);
@@ -2944,8 +2964,8 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 }
 
 .dscan-summary {
-    font-size: 13px;
-    color: rgba(100, 180, 220, 0.5);
+    font-size: var(--text-base);
+    color: rgba(100, 180, 220, 0.7);
     padding: 4px 0;
     text-align: center;
     letter-spacing: 1px;
@@ -2959,13 +2979,13 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 .dscan-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .dscan-table thead th {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
-    color: rgba(100, 180, 220, 0.5);
+    color: rgba(100, 180, 220, 0.7);
     text-align: left;
     padding: 3px 4px;
     border-bottom: 1px solid rgba(0, 255, 255, 0.15);
@@ -3001,7 +3021,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
 
 .dscan-type {
     color: var(--text-dim);
-    font-size: 13px;
+    font-size: var(--text-base);
     text-transform: uppercase;
 }
 
@@ -3009,7 +3029,7 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     color: var(--text-secondary);
     text-align: right;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 tr.dscan-hostile .dscan-name { color: #ff6666; }
@@ -3047,7 +3067,7 @@ tr.dscan-player .dscan-name { color: var(--primary-cyan); }
 }
 
 .bookmark-name {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .bookmark-delete {
@@ -3220,7 +3240,7 @@ body.scanlines::after {
 }
 
 .keybindings-header p {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
     margin: 0;
 }
@@ -3235,7 +3255,7 @@ body.scanlines::after {
     border: 1px solid var(--panel-border);
     color: var(--text-primary);
     padding: 10px 18px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 1px;
     cursor: pointer;
@@ -3270,7 +3290,7 @@ body.scanlines::after {
 }
 
 .keybinding-category-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 3px;
     color: var(--primary-cyan);
@@ -3304,7 +3324,7 @@ body.scanlines::after {
 
 .keybinding-description {
     flex: 1;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-body);
     color: var(--text-primary);
 }
@@ -3315,7 +3335,7 @@ body.scanlines::after {
     padding: 10px 20px;
     min-width: 110px;
     text-align: center;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     color: var(--text-primary);
     cursor: pointer;
@@ -3396,7 +3416,7 @@ body.scanlines::after {
 }
 
 .rebind-title {
-    font-size: 14px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
     letter-spacing: 3px;
     margin-bottom: 18px;
@@ -3412,7 +3432,7 @@ body.scanlines::after {
 }
 
 .rebind-hint {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     letter-spacing: 1px;
 }
@@ -3435,7 +3455,7 @@ body.scanlines::after {
 }
 
 .settings-row label {
-    font-size: 14px;
+    font-size: var(--text-base);
     color: var(--text-primary);
 }
 
@@ -3457,7 +3477,7 @@ body.scanlines::after {
     border: 1px solid var(--panel-border);
     color: var(--text-primary);
     padding: 10px 18px;
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     border-radius: 4px;
     transition: all var(--transition-fast);
@@ -3468,14 +3488,14 @@ body.scanlines::after {
 }
 
 .settings-row span {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
     min-width: 60px;
     text-align: right;
 }
 
 .settings-section-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     color: var(--primary-cyan);
     text-transform: uppercase;
@@ -3485,7 +3505,7 @@ body.scanlines::after {
 }
 
 .settings-hint {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     padding: 4px 25px 12px;
     line-height: 1.5;
@@ -3537,7 +3557,7 @@ select:focus-visible {
 }
 
 #object-viewer-content {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .viewer-placeholder {
@@ -3564,7 +3584,7 @@ select:focus-visible {
 }
 
 .viewer-type {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -3576,7 +3596,7 @@ select:focus-visible {
 }
 
 .viewer-section-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -3601,12 +3621,12 @@ select:focus-visible {
 
 .viewer-stat-label {
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .viewer-stat-value {
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     text-align: right;
 }
@@ -3633,7 +3653,7 @@ select:focus-visible {
 
 .viewer-bar-label {
     width: 60px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -3674,7 +3694,7 @@ select:focus-visible {
     background: linear-gradient(180deg, rgba(255, 68, 68, 0.3) 0%, rgba(255, 68, 68, 0.1) 100%);
     border: 1px solid var(--hostile-color);
     color: var(--hostile-color);
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 2px;
     padding: 4px 10px;
     border-radius: 3px;
@@ -3772,7 +3792,7 @@ select:focus-visible {
     border-bottom: 2px solid transparent;
     color: rgba(180, 200, 220, 0.6);
     font-family: 'Courier New', monospace;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -3858,7 +3878,7 @@ select:focus-visible {
     border-radius: 3px;
     color: var(--primary-cyan);
     font-family: 'Courier New', monospace;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     text-transform: uppercase;
     box-shadow: 0 0 15px rgba(0, 200, 255, 0.4);
@@ -3892,7 +3912,7 @@ select:focus-visible {
 }
 
 #locked-targets-container .panel-title {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .locked-targets-content {
@@ -3927,7 +3947,7 @@ select:focus-visible {
 }
 
 .locked-target-card.selected {
-    border-color: rgba(0, 255, 255, 0.5);
+    border-color: rgba(0, 255, 255, 0.6);
     background: rgba(0, 255, 255, 0.1);
 }
 
@@ -3936,7 +3956,7 @@ select:focus-visible {
 }
 
 .locked-target-card-icon {
-    font-size: 13px;
+    font-size: var(--text-base);
     width: 16px;
     text-align: center;
     flex-shrink: 0;
@@ -3958,7 +3978,7 @@ select:focus-visible {
 }
 
 .locked-target-card-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
@@ -3967,7 +3987,7 @@ select:focus-visible {
 }
 
 .locked-target-card-dist {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     white-space: nowrap;
     flex-shrink: 0;
@@ -4027,7 +4047,7 @@ select:focus-visible {
 }
 
 #ship-indicator .panel-title {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .ship-indicator-content {
@@ -4052,7 +4072,7 @@ select:focus-visible {
 }
 
 .ship-indicator-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--primary-cyan);
     text-shadow: 0 0 5px var(--glow-cyan);
     white-space: nowrap;
@@ -4061,7 +4081,7 @@ select:focus-visible {
 }
 
 .ship-indicator-class {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
     text-transform: uppercase;
 }
@@ -4082,7 +4102,7 @@ select:focus-visible {
     position: absolute;
     right: 2px;
     top: -1px;
-    font-size: 13px;
+    font-size: var(--text-base);
     line-height: 10px;
     color: rgba(255, 255, 255, 0.7);
     text-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
@@ -4111,11 +4131,11 @@ select:focus-visible {
 }
 
 #drone-bar .panel-title {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .drone-count {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
 }
 
@@ -4136,7 +4156,7 @@ select:focus-visible {
     border: 1px solid var(--panel-border);
     border-radius: 4px;
     color: var(--text-secondary);
-    font-size: 14px;
+    font-size: var(--text-base);
     cursor: pointer;
     transition: all var(--transition-fast);
     display: flex;
@@ -4162,7 +4182,7 @@ select:focus-visible {
 }
 
 .drone-status {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     text-align: center;
 }
@@ -4186,7 +4206,7 @@ select:focus-visible {
 }
 
 #performance-monitor .panel-title {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .perf-content {
@@ -4206,7 +4226,7 @@ select:focus-visible {
 }
 
 .perf-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     letter-spacing: 1px;
     margin-bottom: 2px;
@@ -4225,12 +4245,12 @@ select:focus-visible {
 }
 
 .perf-unit {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
 }
 
 .perf-detail {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
 }
 
@@ -4270,7 +4290,7 @@ select:focus-visible {
     border: 2px solid var(--hostile-color);
     color: var(--hostile-color);
     padding: 15px 30px;
-    font-size: 14px;
+    font-size: var(--text-base);
     letter-spacing: 3px;
     text-transform: uppercase;
     border-radius: 4px;
@@ -4362,7 +4382,7 @@ select:focus-visible {
 }
 
 .module-tooltip-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-primary);
     margin-bottom: 8px;
     text-shadow: 0 0 10px var(--glow-cyan-soft);
@@ -4371,7 +4391,7 @@ select:focus-visible {
 .module-tooltip-stat {
     display: flex;
     justify-content: space-between;
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-bottom: 4px;
 }
 
@@ -4426,7 +4446,7 @@ select:focus-visible {
 #overview-table td.col-ang {
     width: 50px;
     color: var(--text-dim);
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 /* Overview sortable column headers */
@@ -4449,7 +4469,7 @@ select:focus-visible {
     right: 3px;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 13px;
+    font-size: var(--text-base);
     opacity: 0.3;
 }
 
@@ -4504,7 +4524,7 @@ select:focus-visible {
 
 #tab-refinery h3 {
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 2px;
     margin-bottom: 15px;
     text-transform: uppercase;
@@ -4528,17 +4548,17 @@ select:focus-visible {
 }
 
 .refinery-ore-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-primary);
 }
 
 .refinery-ore-amount {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
 }
 
 .refinery-ore-value {
-    font-size: 14px;
+    font-size: var(--text-base);
     color: #ffdd44;
     text-shadow: 0 0 10px rgba(255, 221, 68, 0.5);
 }
@@ -4555,7 +4575,7 @@ select:focus-visible {
 }
 
 #refinery-total .label {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
     letter-spacing: 2px;
     text-transform: uppercase;
@@ -4571,7 +4591,7 @@ select:focus-visible {
 #sell-all-ore-btn {
     width: 100%;
     padding: 12px;
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 2px;
 }
 
@@ -4657,7 +4677,7 @@ select:focus-visible {
 .ship-stats-column h3,
 .ship-modules-column h3,
 #ship-tab-inventory h3 {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-secondary);
@@ -4672,7 +4692,7 @@ select:focus-visible {
 }
 
 .stat-section h4 {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -4690,13 +4710,13 @@ select:focus-visible {
 
 .stat-label {
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
 }
 
 .stat-value {
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     font-weight: bold;
 }
@@ -4712,7 +4732,7 @@ select:focus-visible {
 }
 
 .modules-section h4 {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -4742,7 +4762,7 @@ select:focus-visible {
 }
 
 .module-slot-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: var(--text-dim);
     text-transform: uppercase;
@@ -4750,13 +4770,13 @@ select:focus-visible {
 }
 
 .module-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-body);
     color: var(--text-primary);
 }
 
 .module-stat {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     color: var(--text-secondary);
 }
@@ -4785,7 +4805,7 @@ select:focus-visible {
 }
 
 .fittings-inventory-panel h4 {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-secondary);
@@ -4805,7 +4825,7 @@ select:focus-visible {
 }
 
 .fitting-section h4 {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -4827,7 +4847,7 @@ select:focus-visible {
 }
 
 .fitting-slot:hover {
-    border-color: rgba(0, 255, 255, 0.3);
+    border-color: rgba(0, 255, 255, 0.6);
     background: rgba(0, 255, 255, 0.05);
 }
 
@@ -4843,7 +4863,7 @@ select:focus-visible {
 }
 
 .fitting-slot-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     color: var(--text-dim);
     min-width: 52px;
@@ -4851,20 +4871,20 @@ select:focus-visible {
 }
 
 .fitting-slot-module {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-body);
     color: var(--text-primary);
     flex: 1;
 }
 
 .fitting-slot-stat {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     color: var(--text-secondary);
 }
 
 .fitting-weapon-group {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     color: var(--glow-cyan);
     background: rgba(0, 255, 255, 0.15);
@@ -4876,7 +4896,7 @@ select:focus-visible {
     background: none;
     border: 1px solid rgba(255, 100, 100, 0.3);
     color: #f66;
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 6px;
     border-radius: 3px;
     cursor: pointer;
@@ -4908,7 +4928,7 @@ select:focus-visible {
 }
 
 .fitting-inv-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-body);
     color: var(--text-primary);
     flex: 1;
@@ -4919,7 +4939,7 @@ select:focus-visible {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     color: var(--text-secondary);
 }
@@ -4928,7 +4948,7 @@ select:focus-visible {
     background: rgba(68, 255, 68, 0.1);
     border: 1px solid rgba(68, 255, 68, 0.3);
     color: var(--friendly-color);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 1px;
     padding: 3px 10px;
@@ -4946,12 +4966,12 @@ select:focus-visible {
     text-align: center;
     padding: 30px 15px;
     color: var(--text-dim);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-style: italic;
 }
 
 .fitting-docked-notice {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     font-style: italic;
     text-align: center;
@@ -4974,7 +4994,7 @@ select:focus-visible {
 }
 
 .inventory-hint {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-style: italic;
 }
 
@@ -4987,7 +5007,7 @@ select:focus-visible {
     border: 1px solid var(--panel-border);
     border-radius: 4px;
     margin-bottom: 20px;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .inventory-total-value {
@@ -5033,24 +5053,24 @@ select:focus-visible {
 }
 
 .inventory-item-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-primary);
 }
 
 .inventory-item-amount {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
 }
 
 .inventory-item-value {
-    font-size: 14px;
+    font-size: var(--text-base);
     color: #ffdd44;
     font-weight: bold;
     text-shadow: 0 0 10px rgba(255, 221, 68, 0.4);
 }
 
 .inventory-category-header {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
     color: var(--text-dim);
@@ -5083,7 +5103,7 @@ select:focus-visible {
 }
 
 .drones-hint {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
 }
 
@@ -5098,17 +5118,17 @@ select:focus-visible {
 
 .drones-header h3 {
     margin: 0;
-    font-size: 14px;
+    font-size: var(--text-base);
     color: var(--text-primary);
 }
 
 .drones-count {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--primary-cyan);
 }
 
 .drones-bandwidth {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     margin-bottom: 12px;
 }
@@ -5126,7 +5146,7 @@ select:focus-visible {
     border: 1px solid var(--panel-border);
     border-radius: 4px;
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -5180,7 +5200,7 @@ select:focus-visible {
     color: #00ff88;
 }
 .drone-size-badge {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: 700;
     margin-left: 2px;
     vertical-align: super;
@@ -5194,12 +5214,12 @@ select:focus-visible {
 }
 
 .drone-item-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-primary);
 }
 
 .drone-item-status {
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 1px;
     color: var(--text-dim);
 }
@@ -5228,7 +5248,7 @@ select:focus-visible {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-primary);
     white-space: nowrap;
 }
@@ -5239,7 +5259,7 @@ select:focus-visible {
     border: 1px solid var(--panel-border);
     border-radius: 4px;
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -5265,7 +5285,7 @@ select:focus-visible {
     text-align: center;
     padding: 15px;
     color: var(--text-dim);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-style: italic;
     border: 1px dashed var(--panel-border);
     border-radius: 4px;
@@ -5392,7 +5412,7 @@ select:focus-visible {
 .damage-number.miss {
     color: #888888;
     font-style: italic;
-    font-size: 14px;
+    font-size: var(--text-base);
     text-shadow: 0 0 6px rgba(136, 136, 136, 0.5);
 }
 
@@ -5418,7 +5438,7 @@ select:focus-visible {
     padding: 10px 16px;
     border-radius: 4px;
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     max-width: 300px;
     animation: toast-in 0.3s ease-out, toast-out 0.3s ease-in 2.7s forwards;
@@ -5501,7 +5521,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.3);
     border-radius: 3px;
     padding: 4px 8px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-body);
     cursor: pointer;
 }
@@ -5513,7 +5533,7 @@ select:focus-visible {
 
 .filter-count {
     color: var(--text-dim, #666);
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-left: auto;
 }
 
@@ -5557,13 +5577,13 @@ select:focus-visible {
 }
 
 .item-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-primary, #e0e0e0);
     font-weight: 500;
 }
 
 .item-desc {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim, #666);
     white-space: nowrap;
     overflow: hidden;
@@ -5571,7 +5591,7 @@ select:focus-visible {
 }
 
 .item-price {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #ffcc00;
     white-space: nowrap;
 }
@@ -5582,12 +5602,12 @@ select:focus-visible {
 }
 
 .trade-in-info {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #44ff88;
 }
 
 .current-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.6);
     padding: 2px 6px;
     border: 1px solid rgba(0, 255, 255, 0.3);
@@ -5601,7 +5621,7 @@ select:focus-visible {
     padding: 4px 10px;
     border-radius: 3px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: inherit;
     white-space: nowrap;
     transition: all 0.15s;
@@ -5619,14 +5639,14 @@ select:focus-visible {
 
 .buy-btn.large {
     padding: 8px 20px;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .empty-message {
     color: var(--text-dim, #666);
     text-align: center;
     padding: 20px;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 /* Ship Detail Panel */
@@ -5660,19 +5680,19 @@ select:focus-visible {
 
 .detail-header h3 {
     color: #00ffff;
-    font-size: 14px;
+    font-size: var(--text-base);
     margin: 0 0 4px;
 }
 
 .detail-role {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim, #666);
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 .detail-desc {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary, #aaa);
     margin: 6px 0 12px;
 }
@@ -5685,7 +5705,7 @@ select:focus-visible {
 }
 
 .detail-stat-group h4 {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.6);
     margin: 0 0 4px;
     letter-spacing: 1px;
@@ -5694,7 +5714,7 @@ select:focus-visible {
 .detail-row {
     display: flex;
     justify-content: space-between;
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 0;
     color: var(--text-secondary, #aaa);
 }
@@ -5711,14 +5731,14 @@ select:focus-visible {
 }
 
 .detail-bonuses h4 {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.6);
     margin: 0 0 4px;
     letter-spacing: 1px;
 }
 
 .detail-bonus {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary, #aaa);
     padding: 2px 0;
 }
@@ -5739,7 +5759,7 @@ select:focus-visible {
 .detail-price,
 .detail-trade-in,
 .detail-final-price {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .detail-price .label,
@@ -5763,8 +5783,8 @@ select:focus-visible {
 }
 
 .current-ship-label {
-    color: rgba(0, 255, 255, 0.5);
-    font-size: 13px;
+    color: rgba(0, 255, 255, 0.6);
+    font-size: var(--text-base);
 }
 
 /* =============================================
@@ -5795,7 +5815,7 @@ select:focus-visible {
 }
 
 .fitting-section-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: rgba(0, 255, 255, 0.6);
     letter-spacing: 1px;
@@ -5814,7 +5834,7 @@ select:focus-visible {
     border-radius: 3px;
     cursor: pointer;
     transition: all 0.15s;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-body);
 }
 
@@ -5842,7 +5862,7 @@ select:focus-visible {
 }
 
 .slot-icon {
-    font-size: 14px;
+    font-size: var(--text-base);
     width: 20px;
     text-align: center;
 }
@@ -5861,7 +5881,7 @@ select:focus-visible {
     border: none;
     color: #ff4444;
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--text-base);
     padding: 0 4px;
     opacity: 0.5;
     transition: opacity 0.15s;
@@ -5881,9 +5901,9 @@ select:focus-visible {
 }
 
 .fitting-stat-group h4 {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
-    color: rgba(0, 255, 255, 0.5);
+    color: rgba(0, 255, 255, 0.6);
     margin: 0 0 3px;
     letter-spacing: 1px;
 }
@@ -5902,7 +5922,7 @@ select:focus-visible {
 }
 .fitting-resource-bar .res-label {
     font-family: var(--font-display);
-    font-size: 11px;
+    font-size: var(--text-sm);
     color: rgba(0, 255, 255, 0.7);
     width: 24px;
 }
@@ -5923,7 +5943,7 @@ select:focus-visible {
     background: linear-gradient(90deg, #ff4444, #ff8800);
 }
 .fitting-resource-bar .res-value {
-    font-size: 11px;
+    font-size: var(--text-sm);
     color: rgba(255, 255, 255, 0.6);
     min-width: 70px;
     text-align: right;
@@ -5941,21 +5961,21 @@ select:focus-visible {
     border-top: 1px solid rgba(0, 255, 255, 0.15);
 }
 .fitting-resist-grid h4 {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
-    color: rgba(0, 255, 255, 0.5);
+    color: rgba(0, 255, 255, 0.6);
     margin: 0 0 4px;
     letter-spacing: 1px;
 }
 .resist-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 11px;
+    font-size: var(--text-sm);
 }
 .resist-table th {
     font-weight: normal;
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: var(--text-xs);
     padding: 2px 4px;
     text-align: center;
 }
@@ -5963,25 +5983,25 @@ select:focus-visible {
     padding: 2px 4px;
     text-align: center;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--text-sm);
 }
 .resist-table td:first-child {
     text-align: left;
     color: rgba(255, 255, 255, 0.5);
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: var(--text-xs);
 }
 .ehp-display {
     text-align: right;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--text-sm);
     color: #44ff88;
     margin-top: 4px;
 }
 
 /* Station Resist Mini Grid */
 .resist-mini-grid {
-    font-size: 11px;
+    font-size: var(--text-sm);
     font-family: var(--font-mono);
 }
 .resist-mini-grid .resist-row {
@@ -5993,7 +6013,7 @@ select:focus-visible {
 .resist-mini-grid .resist-row span:first-child {
     color: rgba(255, 255, 255, 0.5);
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: var(--text-xs);
 }
 .resist-mini-grid .resist-row span {
     text-align: center;
@@ -6002,7 +6022,7 @@ select:focus-visible {
 /* Dim fitting stat */
 .fitting-slot-stat.dim {
     opacity: 0.4;
-    font-size: 10px;
+    font-size: var(--text-xs);
 }
 
 /* Fitting Inventory */
@@ -6025,7 +6045,7 @@ select:focus-visible {
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 2px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-body);
     transition: all 0.15s;
 }
@@ -6035,12 +6055,12 @@ select:focus-visible {
 }
 
 .fitting-inventory-item.selected {
-    border-color: rgba(0, 255, 255, 0.5);
+    border-color: rgba(0, 255, 255, 0.6);
     background: rgba(0, 255, 255, 0.1);
 }
 
 .inv-icon {
-    font-size: 13px;
+    font-size: var(--text-base);
     width: 16px;
     text-align: center;
 }
@@ -6051,7 +6071,7 @@ select:focus-visible {
 }
 
 .inv-slot {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: var(--text-dim, #666);
     padding: 1px 4px;
@@ -6101,17 +6121,17 @@ select:focus-visible {
     position: absolute;
     top: 6px;
     left: 8px;
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 2px;
-    color: rgba(0, 255, 255, 0.5);
+    color: rgba(0, 255, 255, 0.6);
     z-index: 1;
     pointer-events: none;
     text-transform: uppercase;
 }
 
 .viewport-hint {
-    font-size: 13px;
-    color: rgba(0, 255, 255, 0.3);
+    font-size: var(--text-base);
+    color: rgba(0, 255, 255, 0.6);
     letter-spacing: 0.5px;
     margin-left: 8px;
 }
@@ -6157,7 +6177,7 @@ select:focus-visible {
 }
 
 .editor-control-group label {
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 1px;
     color: var(--text-secondary);
     text-transform: uppercase;
@@ -6175,7 +6195,7 @@ select:focus-visible {
     border-radius: 3px;
     color: var(--text-primary);
     padding: 5px 8px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: inherit;
 }
 
@@ -6199,7 +6219,7 @@ select:focus-visible {
     border-radius: 2px;
     color: var(--text-secondary);
     padding: 4px 8px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: inherit;
     cursor: pointer;
     text-align: left;
@@ -6270,7 +6290,7 @@ select:focus-visible {
 }
 
 .editor-status {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     text-align: center;
     min-height: 14px;
@@ -6298,7 +6318,7 @@ select:focus-visible {
 .fleet-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-body);
 }
 
@@ -6306,7 +6326,7 @@ select:focus-visible {
     color: var(--text-dim);
     font-weight: normal;
     text-transform: uppercase;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 0.5px;
     padding: 4px 6px;
@@ -6380,7 +6400,7 @@ select:focus-visible {
 }
 
 .fleet-state {
-    font-size: 13px;
+    font-size: var(--text-base);
     text-transform: capitalize;
 }
 
@@ -6437,7 +6457,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.25);
     color: var(--text-primary);
     padding: 4px 6px;
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     border-radius: 3px;
     text-transform: uppercase;
@@ -6465,11 +6485,11 @@ select:focus-visible {
     text-align: center;
     padding: 20px 10px;
     color: var(--text-dim);
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .fleet-hint {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     opacity: 0.6;
     margin-top: 6px;
@@ -6490,7 +6510,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.15);
     color: var(--text-dim);
     padding: 3px 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     cursor: pointer;
     border-radius: 2px;
@@ -6520,7 +6540,7 @@ select:focus-visible {
     display: flex;
     gap: 8px;
     padding: 3px 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     color: var(--text-dim);
     border-bottom: 1px solid rgba(0, 255, 255, 0.08);
@@ -6544,7 +6564,7 @@ select:focus-visible {
 /* Fleet Distance Column */
 .fleet-dist {
     color: var(--text-dim);
-    font-size: 13px;
+    font-size: var(--text-base);
     text-align: right;
     width: 50px;
 }
@@ -6566,7 +6586,7 @@ select:focus-visible {
 }
 
 .fleet-detail-info {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-secondary);
     margin-bottom: 4px;
 }
@@ -6574,7 +6594,7 @@ select:focus-visible {
 .fleet-detail-label {
     color: var(--text-dim);
     text-transform: uppercase;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 0.5px;
 }
@@ -6587,7 +6607,7 @@ select:focus-visible {
 .fleet-detail-hp {
     display: flex;
     gap: 10px;
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-bottom: 4px;
 }
 
@@ -6602,7 +6622,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.2);
     color: var(--text-primary);
     padding: 2px 6px;
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     border-radius: 2px;
     text-transform: uppercase;
@@ -6638,7 +6658,7 @@ select:focus-visible {
 }
 
 .cantina-section-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--primary-cyan);
     letter-spacing: 1px;
     text-transform: uppercase;
@@ -6675,12 +6695,12 @@ select:focus-visible {
 .pilot-name {
     color: var(--text-primary);
     font-weight: bold;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .pilot-salary {
     color: var(--text-dim);
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .pilot-skills {
@@ -6694,14 +6714,14 @@ select:focus-visible {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .skill-label {
     color: var(--text-dim);
     width: 60px;
     text-transform: uppercase;
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 0.5px;
 }
 
@@ -6735,7 +6755,7 @@ select:focus-visible {
     color: var(--text-secondary);
     width: 24px;
     text-align: right;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .pilot-traits {
@@ -6746,7 +6766,7 @@ select:focus-visible {
 }
 
 .pilot-trait {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 6px;
     border: 1px solid;
     border-radius: 10px;
@@ -6755,7 +6775,7 @@ select:focus-visible {
 }
 
 .pilot-status {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     margin-bottom: 6px;
 }
@@ -6771,7 +6791,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.25);
     color: var(--text-primary);
     padding: 4px 10px;
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     border-radius: 3px;
     text-transform: uppercase;
@@ -6807,7 +6827,7 @@ select:focus-visible {
     text-align: center;
     padding: 20px;
     color: var(--text-dim);
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .cantina-assign-menu {
@@ -6822,7 +6842,7 @@ select:focus-visible {
 
 .cantina-assign-title {
     padding: 4px 10px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -6831,7 +6851,7 @@ select:focus-visible {
 .cantina-assign-option {
     padding: 6px 10px;
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     transition: background 0.1s;
 }
@@ -6854,7 +6874,7 @@ select:focus-visible {
     color: rgba(0, 170, 255, 0.5);
     cursor: pointer;
     padding: 1px 5px;
-    font-size: 13px;
+    font-size: var(--text-base);
     border-radius: 2px;
     line-height: 14px;
 }
@@ -6891,7 +6911,7 @@ select:focus-visible {
     background: rgba(0, 30, 60, 0.85);
     border: 1px solid var(--accent-primary, #00aaff);
     border-radius: 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--accent-primary, #00aaff);
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -6912,7 +6932,7 @@ select:focus-visible {
     color: #ff6666;
     cursor: pointer;
     padding: 0 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
     line-height: 16px;
     border-radius: 2px;
 }
@@ -6935,7 +6955,7 @@ select:focus-visible {
     border-radius: 50%;
     border: 1px solid rgba(0, 170, 255, 0.4);
     color: rgba(0, 170, 255, 0.6);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     cursor: help;
     margin-left: 4px;
@@ -6960,7 +6980,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 170, 255, 0.5);
     border-radius: 4px;
     color: #aaccdd;
-    font-size: 13px;
+    font-size: var(--text-base);
     line-height: 1.5;
     pointer-events: none;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
@@ -6972,7 +6992,7 @@ select:focus-visible {
 
 .help-popover .help-title {
     color: #00ccff;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     margin-bottom: 6px;
     text-transform: uppercase;
@@ -6999,13 +7019,13 @@ select:focus-visible {
     border: 1px solid rgba(0, 170, 255, 0.3);
     border-radius: 2px;
     color: #00ccff;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: monospace;
 }
 
 .help-popover .help-key-desc {
     color: #88aacc;
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-left: 4px;
 }
 
@@ -7090,7 +7110,7 @@ select:focus-visible {
 
 .credit-popup {
     position: absolute;
-    font-size: 14px;
+    font-size: var(--text-base);
     font-weight: bold;
     text-shadow: 0 0 6px rgba(0, 0, 0, 0.8), 0 0 3px rgba(0, 0, 0, 0.6);
     pointer-events: none;
@@ -7209,7 +7229,7 @@ select:focus-visible {
 
 .dialogue-speaker-name {
     color: #ffffff;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     text-align: center;
     white-space: nowrap;
@@ -7217,7 +7237,7 @@ select:focus-visible {
 
 .dialogue-speaker-title {
     color: #88aacc;
-    font-size: 13px;
+    font-size: var(--text-base);
     text-align: center;
     white-space: nowrap;
 }
@@ -7231,7 +7251,7 @@ select:focus-visible {
 
 .dialogue-text {
     color: #ccddee;
-    font-size: 13px;
+    font-size: var(--text-base);
     line-height: 1.5;
     min-height: 40px;
 }
@@ -7249,7 +7269,7 @@ select:focus-visible {
     padding: 6px 10px;
     cursor: pointer;
     color: #00ccff;
-    font-size: 13px;
+    font-size: var(--text-base);
     border: 1px solid transparent;
     border-radius: 2px;
     transition: all 0.15s;
@@ -7289,7 +7309,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 170, 255, 0.15);
     border-radius: 3px;
     color: #88aacc;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     cursor: pointer;
     transition: all 0.2s;
@@ -7311,7 +7331,7 @@ select:focus-visible {
 }
 
 .guild-tab-icon {
-    font-size: 14px;
+    font-size: var(--text-base);
 }
 
 .guild-agent {
@@ -7338,13 +7358,13 @@ select:focus-visible {
 
 .guild-agent-name {
     color: #ffffff;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
 }
 
 .guild-agent-title {
     color: #88aacc;
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-top: 2px;
 }
 
@@ -7364,12 +7384,12 @@ select:focus-visible {
 
 .guild-rank-label {
     color: #88aacc;
-    font-size: 13px;
+    font-size: var(--text-base);
     text-transform: uppercase;
 }
 
 .guild-rank-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
 }
 
@@ -7398,14 +7418,14 @@ select:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #ffffff;
     text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
 }
 
 .guild-next-rank {
     margin-top: 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #88aacc;
 }
 
@@ -7415,7 +7435,7 @@ select:focus-visible {
 
 .guild-section-title {
     color: #00ccff;
-    font-size: 13px;
+    font-size: var(--text-base);
     text-transform: uppercase;
     letter-spacing: 1px;
     padding-bottom: 4px;
@@ -7425,7 +7445,7 @@ select:focus-visible {
 
 .guild-no-quests {
     color: #667788;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-style: italic;
     padding: 10px;
     text-align: center;
@@ -7461,12 +7481,12 @@ select:focus-visible {
 
 .quest-title {
     color: #ffffff;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
 }
 
 .quest-status {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 6px;
     border-radius: 2px;
     text-transform: uppercase;
@@ -7480,7 +7500,7 @@ select:focus-visible {
 }
 
 .quest-badge.repeatable {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 1px 5px;
     background: rgba(0, 255, 136, 0.15);
     color: #44ff88;
@@ -7492,7 +7512,7 @@ select:focus-visible {
 
 .quest-description {
     color: #88aacc;
-    font-size: 13px;
+    font-size: var(--text-base);
     line-height: 1.4;
     margin-bottom: 8px;
 }
@@ -7503,7 +7523,7 @@ select:focus-visible {
 
 .quest-obj-text {
     color: #aabbcc;
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-bottom: 2px;
 }
 
@@ -7532,7 +7552,7 @@ select:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #ffffff;
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
 }
@@ -7547,12 +7567,12 @@ select:focus-visible {
 
 .quest-reward-label {
     color: #667788;
-    font-size: 13px;
+    font-size: var(--text-base);
     text-transform: uppercase;
 }
 
 .quest-reward {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 1px 5px;
     background: rgba(255, 204, 0, 0.1);
     color: #ffcc44;
@@ -7575,7 +7595,7 @@ select:focus-visible {
 
 .quest-btn {
     padding: 4px 12px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     border-radius: 2px;
     cursor: pointer;
@@ -7626,7 +7646,7 @@ select:focus-visible {
 
 .quest-tracker-empty {
     color: #667788;
-    font-size: 13px;
+    font-size: var(--text-base);
     text-align: center;
     padding: 12px 6px;
     line-height: 1.5;
@@ -7634,7 +7654,7 @@ select:focus-visible {
 
 .quest-tracker-hint {
     color: #556677;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .qt-quest {
@@ -7654,12 +7674,12 @@ select:focus-visible {
 }
 
 .qt-guild-icon {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .qt-quest-title {
     color: #ccddee;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -7699,7 +7719,7 @@ select:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #ffffff;
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
 }
@@ -7728,7 +7748,7 @@ select:focus-visible {
     color: #88aacc;
     padding: 6px 16px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     text-transform: uppercase;
     transition: all 0.2s;
@@ -7755,14 +7775,14 @@ select:focus-visible {
 
 .specialty-label {
     color: #ffaa44;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     margin-right: 8px;
 }
 
 .specialty-name {
     color: #aaccee;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .trade-category-filters {
@@ -7778,7 +7798,7 @@ select:focus-visible {
     color: #668;
     padding: 3px 8px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     transition: all 0.2s;
 }
@@ -7801,7 +7821,7 @@ select:focus-visible {
     padding: 4px 8px;
     background: rgba(20, 30, 40, 0.8);
     border-bottom: 1px solid #44aaff33;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     color: #668;
     text-transform: uppercase;
@@ -7818,7 +7838,7 @@ select:focus-visible {
     gap: 4px;
     padding: 5px 8px;
     border-bottom: 1px solid rgba(40, 60, 80, 0.3);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #aaccee;
     align-items: center;
     transition: background 0.15s;
@@ -7833,17 +7853,17 @@ select:focus-visible {
 }
 
 .tg-icon {
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-right: 4px;
 }
 
 .tg-name {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .trade-profit-hint {
     color: #44ff88;
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-left: 6px;
     opacity: 0.8;
 }
@@ -7860,7 +7880,7 @@ select:focus-visible {
     color: #44aaff;
     padding: 2px 8px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     transition: all 0.2s;
 }
@@ -7896,14 +7916,14 @@ select:focus-visible {
 
 .trade-cargo-title {
     color: #ffaa44;
-    font-size: 13px;
+    font-size: var(--text-base);
     text-transform: uppercase;
     margin-bottom: 4px;
 }
 
 .trade-cargo-empty {
     color: #557;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-style: italic;
 }
 
@@ -7911,7 +7931,7 @@ select:focus-visible {
     display: flex;
     justify-content: space-between;
     padding: 2px 0;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #88aacc;
 }
 
@@ -7923,7 +7943,7 @@ select:focus-visible {
     background: rgba(20, 40, 60, 0.3);
     border-left: 2px solid #ffaa44;
     margin: 4px 0;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .quest-route {
@@ -7995,7 +8015,7 @@ select:focus-visible {
 }
 
 .admin-hint {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #556677;
 }
 
@@ -8040,7 +8060,7 @@ select:focus-visible {
     color: #778899;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .admin-faction-tab:hover {
@@ -8095,7 +8115,7 @@ select:focus-visible {
 }
 
 .admin-stat-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #556677;
     letter-spacing: 1.5px;
     margin-bottom: 4px;
@@ -8139,7 +8159,7 @@ select:focus-visible {
 .admin-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .admin-table thead {
@@ -8153,7 +8173,7 @@ select:focus-visible {
     text-align: left;
     background: rgba(8, 16, 28, 0.98);
     color: #668899;
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 1px;
     text-transform: uppercase;
     border-bottom: 1px solid rgba(0, 255, 255, 0.1);
@@ -8171,12 +8191,12 @@ select:focus-visible {
 
 .admin-sortable.sort-asc::after {
     content: ' \u25B2';
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .admin-sortable.sort-desc::after {
     content: ' \u25BC';
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .admin-table td {
@@ -8202,7 +8222,7 @@ select:focus-visible {
 
 .admin-dim {
     color: #667788 !important;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .admin-task-detail {
@@ -8229,7 +8249,7 @@ select:focus-visible {
 /* Materialized badge */
 .admin-mat-badge {
     display: inline-block;
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 1px 4px;
     background: rgba(0, 255, 100, 0.15);
     border: 1px solid rgba(0, 255, 100, 0.3);
@@ -8260,7 +8280,7 @@ select:focus-visible {
 }
 
 .admin-cargo-text {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #778899;
 }
 
@@ -8273,7 +8293,7 @@ select:focus-visible {
     height: 22px;
     border-radius: 3px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--text-base);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -8294,7 +8314,7 @@ select:focus-visible {
 }
 
 .admin-raid-log-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #cc2244;
     letter-spacing: 1.5px;
     margin-bottom: 6px;
@@ -8312,14 +8332,14 @@ select:focus-visible {
     align-items: center;
     gap: 8px;
     padding: 3px 8px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #aabbcc;
     border-left: 2px solid #888;
     background: rgba(10, 15, 25, 0.5);
 }
 
 .admin-raid-icon {
-    font-size: 13px;
+    font-size: var(--text-base);
     flex-shrink: 0;
 }
 
@@ -8331,7 +8351,7 @@ select:focus-visible {
 }
 
 .admin-raid-time {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #556677;
     flex-shrink: 0;
 }
@@ -8347,7 +8367,7 @@ select:focus-visible {
     justify-content: space-between;
     padding: 10px 20px;
     border-top: 1px solid rgba(0, 255, 255, 0.08);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #556677;
     background: rgba(0, 10, 20, 0.3);
 }
@@ -8401,7 +8421,7 @@ select:focus-visible {
 }
 
 .keybind-hint {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(100, 180, 220, 0.4);
     letter-spacing: 1px;
 }
@@ -8420,7 +8440,7 @@ select:focus-visible {
 }
 
 .keybind-category-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 2px;
     color: rgba(0, 255, 255, 0.6);
     margin-bottom: 12px;
@@ -8437,12 +8457,12 @@ select:focus-visible {
 }
 
 .keybind-desc {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(180, 210, 230, 0.7);
 }
 
 .keybind-key {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     color: rgba(0, 255, 255, 0.9);
     background: rgba(0, 255, 255, 0.08);
@@ -8458,7 +8478,7 @@ select:focus-visible {
     margin-top: 24px;
     padding-top: 12px;
     border-top: 1px solid rgba(0, 255, 255, 0.1);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(100, 150, 180, 0.4);
     text-align: center;
     letter-spacing: 2px;
@@ -8489,7 +8509,7 @@ select:focus-visible {
 }
 
 .minimap-header .panel-title {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .minimap-range-btns {
@@ -8500,8 +8520,8 @@ select:focus-visible {
 .minimap-range-btn {
     background: rgba(0, 255, 255, 0.08);
     border: 1px solid rgba(0, 255, 255, 0.15);
-    color: rgba(0, 255, 255, 0.5);
-    font-size: 13px;
+    color: rgba(0, 255, 255, 0.6);
+    font-size: var(--text-base);
     padding: 1px 4px;
     cursor: pointer;
     font-family: var(--font-display);
@@ -8517,7 +8537,7 @@ select:focus-visible {
 
 .minimap-range-btn.active {
     background: rgba(0, 255, 255, 0.2);
-    border-color: rgba(0, 255, 255, 0.5);
+    border-color: rgba(0, 255, 255, 0.6);
     color: rgba(0, 255, 255, 0.9);
 }
 
@@ -8565,20 +8585,20 @@ select:focus-visible {
 }
 
 .insurance-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
-    color: rgba(0, 255, 255, 0.5);
+    color: rgba(0, 255, 255, 0.6);
 }
 
 .insurance-ship-name {
-    font-size: 14px;
+    font-size: var(--text-base);
     color: #e0e8ff;
     font-weight: bold;
 }
 
 .insurance-ship-value {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(200, 210, 230, 0.6);
 }
 
@@ -8599,7 +8619,7 @@ select:focus-visible {
 }
 
 .insurance-tier-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #44ff88;
     font-weight: bold;
 }
@@ -8609,12 +8629,12 @@ select:focus-visible {
 }
 
 .insurance-payout {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(200, 220, 200, 0.8);
 }
 
 .insurance-warning {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #ffaa44;
 }
 
@@ -8628,12 +8648,12 @@ select:focus-visible {
     border: 1px solid rgba(255, 50, 50, 0.2);
     border-radius: 4px;
     color: #ff6644;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
 }
 
 .insurance-warning-text {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 100, 70, 0.6);
     font-weight: normal;
 }
@@ -8654,7 +8674,7 @@ select:focus-visible {
 }
 
 .insurance-tier-card:hover {
-    border-color: rgba(0, 255, 255, 0.3);
+    border-color: rgba(0, 255, 255, 0.6);
 }
 
 .insurance-tier-card.active {
@@ -8664,7 +8684,7 @@ select:focus-visible {
 
 .tier-header {
     padding: 6px 10px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     letter-spacing: 1px;
     text-align: center;
@@ -8684,7 +8704,7 @@ select:focus-visible {
     display: flex;
     justify-content: space-between;
     padding: 3px 0;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(200, 210, 230, 0.6);
     border-bottom: 1px solid rgba(100, 120, 160, 0.1);
 }
@@ -8702,7 +8722,7 @@ select:focus-visible {
 .insurance-btn {
     width: 100%;
     padding: 6px;
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-top: 4px;
 }
 
@@ -8711,7 +8731,7 @@ select:focus-visible {
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(100, 120, 160, 0.1);
     border-radius: 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(200, 210, 230, 0.4);
     line-height: 1.5;
 }
@@ -8740,7 +8760,7 @@ select:focus-visible {
 }
 
 .velocity-speed-label {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.7);
     font-family: var(--font-mono);
     white-space: nowrap;
@@ -8759,7 +8779,7 @@ select:focus-visible {
 .ewar-badge {
     display: inline-block;
     padding: 1px 6px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: 700;
     letter-spacing: 1px;
     border-radius: 2px;
@@ -8866,10 +8886,10 @@ select:focus-visible {
 }
 
 .stat-section-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     letter-spacing: 2px;
-    color: rgba(0, 255, 255, 0.5);
+    color: rgba(0, 255, 255, 0.6);
     border-bottom: 1px solid rgba(0, 255, 255, 0.1);
     padding-bottom: 3px;
     margin-bottom: 4px;
@@ -8879,7 +8899,7 @@ select:focus-visible {
     display: flex;
     justify-content: space-between;
     padding: 2px 0;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(200, 210, 230, 0.6);
 }
 
@@ -8896,10 +8916,10 @@ select:focus-visible {
 }
 
 .skills-header {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     letter-spacing: 2px;
-    color: rgba(200, 210, 230, 0.5);
+    color: rgba(200, 210, 230, 0.7);
     margin-bottom: 10px;
     text-align: center;
 }
@@ -8931,20 +8951,20 @@ select:focus-visible {
 }
 
 .skill-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     color: #e0e8ff;
 }
 
 .skill-level {
-    font-size: 13px;
-    color: rgba(200, 210, 230, 0.5);
+    font-size: var(--text-base);
+    color: rgba(200, 210, 230, 0.7);
     font-weight: normal;
     margin-left: 4px;
 }
 
 .skill-desc {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(200, 210, 230, 0.4);
     margin-top: 2px;
 }
@@ -8991,7 +9011,7 @@ select:focus-visible {
 }
 
 .skill-xp-text {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(200, 210, 230, 0.4);
 }
 
@@ -9001,12 +9021,12 @@ select:focus-visible {
 }
 
 .skill-bonus-line {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(100, 200, 150, 0.7);
 }
 
 .skill-spec-badge {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     padding: 2px 6px;
     margin-top: 4px;
@@ -9022,7 +9042,7 @@ select:focus-visible {
 }
 
 .skill-spec-prompt {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 220, 100, 0.8);
     margin-bottom: 4px;
 }
@@ -9036,7 +9056,7 @@ select:focus-visible {
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 4px;
     color: rgba(200, 210, 230, 0.9);
-    font-size: 13px;
+    font-size: var(--text-base);
     text-align: left;
     cursor: pointer;
     transition: background 0.2s, border-color 0.2s;
@@ -9044,11 +9064,11 @@ select:focus-visible {
 
 .skill-spec-btn:hover {
     background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.55);
 }
 
 .skill-spec-btn strong {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .skill-spec-btn em {
@@ -9072,7 +9092,7 @@ select:focus-visible {
 
 .achievements-summary {
     text-align: center;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     color: #ffd700;
     padding: 6px 0;
@@ -9086,7 +9106,7 @@ select:focus-visible {
 }
 
 .achievement-category-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     letter-spacing: 2px;
     color: rgba(200, 210, 230, 0.4);
@@ -9126,7 +9146,7 @@ select:focus-visible {
 }
 
 .achievement-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     color: #e0e8ff;
 }
@@ -9136,13 +9156,13 @@ select:focus-visible {
 }
 
 .achievement-desc {
-    font-size: 13px;
-    color: rgba(200, 210, 230, 0.5);
+    font-size: var(--text-base);
+    color: rgba(200, 210, 230, 0.7);
 }
 
 .achievement-check {
     color: #ffd700;
-    font-size: 14px;
+    font-size: var(--text-base);
     font-weight: bold;
     flex-shrink: 0;
 }
@@ -9170,15 +9190,15 @@ select:focus-visible {
 }
 
 #ship-log-filters .log-filter-btn {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 6px;
 }
 
 .ship-log-empty {
     text-align: center;
-    color: rgba(200, 210, 230, 0.3);
+    color: rgba(200, 210, 230, 0.55);
     padding: 20px 0;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .ship-log-entry {
@@ -9186,7 +9206,7 @@ select:focus-visible {
     align-items: center;
     gap: 6px;
     padding: 3px 6px;
-    font-size: 13px;
+    font-size: var(--text-base);
     border-bottom: 1px solid rgba(200, 210, 230, 0.04);
 }
 
@@ -9195,7 +9215,7 @@ select:focus-visible {
 }
 
 .ship-log-icon {
-    font-size: 13px;
+    font-size: var(--text-base);
     width: 16px;
     text-align: center;
     flex-shrink: 0;
@@ -9211,8 +9231,8 @@ select:focus-visible {
 }
 
 .ship-log-time {
-    font-size: 13px;
-    color: rgba(200, 210, 230, 0.3);
+    font-size: var(--text-base);
+    color: rgba(200, 210, 230, 0.55);
     flex-shrink: 0;
 }
 
@@ -9221,7 +9241,7 @@ select:focus-visible {
 .ship-log-nav .ship-log-icon { color: #44aaff; }
 .ship-log-quest .ship-log-icon { color: #ffd700; }
 .ship-log-skill .ship-log-icon { color: #44ff88; }
-.ship-log-system .ship-log-icon { color: rgba(200, 210, 230, 0.5); }
+.ship-log-system .ship-log-icon { color: rgba(200, 210, 230, 0.7); }
 
 /* =============================================
    Combat Log Panel
@@ -9233,7 +9253,7 @@ select:focus-visible {
     gap: 4px;
     padding: 6px;
     border-bottom: 1px solid rgba(200, 210, 230, 0.1);
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .clog-stat {
@@ -9245,14 +9265,14 @@ select:focus-visible {
 
 .clog-stat-label {
     color: rgba(200, 210, 230, 0.4);
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 1px;
     text-transform: uppercase;
 }
 
 .clog-stat-value {
     font-weight: bold;
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-top: 1px;
 }
 
@@ -9269,11 +9289,11 @@ select:focus-visible {
 }
 
 .clog-filter-btn {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 6px;
     background: rgba(100, 120, 150, 0.15);
     border: 1px solid rgba(100, 120, 150, 0.2);
-    color: rgba(200, 210, 230, 0.5);
+    color: rgba(200, 210, 230, 0.7);
     cursor: pointer;
     border-radius: 2px;
     transition: all 0.15s;
@@ -9301,7 +9321,7 @@ select:focus-visible {
     align-items: center;
     gap: 4px;
     padding: 2px 6px;
-    font-size: 13px;
+    font-size: var(--text-base);
     border-bottom: 1px solid rgba(200, 210, 230, 0.03);
     line-height: 1.4;
 }
@@ -9312,7 +9332,7 @@ select:focus-visible {
 
 .clog-time {
     color: rgba(200, 210, 230, 0.25);
-    font-size: 13px;
+    font-size: var(--text-base);
     flex-shrink: 0;
     width: 36px;
 }
@@ -9321,7 +9341,7 @@ select:focus-visible {
     width: 14px;
     text-align: center;
     flex-shrink: 0;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .clog-msg {
@@ -9335,7 +9355,7 @@ select:focus-visible {
 .clog-dmg {
     flex-shrink: 0;
     font-weight: bold;
-    font-size: 13px;
+    font-size: var(--text-base);
     min-width: 40px;
     text-align: right;
 }
@@ -9349,9 +9369,9 @@ select:focus-visible {
 .clog-entry.incoming .clog-msg { color: rgba(255, 85, 85, 0.7); }
 .clog-entry.incoming .clog-dmg { color: #ff5555; }
 
-.clog-entry.miss .clog-icon { color: rgba(200, 210, 230, 0.3); }
+.clog-entry.miss .clog-icon { color: rgba(200, 210, 230, 0.55); }
 .clog-entry.miss .clog-msg { color: rgba(200, 210, 230, 0.35); font-style: italic; }
-.clog-entry.miss .clog-dmg { color: rgba(200, 210, 230, 0.3); }
+.clog-entry.miss .clog-dmg { color: rgba(200, 210, 230, 0.55); }
 
 .clog-entry.kill .clog-icon { color: #ffd700; }
 .clog-entry.kill .clog-msg { color: rgba(255, 215, 0, 0.85); font-weight: bold; }
@@ -9366,9 +9386,9 @@ select:focus-visible {
 
 .clog-empty {
     text-align: center;
-    color: rgba(200, 210, 230, 0.3);
+    color: rgba(200, 210, 230, 0.55);
     padding: 20px 0;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 /* =============================================
@@ -9413,7 +9433,7 @@ select:focus-visible {
     align-items: center;
     gap: 8px;
     z-index: 30;
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 2px;
     animation: hazard-blink 2s ease-in-out infinite;
 }
@@ -9451,7 +9471,7 @@ select:focus-visible {
     bottom: 100px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 3px;
     color: rgba(0, 255, 255, 0.7);
     text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
@@ -9495,7 +9515,7 @@ select:focus-visible {
 }
 
 .sector-banner-subtitle {
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 4px;
     color: var(--text-secondary);
     margin-top: 8px;
@@ -9534,7 +9554,7 @@ select:focus-visible {
 }
 
 .streak-count {
-    font-size: 14px;
+    font-size: var(--text-base);
     color: rgba(255, 200, 0, 0.6);
     letter-spacing: 2px;
     margin-top: 4px;
@@ -9566,7 +9586,7 @@ select:focus-visible {
 }
 
 .kill-notif-header {
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 6px;
     color: var(--hostile-color);
     text-shadow: 0 0 15px rgba(255, 68, 68, 0.5);
@@ -9587,7 +9607,7 @@ select:focus-visible {
 }
 
 .kill-notif-class {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--text-dim);
     letter-spacing: 3px;
     margin-top: 2px;
@@ -9636,7 +9656,7 @@ select:focus-visible {
 .tac-label {
     position: absolute;
     transform: translate(-50%, -100%);
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 1px;
     white-space: nowrap;
     padding: 1px 4px;
@@ -9655,9 +9675,9 @@ select:focus-visible {
 }
 
 .tac-label .tac-dist {
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.55);
     margin-left: 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .tac-bracket {
@@ -9756,7 +9776,7 @@ select:focus-visible {
 }
 
 .dock-anim-station {
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 3px;
     color: var(--text-secondary);
     margin-top: 8px;
@@ -9828,14 +9848,14 @@ select:focus-visible {
 }
 
 .route-dest {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #ffcc33;
     font-weight: bold;
     letter-spacing: 1px;
 }
 
 .route-jumps {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 200, 50, 0.6);
     letter-spacing: 0.5px;
 }
@@ -9956,7 +9976,7 @@ select:focus-visible {
 .mission-section { margin-bottom: 16px; }
 .mission-section h3 {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.6);
     letter-spacing: 1px;
     margin: 0 0 8px;
@@ -9981,12 +10001,12 @@ select:focus-visible {
 }
 .mission-name {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #fff;
     flex: 1;
 }
 .mission-category {
-    font-size: 10px;
+    font-size: var(--text-xs);
     padding: 1px 6px;
     border-radius: 3px;
     font-family: var(--font-display);
@@ -9997,11 +10017,11 @@ select:focus-visible {
 .mission-category.industry { background: rgba(255, 204, 68, 0.3); color: #ffcc44; }
 .mission-category.exploration { background: rgba(68, 170, 255, 0.3); color: #44aaff; }
 .mission-difficulty {
-    font-size: 11px;
+    font-size: var(--text-sm);
     color: #ffcc44;
 }
 .mission-desc {
-    font-size: 11px;
+    font-size: var(--text-sm);
     color: rgba(255, 255, 255, 0.5);
     margin-bottom: 6px;
 }
@@ -10025,7 +10045,7 @@ select:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: var(--text-xs);
     font-family: var(--font-mono);
     color: #fff;
     text-shadow: 0 1px 2px rgba(0,0,0,0.8);
@@ -10034,7 +10054,7 @@ select:focus-visible {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 11px;
+    font-size: var(--text-sm);
 }
 .mission-reward {
     color: #44ff88;
@@ -10042,17 +10062,17 @@ select:focus-visible {
 }
 .mission-standing {
     color: #44aaff;
-    font-size: 10px;
+    font-size: var(--text-xs);
 }
 .mission-timer {
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 10px;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: var(--text-xs);
     flex: 1;
     text-align: right;
 }
 .mission-accept-btn, .mission-abandon-btn {
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: var(--text-xs);
     padding: 2px 10px;
     border: 1px solid;
     border-radius: 3px;
@@ -10072,15 +10092,15 @@ select:focus-visible {
 .mission-abandon-btn:hover { background: rgba(255, 68, 68, 0.15); }
 .mission-accepted-tag {
     font-family: var(--font-display);
-    font-size: 10px;
-    color: rgba(0, 255, 255, 0.5);
+    font-size: var(--text-xs);
+    color: rgba(0, 255, 255, 0.6);
 }
 .mission-empty {
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.5);
     font-style: italic;
     padding: 12px;
     text-align: center;
-    font-size: 12px;
+    font-size: var(--text-xs);
 }
 
 /* Order Book */
@@ -10093,7 +10113,7 @@ select:focus-visible {
 }
 .order-good-selector label {
     font-family: var(--font-display);
-    font-size: 11px;
+    font-size: var(--text-sm);
     color: rgba(0, 255, 255, 0.6);
     letter-spacing: 0.5px;
 }
@@ -10102,15 +10122,15 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.3);
     color: #fff;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--text-sm);
     padding: 3px 8px;
     border-radius: 3px;
     flex: 1;
 }
 .order-base-price {
     font-family: var(--font-mono);
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.4);
+    font-size: var(--text-xs);
+    color: rgba(255, 255, 255, 0.55);
 }
 .order-book-spread {
     display: flex;
@@ -10121,12 +10141,12 @@ select:focus-visible {
     border-radius: 4px;
     margin-bottom: 8px;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--text-xs);
 }
 .spread-bid { color: #44ff88; }
 .spread-ask { color: #ff6666; }
 .spread-separator { color: rgba(255, 255, 255, 0.2); }
-.spread-value { color: rgba(255, 255, 255, 0.4); font-size: 10px; margin-left: auto; }
+.spread-value { color: rgba(255, 255, 255, 0.55); font-size: var(--text-xs); margin-left: auto; }
 .order-book-columns {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -10141,7 +10161,7 @@ select:focus-visible {
 }
 .order-col-header {
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: var(--text-xs);
     letter-spacing: 1px;
     padding: 3px 6px;
     margin-bottom: 4px;
@@ -10154,16 +10174,16 @@ select:focus-visible {
     justify-content: space-between;
     padding: 2px 6px;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--text-sm);
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 .order-row.sell .order-price { color: #ff6666; }
 .order-row.buy .order-price { color: #44ff88; }
 .order-qty { color: rgba(255, 255, 255, 0.6); }
-.order-owner { color: rgba(255, 255, 255, 0.3); font-size: 9px; }
+.order-owner { color: rgba(255, 255, 255, 0.5); font-size: var(--text-2xs); }
 .order-empty {
     color: rgba(255, 255, 255, 0.25);
-    font-size: 10px;
+    font-size: var(--text-xs);
     text-align: center;
     padding: 8px;
     font-style: italic;
@@ -10177,7 +10197,7 @@ select:focus-visible {
 }
 .order-form-title {
     font-family: var(--font-display);
-    font-size: 11px;
+    font-size: var(--text-sm);
     color: rgba(0, 255, 255, 0.6);
     letter-spacing: 1px;
     margin-bottom: 6px;
@@ -10189,7 +10209,7 @@ select:focus-visible {
     flex-wrap: wrap;
 }
 .order-form-row label {
-    font-size: 10px;
+    font-size: var(--text-xs);
     color: rgba(255, 255, 255, 0.5);
 }
 .order-form-row select, .order-form-row input {
@@ -10197,7 +10217,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.2);
     color: #fff;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--text-sm);
     padding: 3px 6px;
     border-radius: 3px;
     width: 65px;
@@ -10205,7 +10225,7 @@ select:focus-visible {
 .order-type-select { width: 55px; }
 .order-place-btn {
     font-family: var(--font-display);
-    font-size: 10px;
+    font-size: var(--text-xs);
     padding: 4px 12px;
     border: 1px solid rgba(0, 255, 255, 0.4);
     border-radius: 3px;
@@ -10219,8 +10239,8 @@ select:focus-visible {
 .order-price-chart { margin-bottom: 8px; }
 .order-chart-title {
     font-family: var(--font-display);
-    font-size: 10px;
-    color: rgba(0, 255, 255, 0.5);
+    font-size: var(--text-xs);
+    color: rgba(0, 255, 255, 0.6);
     letter-spacing: 1px;
     margin-bottom: 4px;
 }
@@ -10233,7 +10253,7 @@ select:focus-visible {
 .order-player-orders { margin-top: 8px; }
 .order-section-title {
     font-family: var(--font-display);
-    font-size: 11px;
+    font-size: var(--text-sm);
     color: rgba(0, 255, 255, 0.6);
     letter-spacing: 1px;
     margin-bottom: 6px;
@@ -10246,11 +10266,11 @@ select:focus-visible {
     gap: 8px;
     padding: 4px 6px;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--text-sm);
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 .order-type-tag {
-    font-size: 9px;
+    font-size: var(--text-2xs);
     padding: 1px 5px;
     border-radius: 2px;
     font-family: var(--font-display);
@@ -10260,7 +10280,7 @@ select:focus-visible {
 .order-type-tag.sell { background: rgba(255, 68, 68, 0.2); color: #ff6666; }
 .order-cancel-btn {
     font-family: var(--font-display);
-    font-size: 9px;
+    font-size: var(--text-2xs);
     padding: 2px 8px;
     border: 1px solid rgba(255, 68, 68, 0.3);
     border-radius: 2px;
@@ -10277,7 +10297,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.2);
     border-radius: 4px;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--text-sm);
     overflow: hidden;
 }
 .chat-header {
@@ -10291,7 +10311,7 @@ select:focus-visible {
 }
 .chat-title {
     font-family: var(--font-display);
-    font-size: 11px;
+    font-size: var(--text-sm);
     color: rgba(0, 255, 255, 0.7);
     letter-spacing: 1px;
 }
@@ -10303,12 +10323,12 @@ select:focus-visible {
 }
 .chat-channel-btn {
     font-family: var(--font-display);
-    font-size: 9px;
+    font-size: var(--text-2xs);
     padding: 1px 6px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 2px;
     background: transparent;
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.55);
     cursor: pointer;
     letter-spacing: 0.5px;
 }
@@ -10321,8 +10341,8 @@ select:focus-visible {
 .chat-close-btn {
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.3);
-    font-size: 14px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: var(--text-base);
     cursor: pointer;
     padding: 0 4px;
 }
@@ -10341,7 +10361,7 @@ select:focus-visible {
 .chat-ts {
     color: rgba(255, 255, 255, 0.2);
     margin-right: 4px;
-    font-size: 10px;
+    font-size: var(--text-xs);
 }
 .chat-sender {
     font-weight: bold;
@@ -10362,7 +10382,7 @@ select:focus-visible {
     border-radius: 6px;
     color: rgba(255, 255, 255, 0.85);
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: var(--text-xs);
     line-height: 1.3;
     pointer-events: none;
     white-space: nowrap;
@@ -10411,7 +10431,7 @@ select:focus-visible {
 }
 
 .bounty-header-title {
-    font-size: 14px;
+    font-size: var(--text-base);
     font-weight: bold;
     color: #ff6644;
     letter-spacing: 2px;
@@ -10424,7 +10444,7 @@ select:focus-visible {
 }
 
 .bounty-stat {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.5);
     letter-spacing: 1px;
 }
@@ -10436,8 +10456,8 @@ select:focus-visible {
 }
 
 .bounty-section-label {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.4);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.55);
     letter-spacing: 2px;
     padding: 6px 4px 4px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -10477,7 +10497,7 @@ select:focus-visible {
 }
 
 .bounty-danger-tag {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     letter-spacing: 2px;
     padding: 2px 8px;
@@ -10509,7 +10529,7 @@ select:focus-visible {
 }
 
 .bounty-status-tag {
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 1px;
     padding: 1px 6px;
     border-radius: 2px;
@@ -10529,7 +10549,7 @@ select:focus-visible {
 }
 
 .bounty-target-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     color: #ffccaa;
     margin-bottom: 3px;
@@ -10543,12 +10563,12 @@ select:focus-visible {
 }
 
 .bounty-detail {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.5);
 }
 
 .bounty-kills {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 80, 40, 0.8);
     margin-top: 3px;
 }
@@ -10573,18 +10593,18 @@ select:focus-visible {
 }
 
 .bounty-label {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.3);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.5);
     letter-spacing: 1px;
 }
 
 .bounty-value {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #88aacc;
 }
 
 .bounty-reward-amount {
-    font-size: 14px;
+    font-size: var(--text-base);
     font-weight: bold;
     color: #ffcc44;
     text-shadow: 0 0 6px rgba(255, 204, 68, 0.3);
@@ -10623,22 +10643,22 @@ select:focus-visible {
 }
 
 .bounty-timer {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 170, 0, 0.6);
     letter-spacing: 1px;
 }
 
 .bounty-claimed-text {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #44ff44;
     font-weight: bold;
 }
 
 .bounty-empty {
     text-align: center;
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.5);
     padding: 30px 10px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-style: italic;
 }
 
@@ -10649,8 +10669,8 @@ select:focus-visible {
 }
 
 .bounty-info p {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.3);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.5);
     margin: 2px 0;
     line-height: 1.4;
 }
@@ -10704,7 +10724,7 @@ select:focus-visible {
 }
 
 .bkn-ship {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.5);
     margin-bottom: 6px;
 }
@@ -10772,12 +10792,12 @@ select:focus-visible {
     border-radius: 3px;
     color: #ccc;
     font-family: var(--font-body);
-    font-size: 13px;
+    font-size: var(--text-base);
     outline: none;
 }
-.enc-search:focus { border-color: rgba(0, 255, 255, 0.5); }
+.enc-search:focus { border-color: rgba(0, 255, 255, 0.6); }
 .enc-discovery-total {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.7);
     white-space: nowrap;
     text-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
@@ -10786,7 +10806,7 @@ select:focus-visible {
     background: none;
     border: 1px solid rgba(0, 255, 255, 0.2);
     color: rgba(0, 255, 255, 0.6);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     cursor: pointer;
     padding: 4px 10px;
@@ -10821,7 +10841,7 @@ select:focus-visible {
     border-bottom: 2px solid transparent;
     color: rgba(255, 255, 255, 0.5);
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     text-align: center;
     transition: all 0.2s;
@@ -10833,7 +10853,7 @@ select:focus-visible {
     border-bottom-color: #00ffff;
     text-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
 }
-.enc-tab-count { font-size: 13px; opacity: 0.6; }
+.enc-tab-count { font-size: var(--text-base); opacity: 0.6; }
 
 /* Toolbar */
 .enc-toolbar {
@@ -10850,7 +10870,7 @@ select:focus-visible {
 }
 .enc-toolbar label {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.5);
     display: flex;
     align-items: center;
@@ -10861,7 +10881,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.15);
     color: #ccc;
     font-family: var(--font-body);
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 3px 6px;
     border-radius: 2px;
     outline: none;
@@ -10872,7 +10892,7 @@ select:focus-visible {
     color: #00ffff;
     cursor: pointer;
     padding: 3px 8px;
-    font-size: 13px;
+    font-size: var(--text-base);
     border-radius: 2px;
 }
 .enc-sort-dir:hover { background: rgba(0, 255, 255, 0.1); }
@@ -10882,7 +10902,7 @@ select:focus-visible {
     color: #00ffff;
     cursor: pointer;
     padding: 4px 10px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-display);
     border-radius: 2px;
     margin-left: auto;
@@ -11019,7 +11039,7 @@ select:focus-visible {
 }
 .enc-badge-role {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 6px;
     border-radius: 2px;
     text-transform: uppercase;
@@ -11029,7 +11049,7 @@ select:focus-visible {
 }
 .enc-badge-size {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 6px;
     border-radius: 2px;
     background: rgba(255, 255, 255, 0.1);
@@ -11039,7 +11059,7 @@ select:focus-visible {
 }
 .enc-badge-guild {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 6px;
     border-radius: 2px;
     background: rgba(255, 170, 0, 0.3);
@@ -11049,7 +11069,7 @@ select:focus-visible {
 }
 .enc-card-name {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #ddd;
     margin-bottom: 4px;
     font-weight: bold;
@@ -11063,18 +11083,18 @@ select:focus-visible {
     display: flex;
     gap: 8px;
     font-family: var(--font-mono);
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.4);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.55);
     flex-wrap: wrap;
 }
 .enc-card-guild {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #ffaa44;
     margin-top: 4px;
 }
 .enc-card-sub {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.3);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.5);
     filter: brightness(3);
 }
 
@@ -11097,12 +11117,12 @@ select:focus-visible {
     cursor: pointer;
     padding: 4px 12px;
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     border-radius: 2px;
 }
 .enc-page-btn:hover:not(:disabled) { background: rgba(0, 255, 255, 0.1); }
 .enc-page-btn:disabled { opacity: 0.3; cursor: default; }
-.enc-page-info { font-size: 13px; color: rgba(255, 255, 255, 0.4); }
+.enc-page-info { font-size: var(--text-base); color: rgba(255, 255, 255, 0.55); }
 
 /* Detail View */
 .enc-detail {
@@ -11142,7 +11162,7 @@ select:focus-visible {
     text-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
 }
 .enc-description {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.5);
     line-height: 1.5;
     margin-bottom: 16px;
@@ -11156,7 +11176,7 @@ select:focus-visible {
 }
 .enc-stat-section h3 {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.6);
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -11171,7 +11191,7 @@ select:focus-visible {
 .enc-stat-label {
     font-family: var(--font-display);
     width: 60px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.5);
     text-align: right;
 }
@@ -11191,11 +11211,11 @@ select:focus-visible {
 .enc-stat-value {
     font-family: var(--font-mono);
     width: 50px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.7);
 }
 .enc-stat-total {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.6);
     text-align: right;
     margin-top: 4px;
@@ -11204,7 +11224,7 @@ select:focus-visible {
     display: flex;
     justify-content: space-between;
     padding: 3px 0;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.5);
 }
 .enc-stat-row span:last-child { color: rgba(255, 255, 255, 0.8); font-family: var(--font-mono); }
@@ -11222,8 +11242,8 @@ select:focus-visible {
     gap: 6px;
 }
 .enc-slot-label {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.4);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.55);
     min-width: 55px;
 }
 .enc-slot-pips { display: flex; gap: 3px; }
@@ -11237,7 +11257,7 @@ select:focus-visible {
 /* Bonus tags */
 .enc-bonus {
     display: inline-block;
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 8px;
     margin: 2px 4px 2px 0;
     background: rgba(0, 255, 255, 0.08);
@@ -11250,7 +11270,7 @@ select:focus-visible {
 .enc-cost-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-top: 8px;
 }
 .enc-cost-table th, .enc-cost-table td {
@@ -11260,10 +11280,10 @@ select:focus-visible {
 }
 .enc-cost-table th {
     font-family: var(--font-display);
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.55);
     font-weight: normal;
     text-transform: uppercase;
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 1px;
 }
 .enc-cost-table td { font-family: var(--font-mono); color: rgba(255, 255, 255, 0.6); }
@@ -11300,8 +11320,8 @@ select:focus-visible {
     box-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
 }
 .enc-size-label {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.3);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.5);
     padding: 2px 0;
 }
 .enc-size-pip.active .enc-size-label { color: #00ffff; }
@@ -11315,7 +11335,7 @@ select:focus-visible {
     color: #00ffff;
     text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     border-radius: 3px;
     transition: all 0.2s;
@@ -11331,7 +11351,7 @@ select:focus-visible {
     text-align: center;
     padding: 12px;
     color: rgba(0, 255, 255, 0.7);
-    font-size: 14px;
+    font-size: var(--text-base);
     margin-bottom: 12px;
 }
 
@@ -11359,8 +11379,8 @@ select:focus-visible {
     font-weight: bold;
 }
 .enc-cmp-sub {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.4);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.55);
     margin-top: 4px;
     display: flex;
     align-items: center;
@@ -11392,7 +11412,7 @@ select:focus-visible {
 .enc-cmp-val {
     font-family: var(--font-mono);
     width: 60px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     text-align: center;
 }
@@ -11428,8 +11448,8 @@ select:focus-visible {
 }
 .enc-cmp-label {
     font-family: var(--font-display);
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.4);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.55);
     text-align: center;
     min-width: 70px;
     white-space: nowrap;
@@ -11449,7 +11469,7 @@ select:focus-visible {
     transition: all 0.2s;
 }
 .enc-faction-card:hover {
-    border-color: rgba(0, 255, 255, 0.3);
+    border-color: rgba(0, 255, 255, 0.6);
     background: rgba(10, 25, 45, 0.9);
 }
 .enc-faction-card.enc-undiscovered {
@@ -11462,12 +11482,12 @@ select:focus-visible {
 .enc-faction-icon-lg { font-size: 40px; }
 .enc-faction-info { flex: 1; }
 .enc-faction-name { font-family: var(--font-display); font-size: 15px; color: #ddd; font-weight: bold; }
-.enc-faction-short { font-size: 13px; color: rgba(255, 255, 255, 0.3); }
-.enc-faction-short-lg { font-size: 14px; color: rgba(255, 255, 255, 0.3); }
-.enc-faction-desc { font-size: 13px; color: rgba(255, 255, 255, 0.4); margin-top: 4px; line-height: 1.4; }
+.enc-faction-short { font-size: var(--text-base); color: rgba(255, 255, 255, 0.5); }
+.enc-faction-short-lg { font-size: var(--text-base); color: rgba(255, 255, 255, 0.5); }
+.enc-faction-desc { font-size: var(--text-base); color: rgba(255, 255, 255, 0.55); margin-top: 4px; line-height: 1.4; }
 .enc-faction-hostile {
     display: inline-block;
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 8px;
     margin-top: 4px;
     background: rgba(255, 0, 0, 0.2);
@@ -11477,7 +11497,7 @@ select:focus-visible {
     letter-spacing: 1px;
 }
 .enc-badge-hostile {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 8px;
     background: rgba(255, 0, 0, 0.2);
     border: 1px solid rgba(255, 0, 0, 0.3);
@@ -11492,18 +11512,18 @@ select:focus-visible {
 .enc-fleet-entry {
     display: flex;
     gap: 12px;
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 3px 0;
     color: rgba(255, 255, 255, 0.6);
 }
-.enc-fleet-role { color: rgba(255, 255, 255, 0.4); min-width: 60px; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; }
+.enc-fleet-role { color: rgba(255, 255, 255, 0.55); min-width: 60px; text-transform: uppercase; font-size: var(--text-base); letter-spacing: 1px; }
 .enc-fleet-ship { color: rgba(255, 255, 255, 0.7); flex: 1; }
 .enc-fleet-count { color: rgba(0, 255, 255, 0.6); }
 
 /* Sector tags */
 .enc-sector-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .enc-sector-tag {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 3px 8px;
     background: rgba(0, 255, 255, 0.06);
     border: 1px solid rgba(0, 255, 255, 0.12);
@@ -11522,7 +11542,7 @@ select:focus-visible {
     transition: all 0.2s;
 }
 .enc-sector-card:hover {
-    border-color: rgba(0, 255, 255, 0.3);
+    border-color: rgba(0, 255, 255, 0.6);
     background: rgba(10, 25, 45, 0.9);
 }
 .enc-sector-card.enc-undiscovered {
@@ -11534,7 +11554,7 @@ select:focus-visible {
 .enc-sector-name { font-family: var(--font-display); font-size: 15px; color: #ddd; font-weight: bold; }
 .enc-badge-diff {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 8px;
     border-radius: 2px;
     color: #000;
@@ -11543,19 +11563,19 @@ select:focus-visible {
     letter-spacing: 1px;
 }
 .enc-sector-specialty {
-    font-size: 13px;
-    color: rgba(0, 255, 255, 0.5);
+    font-size: var(--text-base);
+    color: rgba(0, 255, 255, 0.6);
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-bottom: 4px;
 }
-.enc-sector-desc { font-size: 13px; color: rgba(255, 255, 255, 0.4); line-height: 1.4; }
-.enc-sector-connections { font-size: 13px; color: rgba(255, 255, 255, 0.3); margin-top: 6px; }
+.enc-sector-desc { font-size: var(--text-base); color: rgba(255, 255, 255, 0.55); line-height: 1.4; }
+.enc-sector-connections { font-size: var(--text-base); color: rgba(255, 255, 255, 0.5); margin-top: 6px; }
 
 /* Trade good detail */
 .enc-trade-icon { font-size: 32px; }
 .enc-produces-tag {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 1px 6px;
     background: rgba(68, 255, 136, 0.2);
     border: 1px solid rgba(68, 255, 136, 0.3);
@@ -11563,7 +11583,7 @@ select:focus-visible {
     color: #44ff88;
 }
 .enc-consumes-tag {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 1px 6px;
     background: rgba(255, 136, 68, 0.2);
     border: 1px solid rgba(255, 136, 68, 0.3);
@@ -11575,7 +11595,7 @@ select:focus-visible {
     justify-content: space-between;
     align-items: center;
     padding: 5px 0;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.6);
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
@@ -11584,7 +11604,7 @@ select:focus-visible {
 .enc-price-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: var(--text-base);
     margin-top: 8px;
 }
 .enc-price-table th, .enc-price-table td {
@@ -11594,10 +11614,10 @@ select:focus-visible {
 }
 .enc-price-table th {
     font-family: var(--font-display);
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.55);
     font-weight: normal;
     text-transform: uppercase;
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 1px;
 }
 .enc-price-table td { font-family: var(--font-mono); color: rgba(255, 255, 255, 0.6); }
@@ -11606,21 +11626,21 @@ select:focus-visible {
 .enc-search-group { margin-bottom: 20px; }
 .enc-search-group h3 {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.7);
     margin: 0 0 10px 0;
     padding-bottom: 6px;
     border-bottom: 1px solid rgba(0, 255, 255, 0.1);
 }
 .enc-search-info {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.5);
 }
 .enc-no-results {
     text-align: center;
     padding: 60px 20px;
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.3);
+    font-size: var(--text-base);
+    color: rgba(255, 255, 255, 0.5);
 }
 
 /* Locked detail view */
@@ -11630,7 +11650,7 @@ select:focus-visible {
 }
 .enc-lock-big { font-size: 48px; margin-bottom: 16px; }
 .enc-detail-locked h2 { color: rgba(255, 255, 255, 0.5); margin-bottom: 12px; }
-.enc-detail-locked p { color: rgba(255, 255, 255, 0.3); margin-bottom: 20px; }
+.enc-detail-locked p { color: rgba(255, 255, 255, 0.5); margin-bottom: 20px; }
 .enc-back-link {
     background: none;
     border: 1px solid rgba(0, 255, 255, 0.2);
@@ -11638,7 +11658,7 @@ select:focus-visible {
     cursor: pointer;
     padding: 6px 16px;
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     border-radius: 3px;
 }
 
@@ -11653,7 +11673,7 @@ select:focus-visible {
 .enc-sound-section h3 {
     margin: 0 0 8px 0;
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.7);
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -11666,7 +11686,7 @@ select:focus-visible {
 }
 .enc-sound-current {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(100, 255, 180, 0.8);
     flex: 1;
     min-width: 100px;
@@ -11678,7 +11698,7 @@ select:focus-visible {
     display: inline-block;
     padding: 3px 10px;
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #00ffff;
     border: 1px solid rgba(0, 255, 255, 0.3);
     border-radius: 3px;
@@ -11692,7 +11712,7 @@ select:focus-visible {
 .enc-sound-clear-btn {
     padding: 3px 10px;
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     border: 1px solid;
     border-radius: 3px;
     cursor: pointer;
@@ -11727,7 +11747,7 @@ select:focus-visible {
 }
 .enc-sounds-category h3 {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.8);
     margin: 16px 0 6px 0;
     padding-bottom: 4px;
@@ -11751,7 +11771,7 @@ select:focus-visible {
     width: 160px;
     flex-shrink: 0;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(255, 255, 255, 0.7);
 }
 .enc-sound-row .enc-sound-current {
@@ -11760,17 +11780,17 @@ select:focus-visible {
 }
 .enc-sound-row .enc-sound-file-label {
     padding: 2px 8px;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 .enc-sound-row .enc-sound-play-btn,
 .enc-sound-row .enc-sound-clear-btn {
     padding: 2px 8px;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 .enc-sound-jump-btn {
     padding: 2px 8px;
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #00ffff;
     border: 1px solid rgba(0, 255, 255, 0.3);
     border-radius: 3px;
@@ -11828,7 +11848,7 @@ select:focus-visible {
 }
 .damage-popup.miss {
     color: #888888;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-style: italic;
     text-shadow: 0 0 4px rgba(136, 136, 136, 0.4), 0 1px 3px rgba(0, 0, 0, 0.8);
 }
@@ -11886,7 +11906,7 @@ select:focus-visible {
 .gate-label {
     position: absolute;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-variant: small-caps;
     color: rgba(255, 255, 255, 0.75);
     text-shadow: 0 0 6px rgba(68, 221, 255, 0.5), 0 1px 3px rgba(0, 0, 0, 0.9);
@@ -11934,14 +11954,14 @@ select:focus-visible {
 }
 
 .combat-info-label {
-    font-size: 13px;
-    color: rgba(0, 255, 255, 0.5);
+    font-size: var(--text-base);
+    color: rgba(0, 255, 255, 0.6);
     letter-spacing: 0.5px;
     text-transform: uppercase;
 }
 
 .combat-info-value {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     color: #00ffcc;
 }
@@ -11965,7 +11985,7 @@ select:focus-visible {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     color: #ff2222;
     text-shadow: 0 0 10px rgba(255, 34, 34, 0.8), 0 0 20px rgba(255, 34, 34, 0.4);
@@ -12064,7 +12084,7 @@ select:focus-visible {
 }
 
 #skippy-panel .panel-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 1.5px;
 }
 
@@ -12078,7 +12098,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.15);
     color: var(--text-secondary, #8899aa);
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 1px 5px;
     border-radius: 2px;
     line-height: 1;
@@ -12136,7 +12156,7 @@ select:focus-visible {
     background: rgba(0, 10, 20, 0.7);
     border: 1px solid rgba(0, 255, 255, 0.12);
     border-radius: 3px;
-    font-size: 13px;
+    font-size: var(--text-base);
     line-height: 1.4;
     color: #ccddee;
     overflow-y: auto;
@@ -12144,7 +12164,7 @@ select:focus-visible {
 }
 
 .skippy-text.speaking {
-    border-color: rgba(0, 255, 255, 0.5);
+    border-color: rgba(0, 255, 255, 0.6);
     animation: skippy-speak-glow 0.8s ease-in-out infinite;
 }
 
@@ -12157,7 +12177,7 @@ select:focus-visible {
     flex: 0 1 auto;
     max-height: 80px;
     overflow-y: auto;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #556677;
     padding: 0 4px;
 }
@@ -12381,9 +12401,9 @@ select:focus-visible {
 
 .splash-subtitle {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 6px;
-    color: rgba(0, 255, 255, 0.5);
+    color: rgba(0, 255, 255, 0.6);
     text-transform: uppercase;
     margin: -4px 0 12px 0;
 }
@@ -12398,7 +12418,7 @@ select:focus-visible {
 
 .splash-btn {
     font-family: var(--font-display);
-    font-size: 14px;
+    font-size: var(--text-base);
     letter-spacing: 3px;
     text-transform: uppercase;
     color: var(--primary-cyan, #00ffff);
@@ -12423,7 +12443,7 @@ select:focus-visible {
 
 .splash-version {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.25);
     letter-spacing: 2px;
     margin-top: 8px;
@@ -12474,7 +12494,7 @@ select:focus-visible {
 
 .splash-back-btn {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--primary-cyan, #00ffff);
     background: transparent;
     border: 1px solid rgba(0, 255, 255, 0.3);
@@ -12537,7 +12557,7 @@ select:focus-visible {
 
 .slot-name {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--primary-cyan, #00ffff);
     font-weight: bold;
     letter-spacing: 1px;
@@ -12549,7 +12569,7 @@ select:focus-visible {
     border-bottom: 1px solid rgba(0, 255, 255, 0.3);
     color: var(--primary-cyan, #00ffff);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 1px;
     width: 100%;
     padding: 0 0 2px 0;
@@ -12562,8 +12582,8 @@ select:focus-visible {
 
 .slot-detail {
     font-family: var(--font-mono);
-    font-size: 13px;
-    color: rgba(0, 255, 255, 0.5);
+    font-size: var(--text-base);
+    color: rgba(0, 255, 255, 0.6);
     letter-spacing: 0.5px;
 }
 
@@ -12573,13 +12593,13 @@ select:focus-visible {
 
 .slot-timestamp {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.35);
 }
 
 .slot-empty-text {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.35);
     font-style: italic;
 }
@@ -12591,7 +12611,7 @@ select:focus-visible {
 
 .slot-action-btn {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     letter-spacing: 1px;
     color: var(--primary-cyan, #00ffff);
     background: rgba(0, 255, 255, 0.06);
@@ -12603,7 +12623,7 @@ select:focus-visible {
 
 .slot-action-btn:hover {
     background: rgba(0, 255, 255, 0.12);
-    border-color: rgba(0, 255, 255, 0.5);
+    border-color: rgba(0, 255, 255, 0.6);
 }
 
 .slot-action-btn.danger {
@@ -12631,7 +12651,7 @@ select:focus-visible {
 }
 
 .save-import-row .splash-btn {
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 6px 14px;
     flex: 1;
 }
@@ -12658,7 +12678,7 @@ select:focus-visible {
 
 .splash-confirm-dialog p {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--primary-cyan, #00ffff);
     margin: 0 0 16px 0;
 }
@@ -12675,7 +12695,7 @@ select:focus-visible {
     grid-template-columns: 1fr 1fr;
     gap: 4px 20px;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.7);
 }
 
@@ -12700,7 +12720,7 @@ select:focus-visible {
 
 .faction-skippy-line {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(0, 255, 255, 0.6);
     font-style: italic;
     text-align: center;
@@ -12715,8 +12735,8 @@ select:focus-visible {
 
 .faction-label {
     font-family: var(--font-mono);
-    font-size: 13px;
-    color: rgba(0, 255, 255, 0.5);
+    font-size: var(--text-base);
+    color: rgba(0, 255, 255, 0.6);
     letter-spacing: 2px;
 }
 
@@ -12757,7 +12777,7 @@ select:focus-visible {
 
 .faction-color-swatch:hover {
     transform: scale(1.15);
-    border-color: rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.55);
 }
 
 .faction-color-swatch.selected {
@@ -12805,7 +12825,7 @@ select:focus-visible {
 /* Fleet "Buy for Fleet" button in station */
 .buy-fleet-btn {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #ffaa00;
     background: rgba(255, 170, 0, 0.1);
     border: 1px solid rgba(255, 170, 0, 0.3);
@@ -12828,7 +12848,7 @@ select:focus-visible {
 /* Faction Treasury HUD */
 .faction-treasury-display {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #ffaa00;
     display: flex;
     align-items: center;
@@ -12836,7 +12856,7 @@ select:focus-visible {
 }
 
 .faction-treasury-icon {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 /* Coalition War Progress HUD */
@@ -12845,7 +12865,7 @@ select:focus-visible {
     align-items: center;
     gap: 3px;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: var(--text-xs);
     margin-left: 6px;
 }
 .war-label-r { color: #4488ff; font-weight: bold; }
@@ -12869,7 +12889,7 @@ select:focus-visible {
 
 .stardate-display {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #88bbff;
     display: flex;
     align-items: center;
@@ -12878,7 +12898,7 @@ select:focus-visible {
 
 .stardate-label {
     color: #557799;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
 }
 
@@ -12900,7 +12920,7 @@ select:focus-visible {
     border: none;
     color: #557788;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     cursor: pointer;
     letter-spacing: 1px;
@@ -12931,11 +12951,11 @@ select:focus-visible {
     text-align: center;
     color: #556677;
     padding: 30px 10px;
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .aar-hint {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #334455;
     margin-top: 6px;
 }
@@ -12949,7 +12969,7 @@ select:focus-visible {
 }
 
 .aar-count {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #557788;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -12959,7 +12979,7 @@ select:focus-visible {
     background: transparent;
     border: 1px solid rgba(255, 68, 68, 0.3);
     color: #ff4444;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     padding: 2px 6px;
     cursor: pointer;
@@ -12994,19 +13014,19 @@ select:focus-visible {
 
 .aar-stardate {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #88bbff;
 }
 
 .aar-outcome {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 .aar-card-body {
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 .aar-sector {
@@ -13037,7 +13057,7 @@ select:focus-visible {
     background: transparent;
     border: 1px solid rgba(0, 255, 255, 0.15);
     color: var(--primary-cyan, #00ffff);
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
     padding: 3px 8px;
     cursor: pointer;
@@ -13064,7 +13084,7 @@ select:focus-visible {
 }
 
 .aar-outcome-large {
-    font-size: 14px;
+    font-size: var(--text-base);
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -13072,14 +13092,14 @@ select:focus-visible {
 
 .aar-detail-stardate {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #88bbff;
 }
 
 .aar-detail-meta {
     display: flex;
     justify-content: space-between;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #667788;
 }
 
@@ -13099,14 +13119,14 @@ select:focus-visible {
 }
 
 .aar-faction-name {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     margin-bottom: 4px;
 }
 
 .aar-faction-stats,
 .aar-faction-damage {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #667788;
     display: flex;
     gap: 8px;
@@ -13122,7 +13142,7 @@ select:focus-visible {
 }
 
 .aar-section-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #557788;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -13136,7 +13156,7 @@ select:focus-visible {
     justify-content: space-between;
     align-items: center;
     padding: 3px 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
@@ -13162,7 +13182,7 @@ select:focus-visible {
 .aar-destroyed-badge {
     color: #ff4444;
     font-weight: bold;
-    font-size: 13px;
+    font-size: var(--text-base);
     text-transform: uppercase;
 }
 
@@ -13181,7 +13201,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.1);
     color: #88aacc;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 5px 8px;
     cursor: pointer;
     width: 100%;
@@ -13200,7 +13220,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.05);
     border-top: none;
     padding: 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-family: var(--font-mono);
 }
 
@@ -13232,7 +13252,7 @@ select:focus-visible {
     border: 1px solid rgba(0, 255, 255, 0.2);
     color: var(--primary-cyan, #00ffff);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 6px 12px;
     cursor: pointer;
     width: 100%;
@@ -13282,7 +13302,7 @@ select:focus-visible {
 
 .tactical-replay-title {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: var(--primary-cyan, #00ffff);
     font-weight: bold;
     letter-spacing: 2px;
@@ -13290,7 +13310,7 @@ select:focus-visible {
 
 .tactical-replay-stardate {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #88bbff;
 }
 
@@ -13326,7 +13346,7 @@ select:focus-visible {
     background: rgba(0, 255, 255, 0.1);
     border: 1px solid rgba(0, 255, 255, 0.2);
     color: var(--primary-cyan, #00ffff);
-    font-size: 13px;
+    font-size: var(--text-base);
     width: 28px;
     height: 24px;
     cursor: pointer;
@@ -13362,7 +13382,7 @@ select:focus-visible {
 
 .replay-time {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #667788;
     white-space: nowrap;
     min-width: 80px;
@@ -13371,7 +13391,7 @@ select:focus-visible {
 
 .replay-speed-btn {
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-base);
     min-width: 28px;
 }
 
@@ -13387,7 +13407,7 @@ select:focus-visible {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #667788;
 }
 
@@ -13421,9 +13441,9 @@ select:focus-visible {
 }
 .sector-event-banner.hidden { display: none; }
 .event-banner-icon { font-size: 20px; }
-.event-banner-title { color: #ffcc44; font-size: 13px; font-weight: bold; letter-spacing: 1px; }
-.event-banner-desc { color: #aaa; font-size: 13px; }
-.event-banner-timer { color: #888; font-size: 13px; margin-left: 8px; }
+.event-banner-title { color: #ffcc44; font-size: var(--text-base); font-weight: bold; letter-spacing: 1px; }
+.event-banner-desc { color: #aaa; font-size: var(--text-base); }
+.event-banner-timer { color: #888; font-size: var(--text-base); margin-left: 8px; }
 @keyframes eventBannerSlide {
     from { transform: translateX(-50%) translateY(-30px); opacity: 0; }
     to { transform: translateX(-50%) translateY(0); opacity: 1; }
@@ -13446,7 +13466,7 @@ select:focus-visible {
     gap: 4px;
     color: #88dddd;
     font-family: "Courier New", monospace;
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
     padding: 2px 6px;
     border: 1px solid rgba(0, 255, 255, 0.2);
@@ -13454,7 +13474,7 @@ select:focus-visible {
     transition: border-color 0.2s;
     user-select: none;
 }
-.map-overlay-toggle:hover { border-color: rgba(0, 255, 255, 0.5); }
+.map-overlay-toggle:hover { border-color: rgba(0, 255, 255, 0.6); }
 .map-overlay-toggle input[type="checkbox"] {
     accent-color: #00ffff;
     width: 12px; height: 12px;
@@ -13497,7 +13517,7 @@ select:focus-visible {
     margin-bottom: 6px;
 }
 .bounty-tier-badge {
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     border: 1px solid;
     border-radius: 3px;
@@ -13516,7 +13536,7 @@ select:focus-visible {
     margin-bottom: 6px;
 }
 .template-card:hover { border-color: rgba(0, 255, 255, 0.4); }
-.template-name { color: #00ffff; font-weight: bold; font-size: 13px; }
+.template-name { color: #00ffff; font-weight: bold; font-size: var(--text-base); }
 
 /* =============================================
    Doctrine Selector (Fleet Panel)
@@ -13528,13 +13548,13 @@ select:focus-visible {
     border-radius: 3px;
     padding: 3px 6px;
     font-family: "Courier New", monospace;
-    font-size: 13px;
+    font-size: var(--text-base);
     cursor: pointer;
 }
 .doctrine-selector:hover { border-color: rgba(0, 255, 255, 0.6); }
 .doctrine-selector option { background: #0a0a1a; color: #ccc; }
-.formation-status { color: #44ff88; font-size: 13px; }
-.doctrine-info { color: #ffaa44; font-size: 13px; }
+.formation-status { color: #44ff88; font-size: var(--text-base); }
+.doctrine-info { color: #ffaa44; font-size: var(--text-base); }
 
 /* =============================================
    Intel Indicators
@@ -13556,7 +13576,7 @@ select:focus-visible {
 }
 .flagship-header {
     color: #ffaa00;
-    font-size: 13px;
+    font-size: var(--text-base);
     font-weight: bold;
     letter-spacing: 1px;
     margin-bottom: 4px;
@@ -13567,10 +13587,10 @@ select:focus-visible {
     align-items: center;
     padding: 3px 6px;
     border-bottom: 1px solid rgba(255, 170, 0, 0.1);
-    font-size: 13px;
+    font-size: var(--text-base);
     color: #ccc;
 }
-.flagship-command-status { color: #ffaa00; font-size: 13px; margin-top: 4px; }
+.flagship-command-status { color: #ffaa00; font-size: var(--text-base); margin-top: 4px; }
 
 /* =============================================
    REFINERY ACTIONS & INGOT PREVIEW
@@ -13599,7 +13619,7 @@ select:focus-visible {
     background: rgba(136, 68, 255, 0.05);
 }
 .ingot-preview-title {
-    font-size: 13px;
+    font-size: var(--text-base);
     color: rgba(136, 68, 255, 0.7);
     letter-spacing: 1px;
     margin-bottom: 4px;
@@ -13608,7 +13628,7 @@ select:focus-visible {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
+    font-size: var(--text-base);
     padding: 2px 0;
 }
 .ingot-ore { color: #99aabb; }
@@ -13662,7 +13682,7 @@ select:focus-visible {
 }
 .death-stats {
     font-family: var(--font-mono);
-    font-size: 14px;
+    font-size: var(--text-base);
     color: #99aabb;
     margin-bottom: 40px;
     line-height: 1.8;
@@ -13678,7 +13698,7 @@ select:focus-visible {
 }
 .death-btn {
     font-family: var(--font-heading);
-    font-size: 14px;
+    font-size: var(--text-base);
     font-weight: 600;
     letter-spacing: 1px;
     padding: 12px 28px;
@@ -13691,7 +13711,7 @@ select:focus-visible {
 }
 .death-btn:hover {
     background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
     color: #ffffff;
 }
 .death-respawn-btn {
@@ -13980,7 +14000,7 @@ select:focus-visible {
     transition: opacity 0.4s, transform 0.4s;
 }
 .skill-flash-levelup {
-    font-size: 13px;
+    font-size: var(--text-base);
     border-left-width: 3px;
     border-left-color: #ffdd44;
     background: rgba(30, 25, 10, 0.8);
@@ -14080,8 +14100,8 @@ select:focus-visible {
     display: none;
 }
 .ri-label {
-    color: rgba(0, 255, 255, 0.5);
-    font-size: 13px;
+    color: rgba(0, 255, 255, 0.6);
+    font-size: var(--text-base);
     text-transform: uppercase;
     letter-spacing: 2px;
 }
@@ -14091,7 +14111,7 @@ select:focus-visible {
 }
 .ri-jumps {
     color: rgba(180, 200, 220, 0.6);
-    font-size: 13px;
+    font-size: var(--text-base);
 }
 
 /* =============================================
@@ -14248,7 +14268,7 @@ select:focus-visible {
     transition: border-color 0.2s;
 }
 .pos-module-card:hover {
-    border-color: rgba(0, 255, 255, 0.3);
+    border-color: rgba(0, 255, 255, 0.6);
 }
 .pos-module-card.completed {
     border-color: rgba(0, 255, 100, 0.3);
@@ -14359,7 +14379,7 @@ select:focus-visible {
 }
 .pos-btn:hover {
     background: rgba(0, 60, 80, 0.6);
-    border-color: rgba(0, 255, 255, 0.5);
+    border-color: rgba(0, 255, 255, 0.6);
 }
 .pos-btn:disabled {
     opacity: 0.3;
@@ -14468,7 +14488,7 @@ select:focus-visible {
 }
 .pos-turret-shop-title {
     font: 10px var(--font-mono);
-    color: rgba(0, 255, 255, 0.5);
+    color: rgba(0, 255, 255, 0.6);
     letter-spacing: 2px;
     margin-bottom: 8px;
 }
@@ -14544,11 +14564,11 @@ select:focus-visible {
 }
 .pos-contribute-input:focus {
     outline: none;
-    border-color: rgba(0, 255, 255, 0.5);
+    border-color: rgba(0, 255, 255, 0.6);
 }
 .pos-section-title {
     font: 10px var(--font-mono);
-    color: rgba(0, 255, 255, 0.5);
+    color: rgba(0, 255, 255, 0.6);
     letter-spacing: 2px;
     margin-bottom: 8px;
     padding-bottom: 4px;

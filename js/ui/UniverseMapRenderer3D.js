@@ -513,7 +513,7 @@ export class UniverseMapRenderer3D {
             border-radius: 4px;
             padding: 8px 12px;
             font-family: 'Rajdhani', 'Share Tech Mono', monospace;
-            font-size: 12px;
+            font-size: 13px;
             color: #eaf2fa;
             pointer-events: none;
             z-index: 10000;
@@ -830,23 +830,23 @@ export class UniverseMapRenderer3D {
 
         // Build faction line
         const factionLine = factionData
-            ? `<div style="color: ${factionData.color}; font-size: 11px; margin-top: 2px;">${factionData.name} (${factionData.nickname})${coalitionData ? ` &middot; ${coalitionData.name}` : ''}</div>`
+            ? `<div style="color: ${factionData.color}; font-size: 13px; margin-top: 2px;">${factionData.name} (${factionData.nickname})${coalitionData ? ` &middot; ${coalitionData.name}` : ''}</div>`
             : sector.contested
-                ? `<div style="color: #ffdd44; font-size: 11px; margin-top: 2px;">CONTESTED${sector.contestedFactions ? ' - ' + sector.contestedFactions.map(f => FACTIONS[f]?.nickname || f).join(' vs ') : ''}</div>`
+                ? `<div style="color: #ffdd44; font-size: 13px; margin-top: 2px;">CONTESTED${sector.contestedFactions ? ' - ' + sector.contestedFactions.map(f => FACTIONS[f]?.nickname || f).join(' vs ') : ''}</div>`
                 : '';
 
         this.tooltipEl.innerHTML = `
             <div style="font-size: 14px; font-weight: bold; color: ${diffColor}; margin-bottom: 3px;">${sector.name}</div>
-            <div style="color: #9db0c4; font-size: 11px;">
+            <div style="color: #9db0c4; font-size: 13px;">
                 <span style="color: ${diffColor};">${(sector.difficulty || '').toUpperCase()}</span>
                 &middot; Tier ${factionData ? factionData.tier : '?'}
             </div>
             ${factionLine}
-            <div style="color: #708498; font-size: 11px; margin-top: 3px;">
+            <div style="color: #708498; font-size: 13px; margin-top: 3px;">
                 ${sector.hasStation ? 'Station' : 'No Station'}
                 &middot; ${jumpText}
             </div>
-            ${!isCurrent ? '<div style="color: #556677; font-size: 10px; margin-top: 4px;">Left-click: Navigate &middot; Right-click: Autopilot</div>' : ''}
+            ${!isCurrent ? '<div style="color: #7799aa; font-size: 12px; margin-top: 4px;">Left-click: Navigate &middot; Right-click: Autopilot</div>' : ''}
         `;
 
         this.tooltipEl.classList.remove('hidden');

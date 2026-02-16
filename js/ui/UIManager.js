@@ -3,7 +3,8 @@
 // Handles all HTML/CSS UI overlays
 // =============================================
 
-import { CONFIG, UNIVERSE_LAYOUT } from '../config.js';
+import { CONFIG, UNIVERSE_LAYOUT, UNIVERSE_LAYOUT_MAP } from '../config.js';
+import { FACTIONS, COALITIONS } from '../data/factionDatabase.js';
 import { EQUIPMENT_DATABASE } from '../data/equipmentDatabase.js';
 import { SHIP_DATABASE } from '../data/shipDatabase.js';
 import { SKILL_GAIN_DEFINITIONS } from '../data/skillGainDatabase.js';
@@ -1129,6 +1130,15 @@ export class UIManager {
         const stardateEl = document.getElementById('stardate-value');
         if (stardateEl) {
             stardateEl.textContent = this.game.getStardate();
+        }
+
+        // Update coalition war progress bar
+        const warProgress = this.game.coalitionWarSystem?.getWarProgress();
+        if (warProgress) {
+            const rBar = document.getElementById('war-bar-rindhalu');
+            const mBar = document.getElementById('war-bar-maxolhx');
+            if (rBar) rBar.style.width = `${warProgress.rindhalu}%`;
+            if (mBar) mBar.style.width = `${warProgress.maxolhx}%`;
         }
 
         // Update cargo display
@@ -4441,8 +4451,19 @@ export class UIManager {
 
         nameEl.textContent = sector.name || 'Unknown Sector';
         const difficulty = sector.difficulty || 'normal';
-        const diffNames = { tutorial: 'Training Grounds', hub: 'High Security', safe: 'Secure Space', normal: 'Low Security', dangerous: 'Null Security', deadly: 'Wormhole Space' };
-        subtitleEl.textContent = diffNames[difficulty] || difficulty;
+        const diffNames = { tutorial: 'Training Grounds', hub: 'High Security', safe: 'Secure Space', tame: 'Secure Space', normal: 'Low Security', neutral: 'Neutral Zone', dangerous: 'Null Security', deadly: 'Wormhole Space' };
+
+        // Add faction info to subtitle
+        let subtitleText = diffNames[difficulty] || difficulty;
+        const sectorLayout = UNIVERSE_LAYOUT_MAP[sector.id] || sector;
+        const factionData = sectorLayout.faction ? FACTIONS[sectorLayout.faction] : null;
+        if (factionData) {
+            const coalitionData = COALITIONS[factionData.coalition];
+            subtitleText += ` - ${factionData.nickname}${coalitionData ? ` (${coalitionData.name})` : ''}`;
+        } else if (sectorLayout.contested) {
+            subtitleText += ' - CONTESTED SPACE';
+        }
+        subtitleEl.textContent = subtitleText;
         subtitleEl.className = `sector-banner-subtitle ${difficulty}`;
 
         // Update danger level indicator

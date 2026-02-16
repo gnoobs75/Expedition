@@ -12839,6 +12839,34 @@ select:focus-visible {
     font-size: 13px;
 }
 
+/* Coalition War Progress HUD */
+.war-progress-display {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    margin-left: 6px;
+}
+.war-label-r { color: #4488ff; font-weight: bold; }
+.war-label-m { color: #ff4444; font-weight: bold; }
+.war-bar-container {
+    display: flex;
+    width: 60px;
+    height: 8px;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.war-bar-fill.rindhalu {
+    background: linear-gradient(90deg, #2244aa, #4488ff);
+    transition: width 0.5s ease;
+}
+.war-bar-fill.maxolhx {
+    background: linear-gradient(90deg, #ff4444, #aa2222);
+    transition: width 0.5s ease;
+}
+
 .stardate-display {
     font-family: var(--font-mono);
     font-size: 13px;

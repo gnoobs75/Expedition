@@ -98,6 +98,208 @@ export const STATION_SPECIALTIES = {
         consumes: ['combat-stimulants', 'medical-supplies', 'luxury-food', 'consumer-electronics'],
         description: 'Mercenary haven - black market hub for illicit goods and services',
     },
+    // === TIER 3 - RUHAR SECTORS ===
+    'ruhar-prime': {
+        name: 'Ruhar Prime',
+        specialty: 'agriculture',
+        produces: ['luxury-food', 'bio-cultures', 'organic-compounds', 'hydroponic-nutrients'],
+        consumes: ['mining-equipment', 'consumer-electronics', 'hull-plating', 'sensor-arrays'],
+        description: 'Ruhar homeworld - lush agricultural output, imports industrial goods',
+    },
+    'ruhar-haven': {
+        name: 'Burrow Haven',
+        specialty: 'mining',
+        produces: ['refined-minerals', 'crystal-composites', 'industrial-alloys', 'heavy-metals'],
+        consumes: ['luxury-food', 'medical-supplies', 'agri-drones', 'water-purifiers'],
+        description: 'Ruhar mining colony - deep underground extraction operations',
+    },
+    'ruhar-market': {
+        name: 'Hamster Market',
+        specialty: 'trade-hub',
+        produces: ['trade-licenses', 'navigation-charts', 'consumer-electronics', 'exotic-textiles'],
+        consumes: ['refined-minerals', 'weapon-components', 'hull-plating', 'bio-cultures'],
+        description: 'Ruhar trade nexus - bustling bazaar connecting multiple supply chains',
+    },
+    // === TIER 3 - KRISTANG SECTORS ===
+    'kristang-hold': {
+        name: 'Kristang Hold',
+        specialty: 'military',
+        produces: ['weapon-components', 'hull-plating', 'combat-stimulants', 'heavy-metals'],
+        consumes: ['refined-minerals', 'industrial-alloys', 'medical-supplies', 'luxury-food'],
+        description: 'Kristang fortress - war production and weapons manufacturing',
+    },
+    'kristang-arena': {
+        name: 'Blood Arena',
+        specialty: 'military',
+        produces: ['contraband-weapons', 'combat-stimulants', 'encryption-keys', 'stolen-cargo'],
+        consumes: ['medical-supplies', 'hull-plating', 'weapon-components', 'heavy-metals'],
+        description: 'Kristang gladiatorial outpost - combat training and black market arms dealing',
+    },
+    'kristang-forge': {
+        name: 'War Forge',
+        specialty: 'mining-refinery',
+        produces: ['industrial-alloys', 'heavy-metals', 'hull-plating', 'tritanium-ingots'],
+        consumes: ['mining-equipment', 'industrial-coolant', 'drone-parts', 'water-purifiers'],
+        description: 'Kristang border forge - raw material processing for the war machine',
+    },
+    // === TIER 3 - KEEPERS ===
+    'keepers-enclave': {
+        name: 'Keepers Enclave',
+        specialty: 'research',
+        produces: ['rare-earth-elements', 'experimental-compounds', 'quantum-processors', 'sensor-arrays'],
+        consumes: ['navigation-charts', 'bio-cultures', 'nebula-gas-samples', 'superconductors'],
+        description: 'Keepers research enclave - ancient knowledge preservation and xenotech study',
+    },
+    // === TIER 3 - CONTESTED BORDER ===
+    'border-alpha': {
+        name: 'Contested Alpha',
+        specialty: 'military',
+        produces: ['weapon-components', 'hull-plating', 'combat-stimulants', 'encryption-keys'],
+        consumes: ['medical-supplies', 'refined-minerals', 'industrial-alloys', 'luxury-food'],
+        description: 'Contested border zone - active warfront between Ruhar and Kristang forces',
+    },
+    'border-bravo': {
+        name: 'Scorched Plains',
+        specialty: 'mining',
+        produces: ['refined-minerals', 'heavy-metals', 'industrial-alloys', 'crystal-composites'],
+        consumes: ['mining-equipment', 'hull-plating', 'medical-supplies', 'industrial-coolant'],
+        description: 'War-scarred mining zone - rich deposits amid battlefield wreckage',
+    },
+    'border-charlie': {
+        name: 'Burning Line',
+        specialty: 'military',
+        produces: ['hull-plating', 'combat-stimulants', 'weapon-components', 'shield-capacitors'],
+        consumes: ['refined-minerals', 'heavy-metals', 'medical-supplies', 'luxury-food'],
+        description: 'Frontline fortification - defensive emplacements and supply depots',
+    },
+    // === TIER 2 - JERAPTHA SECTORS ===
+    'jeraptha-prime': {
+        name: 'Jeraptha Exchange',
+        specialty: 'trade-hub',
+        produces: ['trade-licenses', 'navigation-charts', 'consumer-electronics', 'quantum-processors'],
+        consumes: ['exotic-textiles', 'luxury-food', 'bio-cultures', 'nebula-gas-samples'],
+        description: 'Jeraptha commercial hub - the galaxy\'s most sophisticated exchange market',
+    },
+    'jeraptha-docks': {
+        name: 'Beetle Docks',
+        specialty: 'technology',
+        produces: ['sensor-arrays', 'shield-capacitors', 'quantum-processors', 'superconductors'],
+        consumes: ['refined-minerals', 'crystal-composites', 'industrial-alloys', 'rare-earth-elements'],
+        description: 'Jeraptha shipyard complex - advanced technology manufacturing',
+    },
+    // === TIER 2 - THURANIN SECTORS ===
+    'thuranin-prime': {
+        name: 'Thuranin Nexus',
+        specialty: 'technology',
+        produces: ['quantum-processors', 'encryption-keys', 'hacked-firmware', 'sensor-arrays'],
+        consumes: ['refined-minerals', 'superconductors', 'rare-earth-elements', 'crystal-composites'],
+        description: 'Thuranin tech nexus - cutting-edge weapons research and cyberwarfare',
+    },
+    'thuranin-labs': {
+        name: 'Research Array',
+        specialty: 'research',
+        produces: ['experimental-compounds', 'superconductors', 'rare-earth-elements', 'nebula-gas-samples'],
+        consumes: ['quantum-processors', 'sensor-arrays', 'bio-cultures', 'crystal-composites'],
+        description: 'Thuranin research complex - classified experiments and prototype development',
+    },
+    // === TIER 2 - BOSPHURAQ SECTORS ===
+    'bosphuraq-prime': {
+        name: 'Bosphuraq Aerie',
+        specialty: 'military',
+        produces: ['weapon-components', 'combat-stimulants', 'hull-plating', 'contraband-weapons'],
+        consumes: ['heavy-metals', 'industrial-alloys', 'refined-minerals', 'medical-supplies'],
+        description: 'Bosphuraq war nest - raptor clans produce aggressive combat hardware',
+    },
+    'bosphuraq-nest': {
+        name: 'Raptor Nest',
+        specialty: 'military',
+        produces: ['hull-plating', 'heavy-metals', 'weapon-components', 'industrial-alloys'],
+        consumes: ['luxury-food', 'medical-supplies', 'consumer-electronics', 'bio-cultures'],
+        description: 'Bosphuraq breeding grounds - heavily fortified military complex',
+    },
+    // === TIER 2 - ESSELGIN SECTORS ===
+    'esselgin-prime': {
+        name: 'Esselgin Nexus',
+        specialty: 'research',
+        produces: ['experimental-compounds', 'sensor-arrays', 'encryption-keys', 'quantum-processors'],
+        consumes: ['refined-minerals', 'bio-cultures', 'nebula-gas-samples', 'crystal-composites'],
+        description: 'Esselgin research hub - serpentine intelligence network and covert ops',
+    },
+    'esselgin-market': {
+        name: 'Serpent Bazaar',
+        specialty: 'trade-hub',
+        produces: ['exotic-textiles', 'trade-licenses', 'forged-documents', 'navigation-charts'],
+        consumes: ['luxury-food', 'consumer-electronics', 'weapon-components', 'medical-supplies'],
+        description: 'Esselgin trade bazaar - information brokerage and exotic goods exchange',
+    },
+    // === TIER 2 - WURGALAN SECTORS ===
+    'wurgalan-prime': {
+        name: 'Wurgalan Depths',
+        specialty: 'agriculture',
+        produces: ['bio-cultures', 'organic-compounds', 'hydroponic-nutrients', 'luxury-food'],
+        consumes: ['sensor-arrays', 'mining-equipment', 'hull-plating', 'quantum-processors'],
+        description: 'Wurgalan bioworld - deep-ocean bio-engineering and aquatic farming',
+    },
+    'wurgalan-reef': {
+        name: 'Tentacle Reef',
+        specialty: 'mining',
+        produces: ['refined-minerals', 'crystal-composites', 'rare-earth-elements', 'industrial-alloys'],
+        consumes: ['water-purifiers', 'industrial-coolant', 'drone-parts', 'bio-cultures'],
+        description: 'Wurgalan reef colony - coral-based mineral extraction and bio-mining',
+    },
+    // === TIER 2 - CONTESTED ===
+    't2-contested-a': {
+        name: 'Shattered Expanse',
+        specialty: 'military',
+        produces: ['weapon-components', 'hull-plating', 'stolen-cargo', 'combat-stimulants'],
+        consumes: ['medical-supplies', 'refined-minerals', 'heavy-metals', 'industrial-alloys'],
+        description: 'Coalition war zone - wreckage-strewn battlefield with salvage opportunities',
+    },
+    't2-contested-b': {
+        name: 'Coalition Breach',
+        specialty: 'military',
+        produces: ['encryption-keys', 'weapon-components', 'combat-stimulants', 'hull-plating'],
+        consumes: ['medical-supplies', 'luxury-food', 'quantum-processors', 'shield-capacitors'],
+        description: 'Coalition front line - strategic chokepoint between rival powers',
+    },
+    // === TIER 1 - RINDHALU SECTORS ===
+    'rindhalu-prime': {
+        name: 'Rindhalu Webway',
+        specialty: 'technology',
+        produces: ['quantum-processors', 'superconductors', 'experimental-compounds', 'sensor-arrays'],
+        consumes: ['rare-earth-elements', 'crystal-composites', 'nebula-gas-samples', 'bio-cultures'],
+        description: 'Rindhalu elder hub - unfathomably advanced alien technology',
+    },
+    'rindhalu-sanctum': {
+        name: 'Elder Sanctum',
+        specialty: 'research',
+        produces: ['rare-earth-elements', 'experimental-compounds', 'superconductors', 'nebula-gas-samples'],
+        consumes: ['quantum-processors', 'sensor-arrays', 'bio-cultures', 'organic-compounds'],
+        description: 'Rindhalu inner sanctum - ancient research beyond human comprehension',
+    },
+    // === TIER 1 - MAXOLHX SECTORS ===
+    'maxolhx-prime': {
+        name: 'Maxolhx Citadel',
+        specialty: 'military',
+        produces: ['weapon-components', 'hull-plating', 'shield-capacitors', 'encryption-keys'],
+        consumes: ['heavy-metals', 'industrial-alloys', 'superconductors', 'quantum-processors'],
+        description: 'Maxolhx fortress world - supreme military manufacturing complex',
+    },
+    'maxolhx-throne': {
+        name: 'Apex Throne',
+        specialty: 'military',
+        produces: ['combat-stimulants', 'contraband-weapons', 'weapon-components', 'hull-plating'],
+        consumes: ['refined-minerals', 'heavy-metals', 'rare-earth-elements', 'crystal-composites'],
+        description: 'Maxolhx seat of power - the most heavily defended station in the galaxy',
+    },
+    // === TIER 1 - CONTESTED ===
+    't1-contested': {
+        name: 'The Crucible',
+        specialty: 'military',
+        produces: ['weapon-components', 'stolen-cargo', 'combat-stimulants', 'hull-plating'],
+        consumes: ['medical-supplies', 'heavy-metals', 'quantum-processors', 'shield-capacitors'],
+        description: 'The ultimate battleground - elder races clash for galactic supremacy',
+    },
 };
 
 // Trade goods categories and items

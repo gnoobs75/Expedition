@@ -3,9 +3,10 @@
 // Handles ship browser, equipment shop, and fitting screen
 // =============================================
 
-import { CONFIG } from '../config.js';
+import { CONFIG, UNIVERSE_LAYOUT_MAP } from '../config.js';
 import { SHIP_DATABASE, SHIP_ROLES, SHIP_SIZES, getShipsByRole, getShipsByRoleAndSize } from '../data/shipDatabase.js';
 import { EQUIPMENT_DATABASE, SLOT_DISPLAY_MAP, getEquipmentBySlot } from '../data/equipmentDatabase.js';
+import { FACTIONS, FACTION_SHIP_VARIANTS, getFactionShipCatalog, applyFactionOverlay } from '../data/factionDatabase.js';
 import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
 import { formatCredits } from '../utils/math.js';
 
@@ -348,8 +349,23 @@ export class StationVendorManager {
             `<option value="${s}" ${this.shipSizeFilter === s ? 'selected' : ''}>${s === 'all' ? 'All Sizes' : s.charAt(0).toUpperCase() + s.slice(1)}</option>`
         ).join('');
 
-        // Filter ships
-        let ships = Object.entries(SHIP_DATABASE);
+        // Filter ships - use faction catalog if docked at faction station
+        const dockedSector = this.game.currentSector;
+        const sectorData = dockedSector ? UNIVERSE_LAYOUT_MAP[dockedSector.id] : null;
+        const stationFaction = sectorData?.faction || null;
+        const hasFactionVariants = stationFaction && FACTION_SHIP_VARIANTS[stationFaction];
+
+        let ships;
+        if (hasFactionVariants) {
+            // Faction station: show faction-overlaid ships + generic SHIP_DATABASE
+            const factionCatalog = getFactionShipCatalog(stationFaction, SHIP_DATABASE);
+            // Also include generic ships not in faction catalog
+            const factionShipIds = new Set(FACTION_SHIP_VARIANTS[stationFaction] || []);
+            const genericShips = Object.entries(SHIP_DATABASE).filter(([id]) => !factionShipIds.has(id));
+            ships = [...factionCatalog, ...genericShips];
+        } else {
+            ships = Object.entries(SHIP_DATABASE);
+        }
         if (this.shipRoleFilter !== 'all') {
             ships = ships.filter(([id, s]) => s.role === this.shipRoleFilter);
         }
@@ -581,8 +597,9 @@ export class StationVendorManager {
     }
 
     showShipDetail(shipId, container) {
-        const config = SHIP_DATABASE[shipId];
-        if (!config) return;
+        const resolved = this.resolveShipId(shipId);
+        if (!resolved) return;
+        const config = resolved.config;
 
         this.selectedShipId = shipId;
 
@@ -680,7 +697,7 @@ export class StationVendorManager {
         const canvas = detailPanel.querySelector('.vendor-ship-canvas');
         if (canvas) {
             this.initVendor3DViewer(canvas);
-            this.setVendorShipMesh(shipId, config);
+            this.setVendorShipMesh(resolved.baseId, config);
             this.animateVendorViewer();
         }
 
@@ -1086,10 +1103,34 @@ export class StationVendorManager {
         return Math.floor(currentConfig.price * 0.5);
     }
 
+    /**
+     * Resolve a ship ID (which may be a faction variant like "ruhar-slasher") to
+     * { baseId, config } where baseId is the SHIP_DATABASE key and config has faction overlay if applicable.
+     */
+    resolveShipId(shipId) {
+        // Direct match in SHIP_DATABASE
+        if (SHIP_DATABASE[shipId]) {
+            return { baseId: shipId, config: SHIP_DATABASE[shipId] };
+        }
+        // Faction variant: "factionId-baseShipId"
+        const dashIdx = shipId.indexOf('-');
+        if (dashIdx > 0) {
+            const factionId = shipId.substring(0, dashIdx);
+            const baseId = shipId.substring(dashIdx + 1);
+            // Handle multi-dash base IDs (e.g. "ruhar-hero-frigate")
+            const baseConfig = SHIP_DATABASE[baseId] || SHIP_DATABASE[shipId.substring(shipId.indexOf('-') + 1)];
+            if (baseConfig && FACTIONS[factionId]) {
+                return { baseId, config: applyFactionOverlay(baseConfig, baseId, factionId) };
+            }
+        }
+        return null;
+    }
+
     purchaseShip(shipId) {
         const player = this.game.player;
-        const config = SHIP_DATABASE[shipId];
-        if (!player || !config) return;
+        const resolved = this.resolveShipId(shipId);
+        if (!player || !resolved) return;
+        const { baseId, config } = resolved;
 
         const tradeInValue = this.calculateTradeInValue();
         const finalPrice = config.price - tradeInValue;
@@ -1100,7 +1141,7 @@ export class StationVendorManager {
         }
 
         this.game.credits -= finalPrice;
-        player.switchShip(shipId);
+        player.switchShip(baseId);
 
         this.game.audio?.play('purchase');
         this.game.ui?.toast(`Purchased ${config.name}!`, 'success');
@@ -1112,8 +1153,9 @@ export class StationVendorManager {
     }
 
     purchaseFleetShip(shipId) {
-        const config = SHIP_DATABASE[shipId];
-        if (!config) return;
+        const resolved = this.resolveShipId(shipId);
+        if (!resolved) return;
+        const { baseId, config } = resolved;
 
         if (this.game.credits < config.price) {
             this.game.ui?.toast('Insufficient funds', 'error');
@@ -1124,12 +1166,12 @@ export class StationVendorManager {
         this.game.credits -= config.price;
 
         // Add ship to fleet via FleetSystem
-        const fleetShip = this.game.fleetSystem?.addShip(shipId, null);
+        const fleetShip = this.game.fleetSystem?.addShip(baseId, null);
         if (fleetShip) {
             this.game.audio?.play('purchase');
             this.game.ui?.toast(`${config.name} added to fleet!`, 'success');
             this.game.ui?.log(`Purchased ${config.name} for fleet - ${formatCredits(config.price)} ISK`, 'system');
-            this.game.events.emit('fleet:ship-purchased', { shipId, ship: fleetShip });
+            this.game.events.emit('fleet:ship-purchased', { shipId: baseId, ship: fleetShip });
         }
 
         this.game.ui?.updateHUD();

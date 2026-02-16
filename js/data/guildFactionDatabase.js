@@ -29,9 +29,9 @@ export const GUILD_FACTIONS = {
             miningPriority: 0.7,
             tradingPriority: 0.2,
             combatPriority: 0.1,
-            preferredMiningSectors: ['sector-1', 'sector-2', 'hub'],
-            preferredTradeSectors: ['sector-1', 'sector-3', 'sector-5'],
-            avoidSectors: ['sector-5'], // Too dangerous for miners
+            preferredMiningSectors: ['sector-1', 'sector-2', 'hub', 'ruhar-haven', 'wurgalan-reef', 'border-bravo'],
+            preferredTradeSectors: ['sector-1', 'sector-3', 'sector-5', 'ruhar-market', 'jeraptha-prime'],
+            avoidSectors: ['sector-5', 'kristang-hold', 'kristang-arena', 'thuranin-prime', 'maxolhx-prime', 'maxolhx-throne'], // Too dangerous for miners
         },
         shipReplacementCosts: { miner: 8000, hauler: 20000, ratter: 12000, surveyor: 10000, logistics: 15000 },
     },
@@ -57,8 +57,8 @@ export const GUILD_FACTIONS = {
             tradingPriority: 0.8,
             combatPriority: 0.2,
             preferredMiningSectors: [],
-            preferredTradeSectors: ['hub', 'sector-1', 'sector-2', 'sector-3', 'sector-6'],
-            avoidSectors: ['sector-4', 'sector-5'],
+            preferredTradeSectors: ['hub', 'sector-1', 'sector-2', 'sector-3', 'sector-6', 'ruhar-market', 'jeraptha-prime', 'esselgin-market'],
+            avoidSectors: ['sector-4', 'sector-5', 'kristang-hold', 'kristang-arena', 'bosphuraq-prime', 'maxolhx-prime', 'maxolhx-throne'],
         },
         shipReplacementCosts: { miner: 8000, hauler: 20000, ratter: 12000, logistics: 15000 },
     },
@@ -86,9 +86,9 @@ export const GUILD_FACTIONS = {
             tradingPriority: 0.15,
             combatPriority: 0.85,
             preferredMiningSectors: [],
-            preferredTradeSectors: ['sector-5', 'hub'],
+            preferredTradeSectors: ['sector-5', 'hub', 'kristang-forge'],
             avoidSectors: [],
-            preferredHuntSectors: ['sector-4', 'sector-5', 'sector-3'],
+            preferredHuntSectors: ['sector-4', 'sector-5', 'sector-3', 'kristang-hold', 'border-alpha', 'bosphuraq-prime', 't2-contested-a'],
         },
         shipReplacementCosts: { miner: 8000, hauler: 15000, ratter: 15000, surveyor: 10000, logistics: 18000 },
     },
@@ -116,10 +116,10 @@ export const GUILD_FACTIONS = {
             miningPriority: 0.35,
             tradingPriority: 0.35,
             combatPriority: 0.3,
-            preferredMiningSectors: ['sector-2', 'sector-6', 'sector-3'],
-            preferredTradeSectors: ['sector-3', 'sector-6', 'hub', 'sector-2'],
-            avoidSectors: ['sector-5'],
-            preferredHuntSectors: ['sector-3', 'sector-4'],
+            preferredMiningSectors: ['sector-2', 'sector-6', 'sector-3', 'ruhar-haven', 'keepers-enclave'],
+            preferredTradeSectors: ['sector-3', 'sector-6', 'hub', 'sector-2', 'ruhar-market', 'jeraptha-prime'],
+            avoidSectors: ['sector-5', 'kristang-arena', 'thuranin-prime', 'maxolhx-prime'],
+            preferredHuntSectors: ['sector-3', 'sector-4', 'border-alpha', 'border-charlie'],
         },
         shipReplacementCosts: { miner: 8000, hauler: 18000, ratter: 12000, surveyor: 10000, logistics: 15000 },
     },
@@ -148,9 +148,9 @@ export const GUILD_FACTIONS = {
             preferredTradeSectors: [],
             avoidSectors: [],
             // Raiders hunt everywhere, prefer rich sectors with guild activity
-            preferredRaidSectors: ['sector-1', 'sector-2', 'sector-3', 'hub', 'sector-6'],
+            preferredRaidSectors: ['sector-1', 'sector-2', 'sector-3', 'hub', 'sector-6', 'ruhar-market', 'ruhar-prime', 'jeraptha-prime', 'esselgin-market'],
             // Bombers hit dangerous zones where ratters patrol
-            preferredAmbushSectors: ['sector-4', 'sector-5', 'sector-3'],
+            preferredAmbushSectors: ['sector-4', 'sector-5', 'sector-3', 'kristang-hold', 'border-alpha', 'bosphuraq-prime'],
             // Raid timing (abstract simulation)
             raidInterval: 45,       // Seconds between raid evaluations
             raidChance: 0.6,        // Chance of launching a raid per evaluation

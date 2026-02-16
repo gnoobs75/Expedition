@@ -237,6 +237,104 @@ export const FACTIONS = {
 };
 
 // =============================================
+// FACTION SHIP VARIANTS
+// =============================================
+// Which base ships each faction produces at their stations
+
+export const FACTION_SHIP_VARIANTS = {
+    kristang:  ['slasher', 'rifter', 'thrasher', 'thorax', 'hurricane', 'maelstrom'],
+    ruhar:     ['venture', 'heron', 'slasher', 'vigil', 'caracal', 'drake'],
+    jeraptha:  ['heron', 'vigil', 'caracal', 'drake', 'raven', 'scorpion'],
+    thuranin:  ['slasher', 'corax', 'caracal', 'ferox', 'raven', 'scorpion'],
+    bosphuraq: ['slasher', 'rifter', 'thrasher', 'thorax', 'hurricane'],
+    esselgin:  ['vigil', 'prospect', 'corax', 'caracal', 'naga'],
+    wurgalan:  ['venture', 'procurer', 'vigil', 'drake', 'brutix'],
+    maxolhx:   ['slasher', 'rifter', 'thrasher', 'corax', 'caracal', 'ferox', 'hurricane', 'drake', 'raven', 'scorpion', 'maelstrom', 'naglfar'],
+    rindhalu:  ['drake', 'hurricane', 'raven', 'scorpion', 'maelstrom'],
+    unef:      ['venture', 'heron', 'slasher', 'vigil', 'caracal'],
+    mavericks: ['slasher', 'heron', 'vigil', 'caracal'],
+    keepers:   ['venture', 'slasher', 'vigil', 'caracal'],
+};
+
+// Stat scaling per faction tier + flavor bonuses
+export const FACTION_TECH_BONUSES = {
+    // Tier 3 - Client Races (base power)
+    kristang:  { tierScale: 1.00, shieldMult: 0.90, armorMult: 1.05, speedMult: 1.00, damageMult: 1.15, capMult: 0.95, flavor: 'Kinetic specialists' },
+    ruhar:     { tierScale: 1.00, shieldMult: 1.10, armorMult: 1.00, speedMult: 1.10, damageMult: 1.00, capMult: 1.00, flavor: 'Shield & speed balanced' },
+    wurgalan:  { tierScale: 1.00, shieldMult: 1.05, armorMult: 1.05, speedMult: 0.95, damageMult: 0.95, capMult: 1.10, flavor: 'Biotech drones' },
+    unef:      { tierScale: 1.00, shieldMult: 1.00, armorMult: 1.00, speedMult: 1.00, damageMult: 1.00, capMult: 1.00, flavor: 'Standard human tech' },
+    mavericks: { tierScale: 1.00, shieldMult: 1.00, armorMult: 0.95, speedMult: 1.15, damageMult: 1.05, capMult: 1.00, flavor: 'Skippy-enhanced' },
+    keepers:   { tierScale: 1.00, shieldMult: 1.05, armorMult: 1.00, speedMult: 0.95, damageMult: 1.00, capMult: 1.05, flavor: 'Faith-hardened' },
+    // Tier 2 - Patron Races (20% stronger)
+    jeraptha:  { tierScale: 1.20, shieldMult: 1.10, armorMult: 1.00, speedMult: 1.05, damageMult: 1.05, capMult: 1.10, flavor: 'Trade-grade shields' },
+    thuranin:  { tierScale: 1.20, shieldMult: 1.00, armorMult: 1.00, speedMult: 0.95, damageMult: 1.15, capMult: 1.10, flavor: 'Precision weapons' },
+    bosphuraq: { tierScale: 1.20, shieldMult: 0.95, armorMult: 1.05, speedMult: 1.15, damageMult: 1.10, capMult: 0.95, flavor: 'Attack vectors' },
+    esselgin:  { tierScale: 1.20, shieldMult: 1.00, armorMult: 1.00, speedMult: 1.10, damageMult: 1.00, capMult: 1.15, flavor: 'EWAR specialists' },
+    // Tier 1 - Elder Races (40% stronger)
+    maxolhx:   { tierScale: 1.40, shieldMult: 1.10, armorMult: 1.10, speedMult: 1.10, damageMult: 1.15, capMult: 1.10, flavor: 'Apex technology' },
+    rindhalu:  { tierScale: 1.40, shieldMult: 1.15, armorMult: 1.05, speedMult: 1.05, damageMult: 1.10, capMult: 1.20, flavor: 'Ancient webtech' },
+};
+
+/**
+ * Apply faction overlay to a base ship config, scaling stats by tier and faction bonuses.
+ * Returns a new config object (doesn't mutate original).
+ * @param {Object} baseShip - Ship config from SHIP_DATABASE
+ * @param {string} baseShipId - Ship ID key
+ * @param {string} factionId - Faction ID
+ * @returns {Object} Modified ship config with faction overlay
+ */
+export function applyFactionOverlay(baseShip, baseShipId, factionId) {
+    const faction = FACTIONS[factionId];
+    const bonuses = FACTION_TECH_BONUSES[factionId];
+    if (!faction || !bonuses || !baseShip) return baseShip;
+
+    const ts = bonuses.tierScale;
+    const prefix = faction.shipPrefix;
+
+    return {
+        ...baseShip,
+        name: `${prefix} ${baseShip.name}`,
+        factionId: factionId,
+        factionVariant: true,
+        basedOn: baseShipId,
+        // Scale defenses
+        shield: Math.round(baseShip.shield * ts * bonuses.shieldMult),
+        armor: Math.round(baseShip.armor * ts * bonuses.armorMult),
+        hull: Math.round(baseShip.hull * ts),
+        // Scale mobility
+        maxSpeed: Math.round(baseShip.maxSpeed * bonuses.speedMult),
+        // Scale power
+        capacitor: Math.round(baseShip.capacitor * ts * bonuses.capMult),
+        capacitorRegen: +(baseShip.capacitorRegen * ts * bonuses.capMult).toFixed(1),
+        // Scale price
+        price: Math.round(baseShip.price * ts * 1.1),
+    };
+}
+
+/**
+ * Get faction-specific ship catalog for a station vendor.
+ * @param {string} factionId - Faction controlling the station
+ * @param {Object} shipDatabase - Full SHIP_DATABASE
+ * @returns {Array<[string, Object]>} Array of [shipId, factionOverlayConfig] pairs
+ */
+export function getFactionShipCatalog(factionId, shipDatabase) {
+    const variants = FACTION_SHIP_VARIANTS[factionId];
+    if (!variants) {
+        // No faction or generic: return all ships as-is
+        return Object.entries(shipDatabase);
+    }
+
+    const catalog = [];
+    for (const shipId of variants) {
+        const base = shipDatabase[shipId];
+        if (!base) continue;
+        const overlaid = applyFactionOverlay(base, shipId, factionId);
+        catalog.push([`${factionId}-${shipId}`, overlaid]);
+    }
+    return catalog;
+}
+
+// =============================================
 // HELPER FUNCTIONS
 // =============================================
 

@@ -4,7 +4,7 @@
 // =============================================
 
 import { Entity } from './Entity.js';
-import { CONFIG, UNIVERSE_LAYOUT } from '../config.js';
+import { CONFIG, UNIVERSE_LAYOUT_MAP } from '../config.js';
 
 // Anomaly templates
 const ANOMALY_TYPES = {
@@ -257,7 +257,7 @@ export class Anomaly extends Entity {
     getDescription() {
         let desc = this.description;
         if (this.anomalyType === 'wormhole' && this.destinationSectorId) {
-            const layout = UNIVERSE_LAYOUT[this.destinationSectorId];
+            const layout = UNIVERSE_LAYOUT_MAP[this.destinationSectorId];
             desc += `\nDestination: ${layout?.name || this.destinationSectorId}`;
             desc += `\nStability: ${Math.round(this.wormholeStability * 100)}%`;
         }

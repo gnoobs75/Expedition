@@ -4,7 +4,8 @@
 // route visualization, and interactive orbit controls.
 // =============================================
 
-import { UNIVERSE_LAYOUT } from '../config.js';
+import { UNIVERSE_LAYOUT, UNIVERSE_LAYOUT_MAP } from '../config.js';
+import { FACTIONS, COALITIONS } from '../data/factionDatabase.js';
 
 // Difficulty color mapping
 const DIFFICULTY_COLORS = {
@@ -272,46 +273,33 @@ export class UniverseMapRenderer3D {
 
     /**
      * Map sector grid (x, y) to a position on the sphere surface.
-     * Core sectors (region=core) go on the front/top hemisphere.
-     * Milky Way sectors (region=milkyway) go on the back/bottom hemisphere.
+     * Unified mapping: all sectors use their x,y coordinates normalized
+     * across the full universe bounds, mapped to longitude/latitude.
      */
     mapToSphere(sector) {
         const R = this.GLOBE_RADIUS;
-        const sectors = UNIVERSE_LAYOUT.sectors;
 
-        // Separate by region
-        const coreSectors = sectors.filter(s => s.region === 'core');
-        const mwSectors = sectors.filter(s => s.region === 'milkyway');
-
-        const isCore = sector.region === 'core';
-        const group = isCore ? coreSectors : mwSectors;
-
-        // Calculate bounds for this region
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (const s of group) {
-            if (s.x < minX) minX = s.x;
-            if (s.x > maxX) maxX = s.x;
-            if (s.y < minY) minY = s.y;
-            if (s.y > maxY) maxY = s.y;
+        // Compute global bounds lazily
+        if (!this._universeBounds) {
+            const sectors = UNIVERSE_LAYOUT.sectors;
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            for (const s of sectors) {
+                if (s.x < minX) minX = s.x;
+                if (s.x > maxX) maxX = s.x;
+                if (s.y < minY) minY = s.y;
+                if (s.y > maxY) maxY = s.y;
+            }
+            this._universeBounds = { minX, maxX, minY, maxY, rangeX: maxX - minX || 1, rangeY: maxY - minY || 1 };
         }
-        const rangeX = maxX - minX || 1;
-        const rangeY = maxY - minY || 1;
+        const b = this._universeBounds;
 
         // Normalize to [-1, 1]
-        const nx = rangeX > 0 ? ((sector.x - minX) / rangeX) * 2 - 1 : 0;
-        const ny = rangeY > 0 ? ((sector.y - minY) / rangeY) * 2 - 1 : 0;
+        const nx = ((sector.x - b.minX) / b.rangeX) * 2 - 1;
+        const ny = ((sector.y - b.minY) / b.rangeY) * 2 - 1;
 
-        // Map to longitude and latitude
-        // Core: front hemisphere (lon: -70 to +70, lat: +10 to +70)
-        // Milky Way: back hemisphere (lon: +110 to +250, lat: -10 to -60)
-        let lon, lat;
-        if (isCore) {
-            lon = nx * 60;                     // -60 to +60 degrees
-            lat = 10 + (ny + 1) / 2 * 55;     // +10 to +65 degrees
-        } else {
-            lon = 180 + nx * 55;               // +125 to +235 degrees
-            lat = -(10 + (ny + 1) / 2 * 50);  // -10 to -60 degrees
-        }
+        // Map to longitude (-150 to +150) and latitude (-70 to +70)
+        const lon = nx * 150;
+        const lat = ny * 70;
 
         // Convert to radians
         const lonRad = lon * Math.PI / 180;
@@ -325,6 +313,17 @@ export class UniverseMapRenderer3D {
         );
     }
 
+    /**
+     * Get the display color for a sector node - faction color if available, else difficulty color.
+     */
+    getSectorColor(sector) {
+        if (sector.contested) return 0xffdd44; // Yellow for contested
+        if (sector.faction && FACTIONS[sector.faction]) {
+            return parseInt(FACTIONS[sector.faction].color.replace('#', ''), 16);
+        }
+        return DIFFICULTY_COLORS[sector.difficulty] || 0x888888;
+    }
+
     createSectorNodes() {
         this.nodesGroup = new THREE.Group();
         const sectors = UNIVERSE_LAYOUT.sectors;
@@ -334,7 +333,7 @@ export class UniverseMapRenderer3D {
             this.sectorPositions[sector.id] = pos;
             this.sectorData[sector.id] = sector;
 
-            const color = DIFFICULTY_COLORS[sector.difficulty] || 0x888888;
+            const color = this.getSectorColor(sector);
             const isCurrent = sector.id === this.game.currentSector?.id;
 
             // Main node sphere
@@ -354,6 +353,8 @@ export class UniverseMapRenderer3D {
                 difficulty: sector.difficulty,
                 region: sector.region,
                 hasStation: sector.hasStation,
+                faction: sector.faction,
+                contested: sector.contested,
             };
 
             this.nodesGroup.add(nodeMesh);
@@ -817,18 +818,30 @@ export class UniverseMapRenderer3D {
 
         const isCurrent = sector.id === this.game.currentSector?.id;
         const jumps = this.getJumpDistance(sector.id);
+
+        // Faction info
+        const factionData = sector.faction ? FACTIONS[sector.faction] : null;
+        const coalitionData = factionData ? COALITIONS[factionData.coalition] : null;
         const jumpText = isCurrent ? 'CURRENT LOCATION' :
             jumps === 1 ? '1 jump' :
             jumps > 0 ? `${jumps} jumps` : 'unreachable';
 
         const diffColor = '#' + (DIFFICULTY_COLORS[sector.difficulty] || 0x888888).toString(16).padStart(6, '0');
 
+        // Build faction line
+        const factionLine = factionData
+            ? `<div style="color: ${factionData.color}; font-size: 11px; margin-top: 2px;">${factionData.name} (${factionData.nickname})${coalitionData ? ` &middot; ${coalitionData.name}` : ''}</div>`
+            : sector.contested
+                ? `<div style="color: #ffdd44; font-size: 11px; margin-top: 2px;">CONTESTED${sector.contestedFactions ? ' - ' + sector.contestedFactions.map(f => FACTIONS[f]?.nickname || f).join(' vs ') : ''}</div>`
+                : '';
+
         this.tooltipEl.innerHTML = `
             <div style="font-size: 14px; font-weight: bold; color: ${diffColor}; margin-bottom: 3px;">${sector.name}</div>
             <div style="color: #9db0c4; font-size: 11px;">
                 <span style="color: ${diffColor};">${(sector.difficulty || '').toUpperCase()}</span>
-                ${sector.region === 'milkyway' ? ' &middot; Milky Way' : ' &middot; Core Region'}
+                &middot; Tier ${factionData ? factionData.tier : '?'}
             </div>
+            ${factionLine}
             <div style="color: #708498; font-size: 11px; margin-top: 3px;">
                 ${sector.hasStation ? 'Station' : 'No Station'}
                 &middot; ${jumpText}

@@ -8,6 +8,7 @@
 import { CONFIG, UNIVERSE_LAYOUT } from '../config.js';
 import { formatDistance, formatCredits } from '../utils/math.js';
 import { GUILD_FACTIONS } from '../data/guildFactionDatabase.js';
+import { FACTIONS } from '../data/factionDatabase.js';
 import { UniverseMapRenderer3D } from './UniverseMapRenderer3D.js';
 
 export class SectorMapManager {
@@ -1556,27 +1557,39 @@ export class SectorMapManager {
     }
 
     renderFactionOverlay(ctx, sectors, positions) {
-        const influence = this.game.guildEconomySystem?.getFactionInfluence();
-        if (!influence) return;
-        const factionColors = { '0': '#44ff44', '1': '#4488ff', '2': '#ff4444', '3': '#ffaa00', '4': '#cc44ff' };
         for (const sector of sectors) {
             const pos = positions[sector.id];
             if (!pos) continue;
-            const sectorInf = influence[sector.id];
-            if (!sectorInf) continue;
-            let dominant = null, maxCount = 0;
-            for (const [fid, count] of Object.entries(sectorInf)) {
-                if (count > maxCount) { dominant = fid; maxCount = count; }
+
+            if (sector.faction && FACTIONS[sector.faction]) {
+                const factionColor = FACTIONS[sector.faction].color;
+                ctx.strokeStyle = factionColor;
+                ctx.globalAlpha = 0.5;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 42, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Faction nickname label below sector name
+                ctx.globalAlpha = 0.6;
+                ctx.fillStyle = factionColor;
+                ctx.font = '9px "Share Tech Mono", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(FACTIONS[sector.faction].nickname, pos.x, pos.y + 26);
+                ctx.globalAlpha = 1;
+            } else if (sector.contested) {
+                // Contested sectors: yellow pulsing ring
+                const pulse = 0.3 + Math.sin(Date.now() / 500) * 0.2;
+                ctx.strokeStyle = '#ffdd44';
+                ctx.globalAlpha = pulse;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 42, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.globalAlpha = 1;
             }
-            if (!dominant) continue;
-            const alpha = Math.min(0.6, maxCount * 0.08);
-            ctx.strokeStyle = factionColors[dominant] || '#888888';
-            ctx.globalAlpha = alpha;
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, 42, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.globalAlpha = 1;
         }
     }
 

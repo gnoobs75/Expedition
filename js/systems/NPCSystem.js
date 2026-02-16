@@ -3,13 +3,14 @@
 // Manages NPC miners, security patrols, and pirate raids
 // =============================================
 
-import { CONFIG } from '../config.js';
+import { CONFIG, UNIVERSE_LAYOUT_MAP } from '../config.js';
 import { NPCShip } from '../entities/NPCShip.js';
 import { EnemyShip } from '../entities/EnemyShip.js';
 import { evaluatePursuit, calculateInterceptPoint, activateTackleModules } from '../utils/PursuitAI.js';
-import { FACTIONS } from '../data/factionDatabase.js';
+import { FACTIONS, FACTION_TECH_BONUSES, applyFactionOverlay } from '../data/factionDatabase.js';
+import { SHIP_DATABASE } from '../data/shipDatabase.js';
 
-// Sector faction pools - which factions control which difficulty tiers
+// Sector faction pools - fallback for sectors without explicit faction
 const SECTOR_FACTIONS = {
     easy:   ['ruhar', 'unef', 'mavericks'],
     medium: ['jeraptha', 'ruhar', 'unef', 'esselgin'],
@@ -17,10 +18,22 @@ const SECTOR_FACTIONS = {
     deadly: ['maxolhx', 'thuranin', 'kristang'],
 };
 
-// Pick a random faction for a sector based on difficulty
-function pickSectorFaction(difficulty) {
+// Pick a sector's controlling faction from layout data, or fallback to difficulty pool
+function getSectorFaction(sectorId, difficulty) {
+    const layoutData = UNIVERSE_LAYOUT_MAP[sectorId];
+    if (layoutData?.faction) return layoutData.faction;
+    // Fallback: pick from difficulty pool
     const pool = SECTOR_FACTIONS[difficulty] || SECTOR_FACTIONS.medium;
     return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// Get the ship class for NPC security based on faction tier
+function getFactionSecurityClass(factionId) {
+    const bonuses = FACTION_TECH_BONUSES[factionId];
+    if (!bonuses) return 'frigate';
+    if (bonuses.tierScale >= 1.4) return 'battlecruiser';
+    if (bonuses.tierScale >= 1.2) return 'cruiser';
+    return 'cruiser';
 }
 
 export class NPCSystem {
@@ -80,7 +93,7 @@ export class NPCSystem {
         if (asteroids.length === 0) return;
 
         // Pick faction for this sector's NPCs
-        const sectorFaction = sector.controllingFaction || pickSectorFaction(sector.difficulty);
+        const sectorFaction = sector.controllingFaction || getSectorFaction(sector.id, sector.difficulty);
         if (!sector.controllingFaction) sector.controllingFaction = sectorFaction;
         const factionData = FACTIONS[sectorFaction];
         const prefix = factionData?.shipPrefix || 'NPC';
@@ -124,7 +137,7 @@ export class NPCSystem {
             const angle = (i / config.count) * Math.PI * 2 + Math.random() * 0.5;
             const dist = 4000 + Math.random() * 4000;
 
-            const secFaction = sector.controllingFaction || pickSectorFaction(sector.difficulty);
+            const secFaction = sector.controllingFaction || getSectorFaction(sector.id, sector.difficulty);
             const secFactionData = FACTIONS[secFaction];
             const secPrefix = secFactionData?.shipPrefix || 'SEC';
 

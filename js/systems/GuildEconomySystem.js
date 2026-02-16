@@ -120,7 +120,8 @@ export class GuildEconomySystem {
         const guildId = `${factionId}-${++this.totalShipsSpawned}`;
 
         // Start at home station (pirates have no home - spawn in random dangerous sector)
-        const startSector = config.homeStation || (['sector-4', 'sector-5'][Math.floor(Math.random() * 2)]);
+        const pirateSectors = ['sector-4', 'sector-5', 'kristang-hold', 'bosphuraq-prime', 'border-alpha'];
+        const startSector = config.homeStation || (pirateSectors[Math.floor(Math.random() * pirateSectors.length)]);
         const sectorSize = CONFIG.SECTOR_SIZE;
 
         const abs = {
@@ -870,7 +871,7 @@ export class GuildEconomySystem {
 
     assignRattingTask(ship, config, isAbstract) {
         // Pick a dangerous sector to patrol
-        const huntSectors = config.aiConfig.preferredHuntSectors || ['sector-4', 'sector-5', 'sector-3'];
+        const huntSectors = config.aiConfig.preferredHuntSectors || ['sector-4', 'sector-5', 'sector-3', 'kristang-hold', 'border-alpha'];
         const targetSector = huntSectors[Math.floor(Math.random() * huntSectors.length)];
 
         const task = { type: 'hunt', targetSector };
@@ -897,7 +898,7 @@ export class GuildEconomySystem {
 
     assignRaidTask(ship, config, isAbstract) {
         // Raiders target sectors with guild miners and haulers
-        const raidSectors = config.aiConfig.preferredRaidSectors || ['sector-1', 'sector-2', 'hub'];
+        const raidSectors = config.aiConfig.preferredRaidSectors || ['sector-1', 'sector-2', 'hub', 'ruhar-market', 'jeraptha-prime'];
 
         // Find sector with most guild activity (non-pirate ships)
         let bestSector = raidSectors[Math.floor(Math.random() * raidSectors.length)];
@@ -938,7 +939,7 @@ export class GuildEconomySystem {
 
     assignAmbushTask(ship, config, isAbstract) {
         // Bombers target sectors where ratters patrol (ambush hunters)
-        const ambushSectors = config.aiConfig.preferredAmbushSectors || ['sector-4', 'sector-5'];
+        const ambushSectors = config.aiConfig.preferredAmbushSectors || ['sector-4', 'sector-5', 'kristang-hold', 'bosphuraq-prime'];
         const targetSector = ambushSectors[Math.floor(Math.random() * ambushSectors.length)];
 
         const task = { type: 'raid', targetSector };
@@ -965,7 +966,7 @@ export class GuildEconomySystem {
 
     assignSurveyTask(ship, config, isAbstract) {
         // Surveyors scan mining sectors for asteroid fields
-        const miningSectors = config.aiConfig.preferredMiningSectors || ['sector-1', 'sector-2'];
+        const miningSectors = config.aiConfig.preferredMiningSectors || ['sector-1', 'sector-2', 'ruhar-haven', 'wurgalan-reef'];
         const avoid = config.aiConfig.avoidSectors || [];
         const candidates = miningSectors.filter(s => !avoid.includes(s));
         const targetSector = candidates.length > 0
@@ -1545,7 +1546,7 @@ export class GuildEconomySystem {
         const allSectors = [...this.sectorGraph.keys()];
         const currentSector = ship.sectorId;
         // Retreat to a different sector (prefer dangerous ones)
-        const dangerous = ['sector-4', 'sector-5'];
+        const dangerous = ['sector-4', 'sector-5', 'kristang-hold', 'bosphuraq-prime', 'border-alpha'];
         const retreat = dangerous.find(s => s !== currentSector) || allSectors.find(s => s !== currentSector) || currentSector;
         return retreat;
     }

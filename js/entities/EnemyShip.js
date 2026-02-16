@@ -25,6 +25,7 @@ export class EnemyShip extends Ship {
         this.type = 'enemy';
         this.enemyType = enemyType;
         this.hostility = 'hostile';
+        this.faction = options.faction || null;
 
         // AI state
         this.aiState = 'idle'; // idle, patrol, chase, attack, flee

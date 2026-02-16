@@ -3,7 +3,7 @@
 // Individual playable area with procedural content
 // =============================================
 
-import { CONFIG, UNIVERSE_LAYOUT } from '../config.js';
+import { CONFIG, UNIVERSE_LAYOUT, UNIVERSE_LAYOUT_MAP } from '../config.js';
 import { SeededRandom, combineSeeds } from '../utils/random.js';
 import { Asteroid } from '../entities/Asteroid.js';
 import { Planet } from '../entities/Planet.js';
@@ -11,6 +11,7 @@ import { Station } from '../entities/Station.js';
 import { WarpGate } from '../entities/WarpGate.js';
 import { EnemyShip } from '../entities/EnemyShip.js';
 import { Anomaly } from '../entities/Anomaly.js';
+import { FACTIONS, FACTION_TECH_BONUSES } from '../data/factionDatabase.js';
 
 export class Sector {
     constructor(game, options = {}) {
@@ -229,41 +230,131 @@ export class Sector {
     }
 
     /**
-     * Generate enemy ships - far from central planet
+     * Generate enemy ships - faction-aware spawning
+     * - Friendly sectors (ruhar, unef, etc.): fewer enemies, only pirates
+     * - Hostile sectors (kristang, etc.): faction military ships
+     * - Contested sectors: ships from both contesting factions fighting each other
+     * - Human core: standard pirates
      */
     generateEnemies() {
-        const count = this.difficultyConfig.enemyCount;
+        const layoutData = UNIVERSE_LAYOUT_MAP[this.id];
+        const sectorFaction = layoutData?.faction || null;
+        const factionData = sectorFaction ? FACTIONS[sectorFaction] : null;
+        const isContested = layoutData?.contested;
+        const contestedFactions = layoutData?.contestedFactions || [];
+
+        let count = this.difficultyConfig.enemyCount;
         const centerX = CONFIG.SECTOR_SIZE / 2;
         const centerY = CONFIG.SECTOR_SIZE / 2;
 
-        for (let i = 0; i < count; i++) {
-            // Determine enemy type based on difficulty
-            let enemyType = 'pirate-frigate';
-            if (this.difficulty === 'dangerous' || this.difficulty === 'deadly') {
-                if (this.random.next() > 0.7) {
-                    enemyType = 'pirate-cruiser';
+        // Friendly factions spawn fewer hostiles (only occasional pirates)
+        if (factionData && factionData.baseStanding >= 2) {
+            count = Math.max(0, Math.floor(count * 0.3));
+        }
+
+        if (isContested && contestedFactions.length >= 2) {
+            // Contested sector: spawn both factions' ships fighting each other
+            const halfCount = Math.ceil(count / 2);
+            for (let f = 0; f < 2; f++) {
+                const fId = contestedFactions[f];
+                const fData = FACTIONS[fId];
+                const prefix = fData?.shipPrefix || 'UNK';
+                const bonuses = FACTION_TECH_BONUSES[fId];
+                for (let i = 0; i < halfCount; i++) {
+                    let enemyType = 'pirate-frigate';
+                    if (bonuses?.tierScale >= 1.2 || this.random.next() > 0.6) {
+                        enemyType = 'pirate-cruiser';
+                    }
+                    const angle = this.random.angle();
+                    const dist = this.random.float(4000, 10000);
+                    const enemy = new EnemyShip(this.game, {
+                        x: centerX + Math.cos(angle) * dist,
+                        y: centerY + Math.sin(angle) * dist,
+                        enemyType,
+                        name: `${prefix} ${enemyType === 'pirate-cruiser' ? 'Cruiser' : 'Patrol'} ${i + 1}`,
+                        faction: fId,
+                    });
+                    // Scale stats by faction tier
+                    if (bonuses) {
+                        enemy.maxShield = Math.round(enemy.maxShield * bonuses.tierScale);
+                        enemy.shield = enemy.maxShield;
+                        enemy.maxArmor = Math.round(enemy.maxArmor * bonuses.tierScale);
+                        enemy.armor = enemy.maxArmor;
+                        enemy.maxHull = Math.round(enemy.maxHull * bonuses.tierScale);
+                        enemy.hull = enemy.maxHull;
+                        enemy.bounty = Math.round(enemy.bounty * bonuses.tierScale);
+                    }
+                    enemy.patrolPoint = {
+                        x: enemy.x + this.random.float(-2000, 2000),
+                        y: enemy.y + this.random.float(-2000, 2000),
+                    };
+                    this.entities.push(enemy);
                 }
             }
-
-            // Random position well away from central planet
-            const angle = this.random.angle();
-            const dist = this.random.float(5000, 12000);
-
-            const enemy = new EnemyShip(this.game, {
-                x: centerX + Math.cos(angle) * dist,
-                y: centerY + Math.sin(angle) * dist,
-                enemyType,
-                name: `Pirate ${i + 1}`,
-            });
-
-            // Set initial patrol point (nearby their spawn)
-            enemy.patrolPoint = {
-                x: enemy.x + this.random.float(-2000, 2000),
-                y: enemy.y + this.random.float(-2000, 2000),
-            };
-
-            this.entities.push(enemy);
+        } else if (factionData && factionData.baseStanding < 0) {
+            // Hostile faction territory: faction military ships
+            const prefix = factionData.shipPrefix;
+            const bonuses = FACTION_TECH_BONUSES[sectorFaction];
+            for (let i = 0; i < count; i++) {
+                let enemyType = 'pirate-frigate';
+                if (this.difficulty === 'dangerous' || this.difficulty === 'deadly') {
+                    if (this.random.next() > 0.5) enemyType = 'pirate-cruiser';
+                }
+                const angle = this.random.angle();
+                const dist = this.random.float(5000, 12000);
+                const enemy = new EnemyShip(this.game, {
+                    x: centerX + Math.cos(angle) * dist,
+                    y: centerY + Math.sin(angle) * dist,
+                    enemyType,
+                    name: `${prefix} ${enemyType === 'pirate-cruiser' ? 'Cruiser' : 'Fighter'} ${i + 1}`,
+                    faction: sectorFaction,
+                });
+                // Scale stats by faction tier
+                if (bonuses) {
+                    enemy.maxShield = Math.round(enemy.maxShield * bonuses.tierScale);
+                    enemy.shield = enemy.maxShield;
+                    enemy.maxArmor = Math.round(enemy.maxArmor * bonuses.tierScale);
+                    enemy.armor = enemy.maxArmor;
+                    enemy.maxHull = Math.round(enemy.maxHull * bonuses.tierScale);
+                    enemy.hull = enemy.maxHull;
+                    enemy.bounty = Math.round(enemy.bounty * bonuses.tierScale);
+                }
+                enemy.patrolPoint = {
+                    x: enemy.x + this.random.float(-2000, 2000),
+                    y: enemy.y + this.random.float(-2000, 2000),
+                };
+                this.entities.push(enemy);
+            }
+        } else {
+            // Standard pirates (human/friendly space)
+            for (let i = 0; i < count; i++) {
+                let enemyType = 'pirate-frigate';
+                if (this.difficulty === 'dangerous' || this.difficulty === 'deadly') {
+                    if (this.random.next() > 0.7) enemyType = 'pirate-cruiser';
+                }
+                const angle = this.random.angle();
+                const dist = this.random.float(5000, 12000);
+                const enemy = new EnemyShip(this.game, {
+                    x: centerX + Math.cos(angle) * dist,
+                    y: centerY + Math.sin(angle) * dist,
+                    enemyType,
+                    name: `Pirate ${i + 1}`,
+                });
+                enemy.patrolPoint = {
+                    x: enemy.x + this.random.float(-2000, 2000),
+                    y: enemy.y + this.random.float(-2000, 2000),
+                };
+                this.entities.push(enemy);
+            }
         }
+    }
+
+    /**
+     * Derive a 0-1 danger level from sector difficulty string
+     */
+    getDangerLevel() {
+        const levels = { tutorial: 0, hub: 0, safe: 0.1, tame: 0.15, normal: 0.35, neutral: 0.45, dangerous: 0.7, deadly: 1.0 };
+        return levels[this.difficulty] || 0.35;
     }
 
     /**
@@ -272,16 +363,15 @@ export class Sector {
     generateAnomalies() {
         const centerX = CONFIG.SECTOR_SIZE / 2;
         const centerY = CONFIG.SECTOR_SIZE / 2;
-        const layout = UNIVERSE_LAYOUT[this.id] || {};
-        const dangerLevel = layout.dangerLevel || 0;
+        const dangerLevel = this.getDangerLevel();
 
         // More anomalies in dangerous sectors, fewer in safe ones
         const baseCount = 1;
         const bonusCount = Math.floor(dangerLevel * 3);
         const totalCount = baseCount + bonusCount;
 
-        // Get list of connected sectors for wormhole destinations
-        const connectedSectors = Object.keys(UNIVERSE_LAYOUT).filter(s => s !== this.id);
+        // Get list of all sector IDs for wormhole destinations
+        const connectedSectors = UNIVERSE_LAYOUT.sectors.map(s => s.id).filter(s => s !== this.id);
 
         for (let i = 0; i < totalCount; i++) {
             // Choose anomaly type based on sector and RNG
@@ -311,7 +401,7 @@ export class Sector {
             if (anomalyType === 'wormhole') {
                 const destIdx = Math.floor(this.random.next() * connectedSectors.length);
                 options.destinationSectorId = connectedSectors[destIdx];
-                const destLayout = UNIVERSE_LAYOUT[options.destinationSectorId];
+                const destLayout = UNIVERSE_LAYOUT_MAP[options.destinationSectorId];
                 options.name = `Wormhole → ${destLayout?.name || options.destinationSectorId}`;
             }
 
@@ -350,8 +440,7 @@ export class Sector {
         if (this.anomalySpawnTimer > 120) { // Check every 2 minutes
             this.anomalySpawnTimer = 0;
             const anomalyCount = this.entities.filter(e => e.type === 'anomaly').length;
-            const layout = UNIVERSE_LAYOUT[this.id] || {};
-            const dangerLevel = layout.dangerLevel || 0;
+            const dangerLevel = this.getDangerLevel();
             const maxAnomalies = 1 + Math.floor(dangerLevel * 3);
 
             if (anomalyCount < maxAnomalies && Math.random() < 0.5) {
@@ -366,8 +455,7 @@ export class Sector {
     spawnRandomAnomaly() {
         const centerX = CONFIG.SECTOR_SIZE / 2;
         const centerY = CONFIG.SECTOR_SIZE / 2;
-        const layout = UNIVERSE_LAYOUT[this.id] || {};
-        const dangerLevel = layout.dangerLevel || 0;
+        const dangerLevel = this.getDangerLevel();
 
         const roll = Math.random();
         let anomalyType;
@@ -390,10 +478,10 @@ export class Sector {
         };
 
         if (anomalyType === 'wormhole') {
-            const sectors = Object.keys(UNIVERSE_LAYOUT).filter(s => s !== this.id);
+            const sectors = UNIVERSE_LAYOUT.sectors.map(s => s.id).filter(s => s !== this.id);
             if (sectors.length > 0) {
                 options.destinationSectorId = sectors[Math.floor(Math.random() * sectors.length)];
-                const destLayout = UNIVERSE_LAYOUT[options.destinationSectorId];
+                const destLayout = UNIVERSE_LAYOUT_MAP[options.destinationSectorId];
                 options.name = `Wormhole → ${destLayout?.name || options.destinationSectorId}`;
             }
         }

@@ -399,7 +399,9 @@ export const CONFIG = {
         tutorial: { chance: 0, interval: 999, maxPirates: 0 },
         hub: { chance: 0, interval: 999, maxPirates: 0 },
         safe: { chance: 0.25, interval: 120, maxPirates: 2 },
+        tame: { chance: 0.15, interval: 150, maxPirates: 1 },
         normal: { chance: 0.45, interval: 90, maxPirates: 3 },
+        neutral: { chance: 0.35, interval: 100, maxPirates: 2 },
         dangerous: { chance: 0.6, interval: 60, maxPirates: 4 },
         deadly: { chance: 0.8, interval: 45, maxPirates: 5 },
     },
@@ -469,28 +471,150 @@ export const CONFIG = {
             warning: 'NEBULA INTERFERENCE - Sensor range reduced',
             color: '#44aa88',
         },
+        // Tier 3 - Kristang sectors (hostile, combat-heavy)
+        'kristang-hold': {
+            type: 'radiation',
+            name: 'Kristang Radiation Grid',
+            damagePerSecond: 3,
+            interval: 3,
+            warning: 'KRISTANG RADIATION GRID - Hull taking damage',
+            color: '#ff6644',
+        },
+        'kristang-arena': {
+            type: 'radiation',
+            name: 'Blood Arena Fallout',
+            damagePerSecond: 4,
+            interval: 3,
+            warning: 'ARENA FALLOUT - Intense radiation exposure',
+            color: '#ff4422',
+        },
+        // Tier 2 - Thuranin (tech/ion storms)
+        'thuranin-prime': {
+            type: 'ion-storm',
+            name: 'Thuranin Capacitor Drain Field',
+            capDrainPerSecond: 12,
+            interval: 2,
+            warning: 'THURANIN DRAIN FIELD - Capacitor destabilizing',
+            color: '#6644ff',
+        },
+        'thuranin-labs': {
+            type: 'nebula-interference',
+            name: 'Thuranin Research Interference',
+            radarReduction: 0.6,
+            warning: 'RESEARCH ARRAY INTERFERENCE - Sensors disrupted',
+            color: '#5588cc',
+        },
+        // Tier 2 - Bosphuraq (aggressive)
+        'bosphuraq-prime': {
+            type: 'radiation',
+            name: 'Bosphuraq Nest Radiation',
+            damagePerSecond: 3,
+            interval: 3,
+            warning: 'NEST RADIATION - Hull taking damage',
+            color: '#ff8844',
+        },
+        // Tier 1 - Maxolhx (extreme)
+        'maxolhx-prime': {
+            type: 'ion-storm',
+            name: 'Maxolhx Suppression Field',
+            capDrainPerSecond: 16,
+            interval: 2,
+            warning: 'MAXOLHX SUPPRESSION FIELD - Critical cap drain',
+            color: '#aa22ff',
+        },
+        'maxolhx-throne': {
+            type: 'radiation',
+            name: 'Apex Throne Radiation',
+            damagePerSecond: 6,
+            interval: 2,
+            warning: 'APEX THRONE RADIATION - Extreme hull damage',
+            color: '#ff2222',
+        },
+        // Contested zones
+        't2-contested-a': {
+            type: 'nebula-interference',
+            name: 'Shattered Expanse Debris',
+            radarReduction: 0.4,
+            warning: 'DEBRIS FIELD - Sensor range severely reduced',
+            color: '#448888',
+        },
+        't1-contested': {
+            type: 'ion-storm',
+            name: 'Crucible Storm',
+            capDrainPerSecond: 14,
+            interval: 2,
+            warning: 'CRUCIBLE STORM - Extreme capacitor drain',
+            color: '#9944ff',
+        },
     },
 };
 
 // Sector layout for hub-and-spoke universe
 export const UNIVERSE_LAYOUT = {
     sectors: [
-        // === CORE SECTORS ===
-        { id: 'tutorial', name: 'Training Grounds', x: 0, y: 2, difficulty: 'tutorial', hasStation: true, region: 'core' },
-        { id: 'hub', name: 'Central Hub', x: 0, y: 0, difficulty: 'hub', hasStation: true, region: 'core' },
-        { id: 'sector-1', name: 'Mining Fields Alpha', x: -1, y: 0, difficulty: 'safe', hasStation: true, region: 'core' },
-        { id: 'sector-2', name: 'Mining Fields Beta', x: 1, y: 0, difficulty: 'safe', hasStation: true, region: 'core' },
-        { id: 'sector-3', name: 'Frontier Zone', x: 0, y: -1, difficulty: 'normal', hasStation: true, region: 'core' },
-        { id: 'sector-4', name: 'Pirate Territory', x: -1, y: -1, difficulty: 'dangerous', hasStation: true, region: 'core' },
-        { id: 'sector-5', name: 'The Abyss', x: 1, y: -1, difficulty: 'deadly', hasStation: true, region: 'core' },
-        { id: 'sector-6', name: 'Nebula Expanse', x: 0, y: 1, difficulty: 'normal', hasStation: true, region: 'core' },
-        // === MILKY WAY REGION ===
-        { id: 'mw-alpha', name: 'Sol Gateway', x: 3, y: 0, difficulty: 'safe', hasStation: true, region: 'milkyway', stationType: 'military-hub' },
-        { id: 'mw-bravo', name: 'Orion Refinery', x: 4, y: -1, difficulty: 'tame', hasStation: true, region: 'milkyway', stationType: 'mining-hub' },
-        { id: 'mw-charlie', name: 'Cygnus Forge', x: 5, y: 0, difficulty: 'tame', hasStation: true, region: 'milkyway', stationType: 'mining-hub' },
-        { id: 'mw-delta', name: 'Vega Outpost', x: 5, y: 1, difficulty: 'neutral', hasStation: true, region: 'milkyway', stationType: 'mercenary-hub' },
-        { id: 'mw-echo', name: 'Sirius Station', x: 4, y: 1, difficulty: 'safe', hasStation: true, region: 'milkyway', stationType: 'military-hub' },
-        { id: 'mw-foxtrot', name: 'Arcturus Landing', x: 3, y: 1, difficulty: 'neutral', hasStation: true, region: 'milkyway', stationType: 'mercenary-hub' },
+        // === RING 0 - HUMANITY CORE ===
+        { id: 'tutorial', name: 'Training Grounds', x: 0, y: 2, difficulty: 'tutorial', hasStation: true, region: 'core', faction: 'unef' },
+        { id: 'hub', name: 'Central Hub', x: 0, y: 0, difficulty: 'hub', hasStation: true, region: 'core', faction: 'unef' },
+        { id: 'sector-1', name: 'Mining Fields Alpha', x: -1, y: 0, difficulty: 'safe', hasStation: true, region: 'core', faction: 'unef' },
+        { id: 'sector-2', name: 'Mining Fields Beta', x: 1, y: 0, difficulty: 'safe', hasStation: true, region: 'core', faction: 'unef' },
+        { id: 'sector-3', name: 'Frontier Zone', x: 0, y: -1, difficulty: 'normal', hasStation: true, region: 'core', faction: 'unef' },
+        { id: 'sector-4', name: 'Pirate Territory', x: -1, y: -1, difficulty: 'dangerous', hasStation: true, region: 'core', faction: 'unef' },
+        { id: 'sector-5', name: 'The Abyss', x: 1, y: -1, difficulty: 'deadly', hasStation: true, region: 'core', faction: 'mavericks' },
+        { id: 'sector-6', name: 'Nebula Expanse', x: 0, y: 1, difficulty: 'normal', hasStation: true, region: 'core', faction: 'unef' },
+
+        // === RING 0.5 - MILKY WAY (Human Space) ===
+        { id: 'mw-alpha', name: 'Sol Gateway', x: 3, y: 0, difficulty: 'safe', hasStation: true, region: 'milkyway', stationType: 'military-hub', faction: 'unef' },
+        { id: 'mw-bravo', name: 'Orion Refinery', x: 4, y: -1, difficulty: 'tame', hasStation: true, region: 'milkyway', stationType: 'mining-hub', faction: 'unef' },
+        { id: 'mw-charlie', name: 'Cygnus Forge', x: 5, y: 0, difficulty: 'tame', hasStation: true, region: 'milkyway', stationType: 'mining-hub', faction: 'unef' },
+        { id: 'mw-delta', name: 'Vega Outpost', x: 5, y: 1, difficulty: 'neutral', hasStation: true, region: 'milkyway', stationType: 'mercenary-hub', faction: 'unef' },
+        { id: 'mw-echo', name: 'Sirius Station', x: 4, y: 1, difficulty: 'safe', hasStation: true, region: 'milkyway', stationType: 'military-hub', faction: 'unef' },
+        { id: 'mw-foxtrot', name: 'Arcturus Landing', x: 3, y: 1, difficulty: 'neutral', hasStation: true, region: 'milkyway', stationType: 'mercenary-hub', faction: 'mavericks' },
+
+        // === RING 1 - TIER 3 ZONES ===
+        // Ruhar (friendly) territory
+        { id: 'ruhar-prime', name: 'Ruhar Prime', x: -3, y: 3, difficulty: 'safe', hasStation: true, region: 'ruhar', faction: 'ruhar' },
+        { id: 'ruhar-haven', name: 'Burrow Haven', x: -4, y: 2, difficulty: 'tame', hasStation: true, region: 'ruhar', faction: 'ruhar' },
+        { id: 'ruhar-market', name: 'Hamster Market', x: -2, y: 3, difficulty: 'safe', hasStation: true, region: 'ruhar', faction: 'ruhar' },
+        // Kristang (hostile) territory
+        { id: 'kristang-hold', name: 'Kristang Hold', x: 3, y: -3, difficulty: 'dangerous', hasStation: true, region: 'kristang', faction: 'kristang' },
+        { id: 'kristang-arena', name: 'Blood Arena', x: 4, y: -3, difficulty: 'dangerous', hasStation: true, region: 'kristang', faction: 'kristang' },
+        { id: 'kristang-forge', name: 'War Forge', x: 2, y: -4, difficulty: 'neutral', hasStation: true, region: 'kristang', faction: 'kristang' },
+        // Contested border
+        { id: 'border-alpha', name: 'Contested Alpha', x: 0, y: -3, difficulty: 'normal', hasStation: false, region: 'border', faction: null, contested: true, contestedFactions: ['ruhar', 'kristang'] },
+        { id: 'border-bravo', name: 'Scorched Plains', x: 1, y: -3, difficulty: 'normal', hasStation: false, region: 'border', faction: null, contested: true, contestedFactions: ['ruhar', 'kristang'] },
+        { id: 'border-charlie', name: 'Burning Line', x: -1, y: -3, difficulty: 'normal', hasStation: false, region: 'border', faction: null, contested: true, contestedFactions: ['ruhar', 'kristang'] },
+        // Keepers enclave
+        { id: 'keepers-enclave', name: 'Keepers Enclave', x: -2, y: 2, difficulty: 'tame', hasStation: true, region: 'core', faction: 'keepers' },
+
+        // === RING 2 - TIER 2 ZONES ===
+        // Jeraptha (Rindhalu Coalition)
+        { id: 'jeraptha-prime', name: 'Jeraptha Exchange', x: -6, y: 4, difficulty: 'neutral', hasStation: true, region: 'jeraptha', faction: 'jeraptha' },
+        { id: 'jeraptha-docks', name: 'Beetle Docks', x: -5, y: 5, difficulty: 'neutral', hasStation: true, region: 'jeraptha', faction: 'jeraptha' },
+        // Thuranin (Maxolhx Coalition)
+        { id: 'thuranin-prime', name: 'Thuranin Nexus', x: 6, y: -5, difficulty: 'dangerous', hasStation: true, region: 'thuranin', faction: 'thuranin' },
+        { id: 'thuranin-labs', name: 'Research Array', x: 7, y: -4, difficulty: 'dangerous', hasStation: true, region: 'thuranin', faction: 'thuranin' },
+        // Bosphuraq (Maxolhx Coalition)
+        { id: 'bosphuraq-prime', name: 'Bosphuraq Aerie', x: 5, y: -6, difficulty: 'dangerous', hasStation: true, region: 'bosphuraq', faction: 'bosphuraq' },
+        { id: 'bosphuraq-nest', name: 'Raptor Nest', x: 4, y: -6, difficulty: 'dangerous', hasStation: true, region: 'bosphuraq', faction: 'bosphuraq' },
+        // Esselgin (Independent)
+        { id: 'esselgin-prime', name: 'Esselgin Nexus', x: -6, y: -2, difficulty: 'neutral', hasStation: true, region: 'esselgin', faction: 'esselgin' },
+        { id: 'esselgin-market', name: 'Serpent Bazaar', x: -7, y: -1, difficulty: 'neutral', hasStation: true, region: 'esselgin', faction: 'esselgin' },
+        // Wurgalan (Independent)
+        { id: 'wurgalan-prime', name: 'Wurgalan Depths', x: 7, y: 3, difficulty: 'neutral', hasStation: true, region: 'wurgalan', faction: 'wurgalan' },
+        { id: 'wurgalan-reef', name: 'Tentacle Reef', x: 6, y: 4, difficulty: 'neutral', hasStation: true, region: 'wurgalan', faction: 'wurgalan' },
+        // Tier 2 Contested
+        { id: 't2-contested-a', name: 'Shattered Expanse', x: 0, y: -6, difficulty: 'dangerous', hasStation: false, region: 'border', faction: null, contested: true, contestedFactions: ['thuranin', 'jeraptha'] },
+        { id: 't2-contested-b', name: 'Coalition Breach', x: -3, y: -5, difficulty: 'dangerous', hasStation: false, region: 'border', faction: null, contested: true, contestedFactions: ['bosphuraq', 'jeraptha'] },
+
+        // === RING 3 - TIER 1 ZONES ===
+        // Rindhalu (Elder, Senior Coalition)
+        { id: 'rindhalu-prime', name: 'Rindhalu Webway', x: -8, y: 6, difficulty: 'deadly', hasStation: true, region: 'rindhalu', faction: 'rindhalu' },
+        { id: 'rindhalu-sanctum', name: 'Elder Sanctum', x: -9, y: 5, difficulty: 'deadly', hasStation: true, region: 'rindhalu', faction: 'rindhalu' },
+        // Maxolhx (Elder, Junior Coalition)
+        { id: 'maxolhx-prime', name: 'Maxolhx Citadel', x: 9, y: -7, difficulty: 'deadly', hasStation: true, region: 'maxolhx', faction: 'maxolhx' },
+        { id: 'maxolhx-throne', name: 'Apex Throne', x: 8, y: -8, difficulty: 'deadly', hasStation: true, region: 'maxolhx', faction: 'maxolhx' },
+        // Tier 1 Contested (Final battleground)
+        { id: 't1-contested', name: 'The Crucible', x: 0, y: -9, difficulty: 'deadly', hasStation: false, region: 'border', faction: null, contested: true, contestedFactions: ['rindhalu', 'maxolhx'] },
     ],
     gates: [
         // === CORE GATES ===
@@ -512,5 +636,66 @@ export const UNIVERSE_LAYOUT = {
         { from: 'mw-delta', to: 'mw-echo' },
         { from: 'mw-echo', to: 'mw-foxtrot' },
         { from: 'mw-foxtrot', to: 'mw-alpha' },
+
+        // === CORE -> TIER 3 RUHAR ===
+        { from: 'sector-6', to: 'ruhar-market' },
+        { from: 'sector-1', to: 'keepers-enclave' },
+        { from: 'keepers-enclave', to: 'ruhar-prime' },
+        { from: 'ruhar-prime', to: 'ruhar-haven' },
+        { from: 'ruhar-prime', to: 'ruhar-market' },
+
+        // === CORE -> TIER 3 KRISTANG ===
+        { from: 'sector-5', to: 'kristang-forge' },
+        { from: 'kristang-forge', to: 'kristang-hold' },
+        { from: 'kristang-hold', to: 'kristang-arena' },
+
+        // === TIER 3 CONTESTED BORDER ===
+        { from: 'sector-3', to: 'border-alpha' },
+        { from: 'sector-4', to: 'border-charlie' },
+        { from: 'border-alpha', to: 'border-bravo' },
+        { from: 'border-alpha', to: 'border-charlie' },
+        { from: 'border-bravo', to: 'kristang-forge' },
+        { from: 'border-charlie', to: 'ruhar-haven' },
+
+        // === TIER 3 -> TIER 2 ===
+        { from: 'ruhar-haven', to: 'jeraptha-prime' },
+        { from: 'ruhar-prime', to: 'jeraptha-docks' },
+        { from: 'jeraptha-prime', to: 'jeraptha-docks' },
+        { from: 'kristang-arena', to: 'bosphuraq-prime' },
+        { from: 'kristang-hold', to: 'thuranin-prime' },
+        { from: 'thuranin-prime', to: 'thuranin-labs' },
+        { from: 'bosphuraq-prime', to: 'bosphuraq-nest' },
+        { from: 'sector-4', to: 'esselgin-prime' },
+        { from: 'esselgin-prime', to: 'esselgin-market' },
+        { from: 'mw-delta', to: 'wurgalan-prime' },
+        { from: 'wurgalan-prime', to: 'wurgalan-reef' },
+
+        // === TIER 2 CONTESTED ===
+        { from: 'border-alpha', to: 't2-contested-a' },
+        { from: 'thuranin-prime', to: 't2-contested-a' },
+        { from: 'jeraptha-prime', to: 't2-contested-b' },
+        { from: 'bosphuraq-nest', to: 't2-contested-b' },
+        { from: 'esselgin-market', to: 't2-contested-b' },
+
+        // === TIER 2 -> TIER 1 ===
+        { from: 'jeraptha-docks', to: 'rindhalu-prime' },
+        { from: 'rindhalu-prime', to: 'rindhalu-sanctum' },
+        { from: 'thuranin-labs', to: 'maxolhx-prime' },
+        { from: 'maxolhx-prime', to: 'maxolhx-throne' },
+
+        // === TIER 1 CONTESTED ===
+        { from: 't2-contested-a', to: 't1-contested' },
+        { from: 'rindhalu-prime', to: 't1-contested', wormhole: true },
+        { from: 'maxolhx-prime', to: 't1-contested', wormhole: true },
+
+        // === CROSS-LINKS ===
+        { from: 'mw-bravo', to: 'kristang-forge' },
+        { from: 'mw-foxtrot', to: 'esselgin-prime' },
     ],
 };
+
+// Quick lookup map: sectorId -> sector data (built once at load time)
+export const UNIVERSE_LAYOUT_MAP = {};
+for (const sector of UNIVERSE_LAYOUT.sectors) {
+    UNIVERSE_LAYOUT_MAP[sector.id] = sector;
+}

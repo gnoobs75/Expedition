@@ -303,6 +303,7 @@ export class SaveManager {
             } : null,
             sectorEvents: game.sectorEventSystem?.saveState() || null,
             missions: game.missionSystem?.saveState() || null,
+            coalitionWar: game.coalitionWarSystem?.saveState() || null,
 
             // Player-owned stations
             playerStations: (game.playerStations || []).map(pos => pos.serialize()),

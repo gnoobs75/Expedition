@@ -37,6 +37,7 @@ import { SectorEventSystem } from '../systems/SectorEventSystem.js';
 import { BountySystem } from '../systems/BountySystem.js';
 import { IntelSystem } from '../systems/IntelSystem.js';
 import { MissionSystem } from '../systems/MissionSystem.js';
+import { CoalitionWarSystem } from '../systems/CoalitionWarSystem.js';
 import { PlayerStationDefenseSystem } from '../systems/PlayerStationDefenseSystem.js';
 import { PlayerStation } from '../entities/PlayerStation.js';
 import { AdminDashboardManager } from '../ui/AdminDashboardManager.js';
@@ -209,6 +210,7 @@ export class Game {
         this.bountySystem = new BountySystem(this);
         this.intelSystem = new IntelSystem(this);
         this.missionSystem = new MissionSystem(this);
+        this.coalitionWarSystem = new CoalitionWarSystem(this);
         this.posDefenseSystem = new PlayerStationDefenseSystem(this);
 
         // Create UI manager (last, needs other systems)
@@ -1241,6 +1243,7 @@ export class Game {
         if (this.intelSystem) this._safeUpdate(this.intelSystem, 'Intel', dt);
         if (this.posDefenseSystem) this._safeUpdate(this.posDefenseSystem, 'POSDefense', dt);
         if (this.missionSystem) this._safeUpdate(this.missionSystem, 'Mission', dt);
+        if (this.coalitionWarSystem) this._safeUpdate(this.coalitionWarSystem, 'CoalitionWar', dt);
 
         // Auto-loot tractor beam
         try { this.updateTractorBeams(dt); } catch (e) { console.error('[TractorBeam] error:', e); }
@@ -1338,11 +1341,11 @@ export class Game {
             return;
         }
 
-        // Check sector danger level
-        const sectorId = this.currentSector?.id;
-        if (sectorId) {
-            const layout = UNIVERSE_LAYOUT[sectorId];
-            const danger = layout?.dangerLevel || 0;
+        // Check sector danger level based on difficulty
+        const difficulty = this.currentSector?.difficulty;
+        if (difficulty) {
+            const dangerLevels = { tutorial: 0, hub: 0, safe: 0.1, tame: 0.15, normal: 0.35, neutral: 0.45, dangerous: 0.7, deadly: 1.0 };
+            const danger = dangerLevels[difficulty] || 0;
             if (danger >= 0.6) {
                 this.audio.setMusicMode('danger');
                 return;
@@ -1748,6 +1751,7 @@ export class Game {
         if (data.fleet?.activeDoctrine) this.fleetSystem?.setDoctrine(data.fleet.activeDoctrine);
         if (data.sectorEvents) this.sectorEventSystem?.loadState(data.sectorEvents);
         if (data.missions) this.missionSystem?.loadState(data.missions);
+        if (data.coalitionWar) this.coalitionWarSystem?.loadState(data.coalitionWar);
 
         // Restore player stations (POS)
         if (data.playerStations && Array.isArray(data.playerStations)) {

@@ -306,6 +306,8 @@ export function applyFactionOverlay(baseShip, baseShipId, factionId) {
         // Scale power
         capacitor: Math.round(baseShip.capacitor * ts * bonuses.capMult),
         capacitorRegen: +(baseShip.capacitorRegen * ts * bonuses.capMult).toFixed(1),
+        // Scale damage output
+        damageMultiplier: bonuses.damageMult || 1.0,
         // Scale price
         price: Math.round(baseShip.price * ts * 1.1),
     };

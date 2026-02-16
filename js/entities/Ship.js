@@ -885,6 +885,9 @@ export class Ship extends Entity {
         // Calculate damage with bonuses
         let damage = moduleConfig.damage;
 
+        // Apply faction damage multiplier (faction NPCs deal more damage by tier)
+        if (this.damageMultiplier) damage *= this.damageMultiplier;
+
         // Apply damage mod bonus from subsystem slots
         for (let i = 0; i < this.lowSlots; i++) {
             const mod = this.modules.low[i];

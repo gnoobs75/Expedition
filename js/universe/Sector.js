@@ -283,6 +283,7 @@ export class Sector {
                         enemy.maxHull = Math.round(enemy.maxHull * bonuses.tierScale);
                         enemy.hull = enemy.maxHull;
                         enemy.bounty = Math.round(enemy.bounty * bonuses.tierScale);
+                        enemy.damageMultiplier = bonuses.damageMult || 1.0;
                     }
                     enemy.patrolPoint = {
                         x: enemy.x + this.random.float(-2000, 2000),
@@ -318,6 +319,7 @@ export class Sector {
                     enemy.maxHull = Math.round(enemy.maxHull * bonuses.tierScale);
                     enemy.hull = enemy.maxHull;
                     enemy.bounty = Math.round(enemy.bounty * bonuses.tierScale);
+                    enemy.damageMultiplier = bonuses.damageMult || 1.0;
                 }
                 enemy.patrolPoint = {
                     x: enemy.x + this.random.float(-2000, 2000),

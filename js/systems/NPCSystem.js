@@ -12,10 +12,14 @@ import { SHIP_DATABASE } from '../data/shipDatabase.js';
 
 // Sector faction pools - fallback for sectors without explicit faction
 const SECTOR_FACTIONS = {
-    easy:   ['ruhar', 'unef', 'mavericks'],
-    medium: ['jeraptha', 'ruhar', 'unef', 'esselgin'],
-    hard:   ['thuranin', 'bosphuraq', 'kristang', 'wurgalan'],
-    deadly: ['maxolhx', 'thuranin', 'kristang'],
+    tutorial:  ['unef'],
+    hub:       ['unef'],
+    safe:      ['ruhar', 'unef', 'mavericks'],
+    tame:      ['ruhar', 'unef', 'keepers'],
+    normal:    ['jeraptha', 'ruhar', 'unef', 'esselgin'],
+    neutral:   ['jeraptha', 'esselgin', 'wurgalan'],
+    dangerous: ['thuranin', 'bosphuraq', 'kristang', 'wurgalan'],
+    deadly:    ['maxolhx', 'thuranin', 'kristang'],
 };
 
 // Pick a sector's controlling faction from layout data, or fallback to difficulty pool

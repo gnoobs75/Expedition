@@ -10,7 +10,7 @@ export const STATION_SPECIALTIES = {
     hub: {
         name: 'Central Hub',
         specialty: 'administration',
-        produces: ['bureaucratic-documents', 'navigation-charts', 'trade-licenses', 'security-codes'],
+        produces: ['bureaucratic-documents', 'navigation-charts', 'trade-licenses', 'security-codes', 'pos-kit-basic'],
         consumes: ['luxury-food', 'medical-supplies', 'consumer-electronics', 'exotic-textiles'],
         description: 'Administrative center - produces permits and documentation, imports luxury goods',
     },

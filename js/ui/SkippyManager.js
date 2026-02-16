@@ -32,6 +32,12 @@ export class SkippyManager {
         this.utterance = null;
         this.ttsKeepAliveId = null;
 
+        // Pre-recorded audio (ElevenLabs)
+        this.audioBasePath = 'audio/skippy/';
+        this.audioFormat = 'ogg';
+        this.currentAudio = null;
+        this.usePreRecorded = true; // set false to force browser TTS
+
         // Cooldowns (ms) per category
         this.cooldowns = {
             'combat:kill': 30000,
@@ -146,7 +152,7 @@ export class SkippyManager {
         } else {
             // Returning player
             setTimeout(() => {
-                this.say("Oh, you're back. I was starting to enjoy the silence. What are we blowing up today?", 5, 'smug');
+                this.say("Oh, you're back. I was starting to enjoy the silence. What are we blowing up today?", 5, 'smug', 'returnGreeting_0');
             }, 2000);
         }
     }
@@ -245,8 +251,63 @@ export class SkippyManager {
         }
     }
 
-    speak(text) {
-        if (this.muted || !this.synth) {
+    speak(text, audioId = null) {
+        if (this.muted) {
+            this.displayText(text);
+            return;
+        }
+
+        // Try pre-recorded audio first
+        if (this.usePreRecorded && audioId) {
+            this.playPreRecordedAudio(text, audioId);
+            return;
+        }
+
+        // Fallback: browser TTS
+        this.speakTTS(text);
+    }
+
+    playPreRecordedAudio(text, audioId) {
+        // Stop any current audio/TTS
+        this.stopCurrentSpeech();
+
+        const src = `${this.audioBasePath}${audioId}.${this.audioFormat}`;
+        const audio = new Audio(src);
+        audio.volume = 0.85;
+        this.currentAudio = audio;
+
+        this.speaking = true;
+        this.avatar?.startTalking();
+        this.textEl?.classList.add('speaking');
+        if (this.speakingDot) this.speakingDot.classList.add('active');
+        this.displayText(text);
+
+        audio.onended = () => {
+            this.currentAudio = null;
+            this._onSpeechEnd();
+        };
+
+        audio.onerror = () => {
+            // Audio file not found / failed - fall back to browser TTS
+            this.currentAudio = null;
+            this.speaking = false;
+            this.avatar?.stopTalking();
+            this.textEl?.classList.remove('speaking');
+            if (this.speakingDot) this.speakingDot.classList.remove('active');
+            this.speakTTS(text);
+        };
+
+        audio.play().catch(() => {
+            // Play blocked (autoplay policy etc) - fall back to TTS
+            this.currentAudio = null;
+            this.speaking = false;
+            this.avatar?.stopTalking();
+            this.speakTTS(text);
+        });
+    }
+
+    speakTTS(text) {
+        if (!this.synth) {
             this.displayText(text);
             return;
         }
@@ -257,7 +318,6 @@ export class SkippyManager {
 
         const utterance = new SpeechSynthesisUtterance(text);
         if (this.voice) utterance.voice = this.voice;
-        // Slight variation for natural feel
         utterance.rate = 0.95 + Math.random() * 0.15;
         utterance.pitch = 0.7 + Math.random() * 0.1;
         utterance.volume = 0.8;
@@ -269,32 +329,43 @@ export class SkippyManager {
         if (this.speakingDot) this.speakingDot.classList.add('active');
 
         utterance.onend = () => {
-            this.speaking = false;
             this.utterance = null;
             this.stopTTSKeepAlive();
-            this.avatar?.stopTalking();
-            this.textEl?.classList.remove('speaking');
-            if (this.speakingDot) this.speakingDot.classList.remove('active');
-            this.currentMessage = null;
-            // Process next message
-            this.processQueue();
+            this._onSpeechEnd();
         };
 
-        utterance.onerror = (e) => {
-            this.speaking = false;
+        utterance.onerror = () => {
             this.utterance = null;
             this.stopTTSKeepAlive();
-            this.avatar?.stopTalking();
-            this.textEl?.classList.remove('speaking');
-            if (this.speakingDot) this.speakingDot.classList.remove('active');
-            this.currentMessage = null;
-            // On non-cancel error, text is already displayed as fallback
-            this.processQueue();
+            this._onSpeechEnd();
         };
 
         this.displayText(text);
         this.synth.speak(utterance);
         this.startTTSKeepAlive();
+    }
+
+    _onSpeechEnd() {
+        this.speaking = false;
+        this.avatar?.stopTalking();
+        this.textEl?.classList.remove('speaking');
+        if (this.speakingDot) this.speakingDot.classList.remove('active');
+        this.currentMessage = null;
+        this.processQueue();
+    }
+
+    stopCurrentSpeech() {
+        // Stop pre-recorded audio
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            this.currentAudio.src = '';
+            this.currentAudio = null;
+        }
+        // Stop browser TTS
+        if (this.synth) {
+            this.synth.cancel();
+        }
+        this.stopTTSKeepAlive();
     }
 
     displayText(text) {
@@ -342,7 +413,7 @@ export class SkippyManager {
 
     // ---- Message Queue ----
 
-    say(text, priority = 5, expression = 'idle') {
+    say(text, priority = 5, expression = 'idle', audioId = null) {
         // Replace placeholders
         text = this.replacePlaceholders(text);
 
@@ -350,6 +421,7 @@ export class SkippyManager {
             text,
             priority,
             expression,
+            audioId,
             timestamp: performance.now(),
         });
 
@@ -377,8 +449,8 @@ export class SkippyManager {
         // Set avatar expression
         this.avatar?.setExpression(msg.expression || 'idle');
 
-        // Speak/display
-        this.speak(msg.text);
+        // Speak/display (with audio file if available)
+        this.speak(msg.text, msg.audioId);
     }
 
     // ---- Dialogue Triggers ----
@@ -431,8 +503,14 @@ export class SkippyManager {
         // Get expression for this category
         const expression = SKIPPY_EXPRESSIONS[catKey] || SKIPPY_EXPRESSIONS[category] || 'idle';
 
-        // Queue message with pre-replaced text
-        this.say(text, selected.priority || 5, expression);
+        // Compute audio file ID: category_subcategory_index
+        const lineIndex = lines.indexOf(selected);
+        const audioId = subcategory
+            ? `${category}_${subcategory}_${lineIndex}`
+            : `${category}_${lineIndex}`;
+
+        // Queue message with pre-replaced text and audio ID
+        this.say(text, selected.priority || 5, expression, audioId);
 
         // Record cooldown
         this.lastTriggerTime[catKey] = performance.now();
@@ -1224,8 +1302,7 @@ export class SkippyManager {
         btn.title = this.muted ? 'Unmute voice' : 'Mute voice';
 
         if (this.muted && this.speaking) {
-            this.synth?.cancel();
-            this.stopTTSKeepAlive();
+            this.stopCurrentSpeech();
             this.speaking = false;
             this.avatar?.stopTalking();
             this.textEl?.classList.remove('speaking');
@@ -1660,7 +1737,7 @@ export class SkippyManager {
         }
 
         // Deliver the step's dialogue
-        this.say(step.say, 8, step.expression || 'lecturing');
+        this.say(step.say, 8, step.expression || 'lecturing', `guided_${step.id}`);
         this.guidedWaiting = true;
     }
 
@@ -1685,7 +1762,7 @@ export class SkippyManager {
 
                 // Deliver completion message if any
                 if (step.complete) {
-                    this.say(step.complete, 7, 'impressed');
+                    this.say(step.complete, 7, 'impressed', `guided_${step.id}_complete`);
                 }
 
                 // Set milestone for this step

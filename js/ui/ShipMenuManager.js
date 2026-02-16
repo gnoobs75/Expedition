@@ -61,6 +61,14 @@ export class ShipMenuManager {
         this.statsContainer = document.getElementById('ship-stats-content');
         this.modulesContainer = document.getElementById('ship-modules-content');
         this.inventoryContainer = document.getElementById('ship-inventory-content');
+
+        // Cache all tab content elements for direct display control
+        this.tabElements = {
+            stats: document.getElementById('ship-tab-stats'),
+            fittings: document.getElementById('ship-tab-fittings'),
+            inventory: document.getElementById('ship-tab-inventory'),
+            drones: document.getElementById('ship-tab-drones'),
+        };
     }
 
     /**
@@ -76,14 +84,15 @@ export class ShipMenuManager {
         // Tab buttons
         this.modal.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                if (!tab) return;
+
                 // Update active tab button
                 this.modal.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
 
-                // Show corresponding tab content
-                this.modal.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                const tabId = `ship-tab-${btn.dataset.tab}`;
-                document.getElementById(tabId)?.classList.add('active');
+                // Switch to tab using direct style control
+                this.switchToTab(tab);
 
                 this.game.audio?.play('click');
             });
@@ -99,13 +108,44 @@ export class ShipMenuManager {
     }
 
     /**
+     * Switch to a specific tab by name, using direct style.display control
+     */
+    switchToTab(tabName) {
+        // Hide ALL tab content with inline style (overrides any CSS)
+        for (const [name, el] of Object.entries(this.tabElements)) {
+            if (!el) continue;
+            if (name === tabName) {
+                el.style.display = 'flex';
+                el.classList.add('active');
+            } else {
+                el.style.display = 'none';
+                el.classList.remove('active');
+            }
+        }
+
+        // Refresh content for the selected tab
+        if (tabName === 'stats') {
+            this.updateStats();
+            this.updateModules();
+            requestAnimationFrame(() => this.refreshViewer());
+            if (!this.animationId && this.visible) this.animate();
+        } else if (tabName === 'fittings') {
+            this.updateFittings();
+        } else if (tabName === 'inventory') {
+            this.updateInventory();
+        } else if (tabName === 'drones') {
+            this.updateDrones();
+        }
+    }
+
+    /**
      * Initialize the 3D ship viewer
      */
     init3DViewer() {
         if (!this.statsCanvas || this.initialized) return;
 
-        const width = 300;
-        const height = 300;
+        const width = 450;
+        const height = 400;
 
         // Set canvas size
         this.statsCanvas.width = width;
@@ -223,18 +263,77 @@ export class ShipMenuManager {
             size: shipConfig?.size || 'frigate',
             detailLevel: 'high',
         }).then(mesh => {
-            if (!mesh || !this.visible) return;
+            if (!mesh) return;
+            // Don't discard mesh if menu was hidden during load - keep it for next show
             this.removeShipMesh();
             this.shipMesh = mesh;
+
+            // Add turret hardpoints to show fitted weapons
+            this.addViewerTurrets(mesh);
+
             // Reset rotation
             this.rotationY = 0;
             this.rotationX = 0.3;
             this.autoRotate = true;
             this.scene.add(this.shipMesh);
             // Restart animation loop if it stopped while waiting for mesh
-            if (!this.animationId) {
+            if (!this.animationId && this.visible) {
                 this.animate();
             }
+        });
+    }
+
+    /**
+     * Add turret hardpoints to the viewer mesh to show fitted weapons
+     */
+    addViewerTurrets(mesh) {
+        const player = this.game.player;
+        if (!player) return;
+
+        const modules = player.getFittedModules();
+        const weapons = modules.filter(m => m.slotType === 'high' && m.config?.damage);
+        if (weapons.length === 0) return;
+
+        // Get mesh bounding box for placement
+        const box = new THREE.Box3().setFromObject(mesh);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+
+        const turretSpacing = size.x / (weapons.length + 1);
+
+        weapons.forEach((weapon, i) => {
+            const turretGroup = new THREE.Group();
+
+            // Base cylinder
+            const baseGeo = new THREE.CylinderGeometry(1.2, 1.5, 1.5, 8);
+            const baseMat = new THREE.MeshStandardMaterial({
+                color: 0x445566,
+                metalness: 0.8,
+                roughness: 0.3,
+            });
+            const base = new THREE.Mesh(baseGeo, baseMat);
+            turretGroup.add(base);
+
+            // Barrel
+            const barrelGeo = new THREE.BoxGeometry(0.5, 0.5, 4);
+            const barrelMat = new THREE.MeshStandardMaterial({
+                color: 0x667788,
+                metalness: 0.9,
+                roughness: 0.2,
+                emissive: weapon.active ? 0xff4400 : 0x223344,
+                emissiveIntensity: weapon.active ? 0.3 : 0.1,
+            });
+            const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+            barrel.position.set(0, 0.5, 2);
+            turretGroup.add(barrel);
+
+            // Position turret on top of ship
+            const xPos = center.x - size.x / 2 + turretSpacing * (i + 1);
+            turretGroup.position.set(xPos, box.max.y + 1, center.z);
+
+            mesh.add(turretGroup);
         });
     }
 
@@ -255,6 +354,21 @@ export class ShipMenuManager {
                 }
             });
             this.shipMesh = null;
+        }
+    }
+
+    /**
+     * Force the WebGL renderer to refresh (needed after canvas was in display:none)
+     */
+    refreshViewer() {
+        if (!this.renderer || !this.statsCanvas) return;
+        const width = 450;
+        const height = 400;
+        this.statsCanvas.width = width;
+        this.statsCanvas.height = height;
+        this.renderer.setSize(width, height);
+        if (this.scene && this.camera) {
+            this.renderer.render(this.scene, this.camera);
         }
     }
 
@@ -297,13 +411,20 @@ export class ShipMenuManager {
         this.modal.classList.remove('hidden');
         this.visible = true;
 
+        // Always reset to stats tab on open
+        this.modal.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.tab === 'stats');
+        });
+
         // Create ship mesh and start animation
         this.createShipMesh();
+        this.refreshViewer();
         this.animate();
 
-        // Update content
-        this.updateStats();
-        this.updateModules();
+        // Switch to stats tab (handles all display + content updates)
+        this.switchToTab('stats');
+
+        // Pre-render other tabs so content is ready when user switches
         this.updateFittings();
         this.updateInventory();
         this.updateDrones();
@@ -324,6 +445,11 @@ export class ShipMenuManager {
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
+        }
+
+        // Clear inline display styles so next show() starts clean
+        for (const el of Object.values(this.tabElements)) {
+            if (el) el.style.display = '';
         }
     }
 

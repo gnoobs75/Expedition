@@ -676,9 +676,10 @@ export class Game {
     deployPlayerStation(posKitType) {
         if (!this.player || !this.currentSector) return false;
 
-        // Check player has the kit in cargo
+        // Check player has the kit in trade goods cargo
         const kitId = posKitType || 'pos-kit-basic';
-        const hasKit = this.player.cargo[kitId]?.quantity > 0;
+        const tradeGoods = this.player.tradeGoods || {};
+        const hasKit = tradeGoods[kitId]?.quantity > 0;
         if (!hasKit) {
             this.ui?.toast('No POS assembly kit in cargo', 'error');
             return false;
@@ -691,9 +692,13 @@ export class Game {
             return false;
         }
 
-        // Remove kit from cargo
-        this.player.cargo[kitId].quantity -= 1;
-        if (this.player.cargo[kitId].quantity <= 0) delete this.player.cargo[kitId];
+        // Remove kit from trade goods
+        if (this.player.removeTradeGood) {
+            this.player.removeTradeGood(kitId, 1);
+        } else {
+            tradeGoods[kitId].quantity -= 1;
+            if (tradeGoods[kitId].quantity <= 0) delete tradeGoods[kitId];
+        }
 
         // Create POS near player position
         const station = new PlayerStation(this, {
@@ -712,6 +717,14 @@ export class Game {
         this.ui?.log(`Deployed ${station.name} at current position`, 'system');
 
         return true;
+    }
+
+    /**
+     * Get player station in the current sector (if any)
+     */
+    getPlayerStationInSector(sectorId) {
+        const sid = sectorId || this.currentSector?.id;
+        return this.playerStations?.find(p => p.sectorId === sid && p.alive) || null;
     }
 
     /**
@@ -1691,6 +1704,7 @@ export class Game {
                     owner: posData.owner || this.faction,
                     sectorId: posData.sectorId,
                     upgradeLevel: posData.upgradeLevel,
+                    modules: posData.modules || [],
                 });
                 station.hull = posData.hull ?? station.maxHull;
                 station.shieldHP = posData.shieldHP ?? station.maxShieldHP;
@@ -1701,6 +1715,8 @@ export class Game {
                         station.addTurret(t.type);
                     }
                 }
+                // Recalculate stats with module bonuses
+                station.recalculateStats();
                 this.playerStations.push(station);
             }
         }

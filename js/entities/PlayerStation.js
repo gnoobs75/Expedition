@@ -6,6 +6,7 @@
 
 import { Station } from './Station.js';
 import { CONFIG } from '../config.js';
+import { POS_MODULES, POS_MAX_SLOTS, isModuleComplete } from '../data/posModuleDatabase.js';
 
 export const TURRET_TYPES = {
     'basic-turret': { name: 'Basic Turret', damage: 50, range: 800, cycleTime: 3, price: 5000 },
@@ -49,6 +50,10 @@ export class PlayerStation extends Station {
         this.shieldHP = 3000 + this.upgradeLevel.defense * 1500;
         this.maxShieldHP = this.shieldHP;
         this.shieldRegen = 5;
+
+        // Modular construction slots
+        this.modules = options.modules || []; // Array of { id, contributed: {}, completed: false }
+        this.maxModuleSlots = POS_MAX_SLOTS;
 
         // Storage
         this.storage = { ore: {}, tradeGoods: {}, materials: {} };
@@ -149,19 +154,22 @@ export class PlayerStation extends Station {
     }
 
     recalculateStats() {
-        this.maxHull = 5000 + this.upgradeLevel.defense * 2000;
-        this.maxShieldHP = 3000 + this.upgradeLevel.defense * 1500;
-        this.maxTurrets = 2 + this.upgradeLevel.defense * 2;
-        this.storageCapacity = 10000 + this.upgradeLevel.storage * 5000;
-        this.refineryBonus = 1.0 + this.upgradeLevel.refinery * 0.1;
+        const mb = this.getModuleBonuses();
+        this.maxHull = 5000 + this.upgradeLevel.defense * 2000 + mb.hull;
+        this.maxShieldHP = 3000 + this.upgradeLevel.defense * 1500 + mb.shields;
+        this.maxTurrets = 2 + this.upgradeLevel.defense * 2 + mb.turretSlots;
+        this.storageCapacity = 10000 + this.upgradeLevel.storage * 5000 + mb.storage;
+        this.refineryBonus = Math.max(1.0 + this.upgradeLevel.refinery * 0.1, mb.refineryMultiplier);
+        this.shieldRegen = 5 * mb.shieldRegenMultiplier;
     }
 
     // ----- Storage -----
 
     getStorageUsed() {
         let total = 0;
-        for (const category of ['ore', 'tradeGoods']) {
+        for (const category of ['ore', 'tradeGoods', 'materials']) {
             const bucket = this.storage[category];
+            if (!bucket) continue;
             for (const id in bucket) {
                 const item = bucket[id];
                 total += (item.quantity || 0) * (item.volume || 1);
@@ -195,6 +203,134 @@ export class PlayerStation extends Station {
             delete bucket[id];
         }
         return true;
+    }
+
+    // ----- Module Construction -----
+
+    /**
+     * Begin construction of a new module in an empty slot.
+     * Returns the slot index or -1 on failure.
+     */
+    installModule(moduleId) {
+        if (!POS_MODULES[moduleId]) return -1;
+        if (this.modules.length >= this.maxModuleSlots) return -1;
+        // Prevent duplicate modules
+        if (this.modules.some(m => m.id === moduleId)) return -1;
+
+        const slot = {
+            id: moduleId,
+            contributed: {},
+            completed: false,
+        };
+        this.modules.push(slot);
+        return this.modules.length - 1;
+    }
+
+    /**
+     * Contribute materials from POS storage to a module under construction.
+     * Returns the amount actually contributed.
+     */
+    contributeToModule(slotIndex, materialId, amount) {
+        const slot = this.modules[slotIndex];
+        if (!slot || slot.completed) return 0;
+
+        const modDef = POS_MODULES[slot.id];
+        if (!modDef) return 0;
+
+        const required = modDef.materials[materialId];
+        if (!required) return 0; // This material isn't needed
+
+        const alreadyContributed = slot.contributed[materialId] || 0;
+        const remaining = required - alreadyContributed;
+        if (remaining <= 0) return 0;
+
+        const toContribute = Math.min(amount, remaining);
+
+        // Pull from POS storage - check both tradeGoods and materials buckets
+        const inTradeGoods = this.storage.tradeGoods[materialId]?.quantity || 0;
+        const inMaterials = this.storage.materials[materialId]?.quantity || 0;
+        const totalAvailable = inTradeGoods + inMaterials;
+        const actual = Math.min(toContribute, totalAvailable);
+        if (actual <= 0) return 0;
+
+        // Remove from tradeGoods first, then materials
+        let remaining2 = actual;
+        if (inTradeGoods > 0 && remaining2 > 0) {
+            const fromTG = Math.min(remaining2, inTradeGoods);
+            this.removeFromStorage('tradeGoods', materialId, fromTG);
+            remaining2 -= fromTG;
+        }
+        if (inMaterials > 0 && remaining2 > 0) {
+            const fromMat = Math.min(remaining2, inMaterials);
+            this.removeFromStorage('materials', materialId, fromMat);
+        }
+
+        // Add to contributed
+        slot.contributed[materialId] = alreadyContributed + actual;
+
+        // Check completion
+        if (isModuleComplete(slot.contributed, slot.id)) {
+            slot.completed = true;
+            this.recalculateStats();
+            this.game?.events?.emit('pos:module-completed', { station: this, moduleId: slot.id });
+        }
+
+        return actual;
+    }
+
+    /**
+     * Get aggregated bonuses from all completed modules.
+     */
+    getModuleBonuses() {
+        const bonuses = {
+            turretSlots: 0,
+            hull: 0,
+            shields: 0,
+            storage: 0,
+            shieldRegenMultiplier: 1.0,
+            refineryMultiplier: 1.0,
+            fleetAutoRepair: false,
+            shipManufacturing: false,
+            equipmentCrafting: false,
+        };
+
+        for (const slot of this.modules) {
+            if (!slot.completed) continue;
+            const modDef = POS_MODULES[slot.id];
+            if (!modDef) continue;
+            const b = modDef.bonuses;
+            if (b.turretSlots) bonuses.turretSlots += b.turretSlots;
+            if (b.hull) bonuses.hull += b.hull;
+            if (b.shields) bonuses.shields += b.shields;
+            if (b.storage) bonuses.storage += b.storage;
+            if (b.shieldRegenMultiplier) bonuses.shieldRegenMultiplier = Math.max(bonuses.shieldRegenMultiplier, b.shieldRegenMultiplier);
+            if (b.refineryMultiplier) bonuses.refineryMultiplier = Math.max(bonuses.refineryMultiplier, b.refineryMultiplier);
+            if (b.fleetAutoRepair) bonuses.fleetAutoRepair = true;
+            if (b.shipManufacturing) bonuses.shipManufacturing = true;
+            if (b.equipmentCrafting) bonuses.equipmentCrafting = true;
+        }
+
+        return bonuses;
+    }
+
+    // ----- Repair -----
+
+    getRepairCost() {
+        const hullDamage = this.maxHull - this.hull;
+        const shieldDamage = this.maxShieldHP - this.shieldHP;
+        return Math.floor(hullDamage * 2 + shieldDamage * 1);
+    }
+
+    repair() {
+        const cost = this.getRepairCost();
+        if (cost <= 0) return 0;
+        if (!this.game?.player) return 0;
+        if (this.game.credits < cost) return 0;
+
+        this.game.credits -= cost;
+        this.hull = this.maxHull;
+        this.shieldHP = this.maxShieldHP;
+        return cost;
     }
 
     // ----- Mesh -----
@@ -440,6 +576,11 @@ export class PlayerStation extends Station {
             owner: this.owner,
             upgradeLevel: { ...this.upgradeLevel },
             turrets: this.turrets.map(t => ({ type: t.type })),
+            modules: this.modules.map(m => ({
+                id: m.id,
+                contributed: { ...m.contributed },
+                completed: m.completed,
+            })),
             hull: this.hull,
             maxHull: this.maxHull,
             shieldHP: this.shieldHP,

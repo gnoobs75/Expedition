@@ -36,8 +36,15 @@ export class QuestTrackerManager {
             this.panel.classList.add('hidden');
         });
 
-        // Register with drag manager
-        this.game.ui?.panelDragManager?.registerPanel('quest-tracker');
+        // Register with drag manager (deferred to ensure it's initialized)
+        if (this.game.ui?.panelDragManager) {
+            this.game.ui.panelDragManager.registerPanel('quest-tracker');
+        } else {
+            // Retry after a short delay if drag manager isn't ready yet
+            setTimeout(() => {
+                this.game.ui?.panelDragManager?.registerPanel('quest-tracker');
+            }, 500);
+        }
     }
 
     toggle() {

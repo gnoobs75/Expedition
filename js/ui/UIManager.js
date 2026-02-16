@@ -34,6 +34,7 @@ import { MinimapRenderer } from './MinimapRenderer.js';
 import { CombatLogManager } from './CombatLogManager.js';
 import { DScanManager } from './DScanManager.js';
 import { StationUIController } from './StationUIController.js';
+import { POSManagementPanel } from './POSManagementPanel.js';
 
 export class UIManager {
     constructor(game) {
@@ -122,6 +123,9 @@ export class UIManager {
 
         // Station UI controller
         this.stationUIController = new StationUIController(this.game, this);
+
+        // POS management panel
+        this.posManagementPanel = new POSManagementPanel(this.game, this);
 
         // Ship indicator 3D viewer state
         this.shipViewerScene = null;
@@ -859,6 +863,8 @@ export class UIManager {
         this.panelDragManager.registerPanel('stats-panel');
         this.panelDragManager.registerPanel('achievements-panel');
         this.panelDragManager.registerPanel('ship-log-panel');
+        this.panelDragManager.registerPanel('quest-tracker');
+        this.panelDragManager.registerPanel('skippy-panel');
 
         // Setup minimap range buttons
         document.querySelectorAll('.minimap-range-btn').forEach(btn => {
@@ -1513,13 +1519,19 @@ export class UIManager {
 
         contentArea.innerHTML = html;
 
-        // Add click handlers to each locked target card
+        // Add click and right-click handlers to each locked target card
         contentArea.querySelectorAll('.locked-target-card').forEach(el => {
             const entityId = el.dataset.entityId;
             const target = aliveTargets.find(t => String(t.id) === entityId);
             if (target) {
                 el.addEventListener('click', () => {
                     this.game.selectTarget(target);
+                });
+                el.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.game.selectTarget(target);
+                    this.showContextMenu(e.clientX, e.clientY, target);
                 });
             }
         });
@@ -3072,6 +3084,13 @@ export class UIManager {
                 items.push(`<div class="menu-item${dockClass}" data-action="dock">Dock</div>`);
             }
 
+            // Manage POS (only for own player stations within range)
+            if (entity.type === 'player-station') {
+                const manageDist = this.game.player ? this.game.player.distanceTo(entity) : Infinity;
+                const canManage = manageDist < 2000;
+                items.push(`<div class="menu-item${canManage ? '' : ' disabled'}" data-action="manage-pos" data-entity-id="${entity.id}">Manage Station</div>`);
+            }
+
             // Jump (only for gates)
             if (entity.type === 'gate' && entity.destinationSectorId) {
                 const canJump = entity.canUse?.(this.game.player);
@@ -3128,10 +3147,11 @@ export class UIManager {
             items.push(`<div class="menu-item" data-action="jettison">Jettison Cargo</div>`);
         }
 
-        // Deploy POS (when player has pos-kit in cargo)
+        // Deploy POS (when player has pos-kit in trade goods)
         if (player) {
-            const hasBasicKit = player.cargo['pos-kit-basic']?.quantity > 0;
-            const hasAdvancedKit = player.cargo['pos-kit-advanced']?.quantity > 0;
+            const tg = player.tradeGoods || {};
+            const hasBasicKit = tg['pos-kit-basic']?.quantity > 0;
+            const hasAdvancedKit = tg['pos-kit-advanced']?.quantity > 0;
             if (hasBasicKit || hasAdvancedKit) {
                 const existing = this.game.playerStations?.find(p => p.sectorId === this.game.currentSector?.id && p.alive);
                 if (!existing) {
@@ -3233,6 +3253,17 @@ export class UIManager {
         }
         if (action === 'deploy-pos-advanced') {
             this.game.deployPlayerStation('pos-kit-advanced');
+            return;
+        }
+
+        // Manage POS
+        if (action === 'manage-pos') {
+            const posStation = this.game.playerStations?.find(p =>
+                p.sectorId === this.game.currentSector?.id && p.alive
+            );
+            if (posStation) {
+                this.posManagementPanel?.show(posStation);
+            }
             return;
         }
 
@@ -5611,3 +5642,35 @@ export class UIManager {
 
 // Make UIManager globally accessible for onclick handlers
 window.game = window.game || {};
+
+// Dev utility: dump current panel positions as code for defaultPositions
+window.dumpLayout = function() {
+    const pdm = window.game?.ui?.panelDragManager;
+    if (!pdm) { console.log('Panel drag manager not found'); return; }
+    const zoom = pdm.getZoom();
+    const positions = {};
+    for (const [panelId, panelData] of pdm.panels) {
+        if (pdm.panelToGroup.has(panelId)) continue;
+        const panel = panelData.element;
+        if (panel.classList.contains('hidden') || panel.offsetParent === null) continue;
+        const rect = panel.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) continue;
+        positions[panelId] = {
+            top: Math.round(rect.top / zoom),
+            left: Math.round(rect.left / zoom),
+        };
+    }
+    console.log('// Paste this into PanelDragManager defaultPositions:');
+    console.log(JSON.stringify(positions, null, 4));
+    return positions;
+};
+
+// Dev utility: dump current key bindings as code
+window.dumpKeybindings = function() {
+    const raw = localStorage.getItem('expedition_keybindings');
+    if (!raw) { console.log('No custom keybindings saved'); return; }
+    const bindings = JSON.parse(raw);
+    console.log('// Paste this into KeyBindings DEFAULT_BINDINGS:');
+    console.log(JSON.stringify(bindings, null, 4));
+    return bindings;
+};

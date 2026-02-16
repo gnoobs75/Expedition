@@ -48,6 +48,7 @@ export class PanelDragManager {
             'achievements-panel': { top: 100, right: 10 },
             'ship-log-panel': { top: 300, right: 10 },
             'skippy-panel': { bottom: 200, right: 240 },
+            'quest-tracker': { top: 200, left: 350 },
         };
 
         // Storage key - bump version to force reset when layout changes
@@ -495,6 +496,8 @@ export class PanelDragManager {
         document.body.appendChild(panel);
         panel.style.position = 'fixed';
         panel.style.width = '';
+        panel.classList.remove('hidden');
+        panel.style.display = '';
 
         // Restore header
         const header = panel.querySelector('.panel-header');
@@ -552,6 +555,7 @@ export class PanelDragManager {
             if (header) header.style.display = '';
 
             panel.classList.remove('hidden');
+            panel.style.display = '';
             this.panelToGroup.delete(panelId);
         }
 
@@ -574,6 +578,7 @@ export class PanelDragManager {
                 panel.style.display = '';
             } else {
                 panel.classList.add('hidden');
+                panel.style.display = 'none';
             }
         }
 

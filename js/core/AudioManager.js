@@ -90,6 +90,21 @@ export class AudioManager {
         this.musicStarted = false;
         this.musicBeatTimer = 0;
 
+        // OGG music track player
+        this.spaceTracks = [
+            'audio/music/Space.ogg',
+            'audio/music/space2.ogg',
+            'audio/music/Space3.ogg',
+            'audio/music/Space4.ogg',
+        ];
+        this.trackIndex = 0;
+        this.trackShuffleOrder = null;
+        this.currentTrack = null;  // Audio element
+        this.nextTrack = null;     // Audio element (for crossfade preload)
+        this.trackFadeInterval = null;
+        this.trackPlaying = false;
+        this.trackVolume = 0.3;    // Base volume for OGG tracks (scaled by musicVolume)
+
         // Initialize on first click
         this.initialized = false;
         document.addEventListener('click', () => this.init(), { once: true });
@@ -1424,6 +1439,7 @@ export class AudioManager {
                 enabled: this.enabled,
                 musicVolume: this.musicVolume,
                 musicEnabled: this.musicEnabled,
+                trackVolume: this.trackVolume,
             }));
         } catch (e) { /* storage full */ }
     }
@@ -1437,6 +1453,7 @@ export class AudioManager {
                 if (parsed.enabled !== undefined) this.enabled = parsed.enabled;
                 if (parsed.musicVolume !== undefined) this.musicVolume = parsed.musicVolume;
                 if (parsed.musicEnabled !== undefined) this.musicEnabled = parsed.musicEnabled;
+                if (parsed.trackVolume !== undefined) this.trackVolume = parsed.trackVolume;
             }
         } catch (e) { /* corrupt */ }
     }
@@ -1573,8 +1590,8 @@ export class AudioManager {
             station: this.createStationMusicLayer(ctx),
         };
 
-        // Start with ambient audible, others silent
-        this.musicLayers.ambient.gain.gain.value = 1.0;
+        // Synth ambient starts quiet (OGG tracks are the main music)
+        this.musicLayers.ambient.gain.gain.value = 0.3;
         this.musicLayers.combat.gain.gain.value = 0.0;
         this.musicLayers.danger.gain.gain.value = 0.0;
         this.musicLayers.station.gain.gain.value = 0.0;
@@ -1582,6 +1599,9 @@ export class AudioManager {
         this.musicMode = 'ambient';
         this.musicTargetMode = 'ambient';
         this.musicStarted = true;
+
+        // Start OGG space music tracks
+        this.startSpaceMusic();
     }
 
     /**
@@ -1897,26 +1917,226 @@ export class AudioManager {
         return { nodes, gain: layerGain };
     }
 
+    // ==========================================
+    // OGG Music Track Player
+    // ==========================================
+
+    /**
+     * Shuffle the track order for variety
+     */
+    shuffleTracks() {
+        this.trackShuffleOrder = [...this.spaceTracks.keys()];
+        // Fisher-Yates shuffle
+        for (let i = this.trackShuffleOrder.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.trackShuffleOrder[i], this.trackShuffleOrder[j]] =
+                [this.trackShuffleOrder[j], this.trackShuffleOrder[i]];
+        }
+        this.trackIndex = 0;
+    }
+
+    /**
+     * Get the next track path from shuffled order
+     */
+    getNextTrackPath() {
+        if (!this.trackShuffleOrder || this.trackIndex >= this.trackShuffleOrder.length) {
+            this.shuffleTracks();
+        }
+        const idx = this.trackShuffleOrder[this.trackIndex];
+        this.trackIndex++;
+        return this.spaceTracks[idx];
+    }
+
+    /**
+     * Start playing space music tracks
+     */
+    startSpaceMusic() {
+        if (!this.musicEnabled || this.trackPlaying) return;
+        if (this.spaceTracks.length === 0) return;
+
+        this.shuffleTracks();
+        this.trackPlaying = true;
+        this.playTrack(this.getNextTrackPath());
+    }
+
+    /**
+     * Play a specific track with fade-in
+     */
+    playTrack(src) {
+        const audio = new Audio(src);
+        audio.volume = 0;
+        this.currentTrack = audio;
+
+        audio.onended = () => {
+            if (!this.trackPlaying) return;
+            // Crossfade to next track
+            this.crossfadeToNext();
+        };
+
+        audio.onerror = () => {
+            // Skip broken track, try next
+            if (!this.trackPlaying) return;
+            setTimeout(() => this.crossfadeToNext(), 500);
+        };
+
+        audio.play().then(() => {
+            this.fadeTrack(audio, 0, this.getEffectiveTrackVolume(), 3000);
+        }).catch(() => {
+            // Autoplay blocked - try next on user interaction
+            this.trackPlaying = false;
+        });
+    }
+
+    /**
+     * Crossfade from current track to the next one
+     */
+    crossfadeToNext() {
+        if (!this.trackPlaying) return;
+
+        const oldTrack = this.currentTrack;
+        const nextSrc = this.getNextTrackPath();
+        const newTrack = new Audio(nextSrc);
+        newTrack.volume = 0;
+        this.currentTrack = newTrack;
+
+        newTrack.onended = () => {
+            if (!this.trackPlaying) return;
+            this.crossfadeToNext();
+        };
+
+        newTrack.onerror = () => {
+            if (!this.trackPlaying) return;
+            setTimeout(() => this.crossfadeToNext(), 500);
+        };
+
+        newTrack.play().then(() => {
+            // Fade in new track
+            this.fadeTrack(newTrack, 0, this.getEffectiveTrackVolume(), 3000);
+            // Fade out old track
+            if (oldTrack) {
+                this.fadeTrack(oldTrack, oldTrack.volume, 0, 3000, () => {
+                    oldTrack.pause();
+                    oldTrack.src = '';
+                });
+            }
+        }).catch(() => {
+            // Failed to play next, keep old going
+            this.currentTrack = oldTrack;
+        });
+    }
+
+    /**
+     * Fade a track's volume from start to end over duration ms
+     */
+    fadeTrack(audio, fromVol, toVol, duration, onComplete = null) {
+        if (!audio) return;
+        const steps = 30;
+        const stepTime = duration / steps;
+        const volStep = (toVol - fromVol) / steps;
+        let step = 0;
+
+        audio.volume = Math.max(0, Math.min(1, fromVol));
+
+        const interval = setInterval(() => {
+            step++;
+            if (step >= steps || !audio.src) {
+                clearInterval(interval);
+                try { audio.volume = Math.max(0, Math.min(1, toVol)); } catch (e) {}
+                if (onComplete) onComplete();
+                return;
+            }
+            try {
+                audio.volume = Math.max(0, Math.min(1, fromVol + volStep * step));
+            } catch (e) {
+                clearInterval(interval);
+            }
+        }, stepTime);
+    }
+
+    /**
+     * Get effective track volume (trackVolume * musicVolume)
+     */
+    getEffectiveTrackVolume() {
+        return Math.min(1, this.trackVolume * (this.musicVolume / 0.12));
+    }
+
+    /**
+     * Stop space music tracks
+     */
+    stopSpaceMusic() {
+        this.trackPlaying = false;
+        if (this.currentTrack) {
+            this.fadeTrack(this.currentTrack, this.currentTrack.volume, 0, 1500, () => {
+                if (this.currentTrack) {
+                    this.currentTrack.pause();
+                    this.currentTrack.src = '';
+                    this.currentTrack = null;
+                }
+            });
+        }
+    }
+
+    /**
+     * Duck space music volume (e.g. during mode transitions)
+     */
+    duckSpaceMusic(targetVol, duration = 2000) {
+        if (this.currentTrack && this.trackPlaying) {
+            this.fadeTrack(this.currentTrack, this.currentTrack.volume, targetVol, duration);
+        }
+    }
+
+    /**
+     * Restore space music volume after ducking
+     */
+    unduckSpaceMusic(duration = 2000) {
+        if (this.currentTrack && this.trackPlaying) {
+            this.fadeTrack(this.currentTrack, this.currentTrack.volume, this.getEffectiveTrackVolume(), duration);
+        }
+    }
+
     /**
      * Set the target music mode (crossfades smoothly)
      */
     setMusicMode(mode) {
-        if (!this.musicStarted || !this.musicLayers) return;
         if (mode === this.musicTargetMode) return;
 
         this.musicTargetMode = mode;
-        this.musicTransitionTimer = this.musicTransitionDuration;
 
-        const ctx = this.context;
-        const now = ctx.currentTime;
-        const fadeDur = this.musicTransitionDuration;
+        // Handle OGG space music: play in ambient, duck in others
+        if (mode === 'ambient') {
+            if (!this.trackPlaying && this.musicEnabled) {
+                this.startSpaceMusic();
+            } else {
+                this.unduckSpaceMusic();
+            }
+        } else if (mode === 'combat' || mode === 'danger') {
+            // Duck space music during combat/danger (don't stop - resume on return)
+            this.duckSpaceMusic(this.getEffectiveTrackVolume() * 0.15, 2000);
+        } else if (mode === 'station') {
+            this.duckSpaceMusic(this.getEffectiveTrackVolume() * 0.25, 2000);
+        }
 
-        // Fade out all layers, fade in target
-        for (const [layerName, layer] of Object.entries(this.musicLayers)) {
-            const target = layerName === mode ? 1.0 : 0.0;
-            layer.gain.gain.cancelScheduledValues(now);
-            layer.gain.gain.setValueAtTime(layer.gain.gain.value, now);
-            layer.gain.gain.linearRampToValueAtTime(target, now + fadeDur);
+        // Handle synth layers
+        if (this.musicStarted && this.musicLayers) {
+            this.musicTransitionTimer = this.musicTransitionDuration;
+
+            const ctx = this.context;
+            const now = ctx.currentTime;
+            const fadeDur = this.musicTransitionDuration;
+
+            // In ambient mode, silence synth layers (OGG tracks take over)
+            for (const [layerName, layer] of Object.entries(this.musicLayers)) {
+                let target;
+                if (mode === 'ambient') {
+                    // OGG tracks play, synth ambient as subtle underlayer
+                    target = layerName === 'ambient' ? 0.3 : 0.0;
+                } else {
+                    target = layerName === mode ? 1.0 : 0.0;
+                }
+                layer.gain.gain.cancelScheduledValues(now);
+                layer.gain.gain.setValueAtTime(layer.gain.gain.value, now);
+                layer.gain.gain.linearRampToValueAtTime(target, now + fadeDur);
+            }
         }
 
         this.musicMode = mode;
@@ -1926,6 +2146,15 @@ export class AudioManager {
      * Stop all music
      */
     stopMusic() {
+        // Stop OGG tracks
+        this.trackPlaying = false;
+        if (this.currentTrack) {
+            this.currentTrack.pause();
+            this.currentTrack.src = '';
+            this.currentTrack = null;
+        }
+
+        // Stop synth layers
         if (!this.musicStarted || !this.musicLayers) return;
 
         for (const layer of Object.values(this.musicLayers)) {
@@ -1952,6 +2181,12 @@ export class AudioManager {
         if (this.musicMasterGain) {
             this.musicMasterGain.gain.setTargetAtTime(volume, this.context.currentTime, 0.1);
         }
+        // Update OGG track volume too
+        if (this.currentTrack && this.trackPlaying) {
+            try {
+                this.currentTrack.volume = Math.max(0, Math.min(1, this.getEffectiveTrackVolume()));
+            } catch (e) {}
+        }
     }
 
     /**
@@ -1964,6 +2199,7 @@ export class AudioManager {
         } else {
             this.stopMusic();
         }
+        this.saveSettings();
         return this.musicEnabled;
     }
 }

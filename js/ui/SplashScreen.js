@@ -358,10 +358,14 @@ export class SplashScreen {
         try {
             this.avatar = new SkippyAvatar(container);
             this.avatar.init();
+            this.avatar.setProjectionMode();
             this.avatar.setExpression('smug');
 
             // Speak welcome line
-            setTimeout(() => this.skippySpeak(this.getWelcomeLine()), 800);
+            setTimeout(() => {
+                const line = this.getWelcomeLine();
+                this.skippySpeak(line, this._lastWelcomeAudioId);
+            }, 800);
         } catch (e) {
             console.warn('Skippy avatar init failed:', e);
         }
@@ -376,10 +380,12 @@ export class SplashScreen {
             "I hope you brought snacks. Space is boring without them.",
             "Engines warming up. Where to, boss?",
         ];
-        return lines[Math.floor(Math.random() * lines.length)];
+        const idx = Math.floor(Math.random() * lines.length);
+        this._lastWelcomeAudioId = `splash_welcome_${idx}`;
+        return lines[idx];
     }
 
-    skippySpeak(text) {
+    skippySpeak(text, audioId = null) {
         if (this.speechEl) {
             this.speechEl.textContent = text;
         }
@@ -388,13 +394,30 @@ export class SplashScreen {
             setTimeout(() => this.avatar?.setExpression('smug'), 3000);
         }
 
-        // TTS
+        // Try pre-recorded audio first
+        if (audioId) {
+            const audio = new Audio(`audio/skippy/${audioId}.ogg`);
+            audio.volume = 0.85;
+            audio.onended = () => {
+                if (this.avatar) this.avatar.setExpression('smug');
+            };
+            audio.onerror = () => {
+                // Fall back to browser TTS
+                this._speakTTSFallback(text);
+            };
+            audio.play().catch(() => this._speakTTSFallback(text));
+            return;
+        }
+
+        this._speakTTSFallback(text);
+    }
+
+    _speakTTSFallback(text) {
         if (this.synth && this.synth.getVoices) {
             try {
                 const utter = new SpeechSynthesisUtterance(text);
                 utter.rate = 1.1;
                 utter.pitch = 0.9;
-                // Try to pick a male voice
                 const voices = this.synth.getVoices();
                 const preferred = voices.find(v => /david|daniel|james|mark/i.test(v.name));
                 if (preferred) utter.voice = preferred;
@@ -541,7 +564,7 @@ export class SplashScreen {
         requestAnimationFrame(() => nameInput.focus());
 
         // Skippy speaks
-        this.skippySpeak("Every empire starts with a name. Choose wisely, Commander.");
+        this.skippySpeak("Every empire starts with a name. Choose wisely, Commander.", 'splash_factionNaming_0');
     }
 
     // ==========================================

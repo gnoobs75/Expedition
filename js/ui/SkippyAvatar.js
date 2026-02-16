@@ -1,426 +1,270 @@
 // =============================================
-// Skippy Avatar - Holographic Admiral Sprite
-// Sprite-based with animated holographic effects
+// Skippy Avatar - Dual Mode Wrapper
+// Manages Beer Can (default) and Hologram (serious) renderers
+// Same external API - SkippyManager and SplashScreen need zero changes
 // =============================================
+
+import { SkippyAvatarBeerCan } from './SkippyAvatarBeerCan.js';
+import { SkippyAvatarHologram } from './SkippyAvatarHologram.js';
+
+// Expressions that trigger hologram mode (serious/strategic)
+const HOLOGRAM_EXPRESSIONS = new Set([
+    'lecturing', 'concerned', 'alarmed',
+]);
 
 export class SkippyAvatar {
     constructor(container) {
         this.container = container;
-        this.canvas = null;
-        this.ctx = null;
-        this.img = null;
-        this.imgLoaded = false;
-        this.animFrameId = null;
+        this.beerCan = null;
+        this.hologram = null;
+        this.activeMode = 'beercan'; // 'beercan' | 'hologram'
+        this.transitioning = false;
+        this.transitionOverlay = null;
         this.disposed = false;
-
-        // Sprite layout
-        this.spriteX = 0;
-        this.spriteY = 0;
-        this.spriteW = 0;
-        this.spriteH = 0;
-
-        // State
-        this.expression = 'idle';
-        this.isTalking = false;
-        this.talkTimer = 0;
-        this.gameState = {
-            inCombat: false,
-            shieldPct: 1,
-            isWarping: false,
-            isDocked: false,
-            isSpeaking: false,
-        };
-
-        // Animation accumulators
-        this.time = 0;
-        this.lastFrame = 0;
-
-        // Glitch state
-        this.nextGlitch = 2000 + Math.random() * 4000;
-        this.glitchActive = false;
-        this.glitchEnd = 0;
-        this.glitchSlices = [];
-
-        // Flicker state
-        this.flickerActive = false;
-        this.flickerOffsetX = 0;
-        this.flickerOpacity = 1;
-
-        // Expression tint colors
-        this.tintColors = {
-            idle:             'rgba(0,255,255,0.07)',
-            talking:          'rgba(0,255,255,0.10)',
-            smug:             'rgba(0,255,170,0.08)',
-            alarmed:          'rgba(255,30,0,0.12)',
-            annoyed:          'rgba(255,136,0,0.10)',
-            laughing:         'rgba(68,255,68,0.10)',
-            excited:          'rgba(255,255,0,0.08)',
-            bored:            'rgba(100,130,130,0.10)',
-            concerned:        'rgba(255,170,0,0.08)',
-            impressed:        'rgba(0,200,255,0.08)',
-            disappointed:     'rgba(130,130,130,0.08)',
-            mildlyImpressed:  'rgba(0,220,170,0.07)',
-            lecturing:        'rgba(136,136,255,0.08)',
-            neutral:          'rgba(0,220,220,0.06)',
-        };
-
-        // Offscreen canvas for chromatic aberration
-        this._offscreen = null;
-        this._offCtx = null;
     }
 
     init() {
-        const width = this.container.clientWidth || 208;
-        const height = this.container.clientHeight || 180;
-        const dpr = Math.min(window.devicePixelRatio, 2);
+        // Create both renderers
+        this.beerCan = new SkippyAvatarBeerCan(this.container);
+        this.hologram = new SkippyAvatarHologram(this.container);
 
-        this.canvas = document.createElement('canvas');
-        this.canvas.width = width * dpr;
-        this.canvas.height = height * dpr;
-        this.canvas.style.width = width + 'px';
-        this.canvas.style.height = height + 'px';
-        this.container.appendChild(this.canvas);
+        // Init both
+        this.beerCan.init();
+        this.hologram.init();
 
-        this.ctx = this.canvas.getContext('2d');
-        this.ctx.scale(dpr, dpr);
-        this.displayW = width;
-        this.displayH = height;
+        // Beer can is default - hide and pause hologram
+        this.hologram.hide();
+        this.hologram.pause();
 
-        // Offscreen for compositing tricks
-        this._offscreen = document.createElement('canvas');
-        this._offscreen.width = width * dpr;
-        this._offscreen.height = height * dpr;
-        this._offCtx = this._offscreen.getContext('2d');
-        this._offCtx.scale(dpr, dpr);
-
-        // Load sprite
-        this.img = new Image();
-        this.img.onload = () => {
-            this.imgLoaded = true;
-            this._computeSpriteLayout();
-        };
-        this.img.src = 'assets/art/Skippy.png';
-
-        this.lastFrame = performance.now();
-        this.animate();
+        // Create transition overlay canvas
+        this._createTransitionOverlay();
     }
 
-    _computeSpriteLayout() {
-        if (!this.img) return;
-        const iw = this.img.naturalWidth;
-        const ih = this.img.naturalHeight;
-        const cw = this.displayW;
-        const ch = this.displayH;
+    _createTransitionOverlay() {
+        this.transitionOverlay = document.createElement('canvas');
+        this.transitionOverlay.className = 'skippy-transition-overlay';
+        const w = this.container.clientWidth || 208;
+        const h = this.container.clientHeight || 180;
+        const dpr = Math.min(window.devicePixelRatio, 2);
+        this.transitionOverlay.width = w * dpr;
+        this.transitionOverlay.height = h * dpr;
+        this.transitionOverlay.style.width = w + 'px';
+        this.transitionOverlay.style.height = h + 'px';
+        this.transitionOverlay.style.display = 'none';
+        this.transitionOverlay.style.pointerEvents = 'none';
+        this.container.appendChild(this.transitionOverlay);
+    }
 
-        // Fit image in container, maintain aspect ratio, leave small margin
-        const margin = 4;
-        const aw = cw - margin * 2;
-        const ah = ch - margin * 2;
-        const scale = Math.min(aw / iw, ah / ih);
+    _getActive() {
+        return this.activeMode === 'beercan' ? this.beerCan : this.hologram;
+    }
 
-        this.spriteW = iw * scale;
-        this.spriteH = ih * scale;
-        this.spriteX = (cw - this.spriteW) / 2;
-        this.spriteY = (ch - this.spriteH) / 2;
+    _getInactive() {
+        return this.activeMode === 'beercan' ? this.hologram : this.beerCan;
+    }
+
+    _shouldBeHologram(expression) {
+        return HOLOGRAM_EXPRESSIONS.has(expression);
     }
 
     setExpression(type) {
-        this.expression = type;
+        // In projection mode, forward to both renderers
+        if (this.projectionMode) {
+            this.beerCan?.setExpression(type);
+            this.hologram?.setExpression(type);
+            return;
+        }
+
+        const needsHologram = this._shouldBeHologram(type);
+        const currentIsHologram = this.activeMode === 'hologram';
+
+        // Switch mode if needed
+        if (needsHologram && !currentIsHologram) {
+            this._switchMode('hologram', type);
+        } else if (!needsHologram && currentIsHologram) {
+            this._switchMode('beercan', type);
+        } else {
+            // Same mode, just forward
+            this._getActive().setExpression(type);
+        }
+    }
+
+    _switchMode(toMode, expression) {
+        if (this.transitioning || this.disposed) return;
+        if (this.activeMode === toMode) return;
+
+        this.transitioning = true;
+        const fromRenderer = this._getActive();
+        const toRenderer = toMode === 'beercan' ? this.beerCan : this.hologram;
+
+        // Set expression on target before showing
+        toRenderer.setExpression(expression);
+
+        // Play transition
+        this._playTransition(() => {
+            // Midpoint: swap visible canvas
+            fromRenderer.hide();
+            fromRenderer.pause();
+
+            this.activeMode = toMode;
+
+            toRenderer.resume();
+            toRenderer.show();
+        }, () => {
+            // Complete
+            this.transitioning = false;
+        });
+    }
+
+    _playTransition(onMidpoint, onComplete) {
+        const overlay = this.transitionOverlay;
+        if (!overlay) {
+            onMidpoint();
+            onComplete();
+            return;
+        }
+
+        const ctx = overlay.getContext('2d');
+        const dpr = Math.min(window.devicePixelRatio, 2);
+        const w = (this.container.clientWidth || 208);
+        const h = (this.container.clientHeight || 180);
+
+        overlay.style.display = 'block';
+
+        const duration = 300;
+        const midpoint = duration / 2;
+        const start = performance.now();
+        let midpointFired = false;
+
+        const animate = () => {
+            if (this.disposed) return;
+
+            const elapsed = performance.now() - start;
+            const progress = Math.min(elapsed / duration, 1);
+
+            ctx.save();
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+
+            // Holographic flicker effect
+            const intensity = progress < 0.5
+                ? progress * 2       // ramp up to midpoint
+                : (1 - progress) * 2; // ramp down after midpoint
+
+            // Glitch bands
+            const bandCount = Math.floor(intensity * 8);
+            for (let i = 0; i < bandCount; i++) {
+                const bandY = Math.random() * h;
+                const bandH = 2 + Math.random() * 6;
+                const offset = (Math.random() - 0.5) * 10 * intensity;
+
+                ctx.fillStyle = `rgba(0,255,255,${(0.15 + intensity * 0.3).toFixed(2)})`;
+                ctx.fillRect(offset, bandY, w, bandH);
+            }
+
+            // White flash at midpoint
+            if (intensity > 0.8) {
+                ctx.fillStyle = `rgba(200,255,255,${((intensity - 0.8) * 2.5).toFixed(2)})`;
+                ctx.fillRect(0, 0, w, h);
+            }
+
+            // Scan lines overlay
+            ctx.fillStyle = `rgba(0,0,0,${(0.1 * intensity).toFixed(2)})`;
+            for (let ly = 0; ly < h; ly += 2) {
+                ctx.fillRect(0, ly, w, 1);
+            }
+
+            ctx.restore();
+
+            // Fire midpoint callback
+            if (!midpointFired && elapsed >= midpoint) {
+                midpointFired = true;
+                onMidpoint();
+            }
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                overlay.style.display = 'none';
+                ctx.save();
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                ctx.clearRect(0, 0, w, h);
+                ctx.restore();
+                onComplete();
+            }
+        };
+
+        requestAnimationFrame(animate);
+    }
+
+    /**
+     * Projection mode: show beer can AND hologram side by side
+     * Beer can on left, projection beam in middle, hologram on right
+     * Used on splash screen for visual flair
+     */
+    setProjectionMode() {
+        if (!this.beerCan || !this.hologram) return;
+
+        this.projectionMode = true;
+
+        // Show both renderers
+        this.beerCan.show();
+        this.beerCan.resume();
+        this.hologram.show();
+        this.hologram.resume();
+
+        // Resize hologram buffer to match its display size (prevents CSS squish)
+        this.hologram.resize(130, 180);
+
+        // Add layout classes for CSS positioning
+        this.container.classList.add('skippy-projection-mode');
+
+        // Add the projection beam element
+        if (!this._projectionBeam) {
+            this._projectionBeam = document.createElement('div');
+            this._projectionBeam.className = 'skippy-projection-beam';
+            this.container.appendChild(this._projectionBeam);
+        }
     }
 
     startTalking() {
-        this.isTalking = true;
-        this.talkTimer = 0;
+        if (this.projectionMode) {
+            this.beerCan?.startTalking();
+            this.hologram?.startTalking();
+        } else {
+            this._getActive()?.startTalking();
+        }
     }
 
     stopTalking() {
-        this.isTalking = false;
+        if (this.projectionMode) {
+            this.beerCan?.stopTalking();
+            this.hologram?.stopTalking();
+        } else {
+            this._getActive()?.stopTalking();
+        }
     }
 
     updateGameState(state) {
-        if (state) {
-            Object.assign(this.gameState, state);
-        }
-    }
-
-    // ---- Main render loop ----
-    animate = () => {
-        if (this.disposed) return;
-        this.animFrameId = requestAnimationFrame(this.animate);
-
-        const now = performance.now();
-        const dt = (now - this.lastFrame) / 1000;
-        this.lastFrame = now;
-        this.time += dt;
-        if (this.isTalking) this.talkTimer += dt;
-
-        const ctx = this.ctx;
-        const w = this.displayW;
-        const h = this.displayH;
-        const t = this.time;
-        const combat = this.gameState.inCombat;
-
-        // 1. Background - dark with subtle radial gradient
-        ctx.save();
-        ctx.clearRect(0, 0, w, h);
-        const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w * 0.7);
-        bgGrad.addColorStop(0, '#000d1a');
-        bgGrad.addColorStop(1, '#000308');
-        ctx.fillStyle = bgGrad;
-        ctx.fillRect(0, 0, w, h);
-        ctx.restore();
-
-        if (!this.imgLoaded) return;
-
-        // Bob offset
-        const bobSpeed = combat ? 3.0 : (this.gameState.isDocked ? 0.8 : 1.5);
-        const bobAmp = combat ? 3.0 : (this.gameState.isDocked ? 1.0 : 1.8);
-        const bobY = Math.sin(t * bobSpeed) * bobAmp;
-
-        // Flicker check (1-3% per frame)
-        const flickerChance = combat ? 0.03 : 0.012;
-        if (Math.random() < flickerChance) {
-            this.flickerActive = true;
-            this.flickerOffsetX = (Math.random() - 0.5) * 3;
-            this.flickerOpacity = 0.4 + Math.random() * 0.4;
-            setTimeout(() => {
-                this.flickerActive = false;
-                this.flickerOffsetX = 0;
-                this.flickerOpacity = 1;
-            }, 30 + Math.random() * 50);
-        }
-
-        // Glitch timing
-        const nowMs = now;
-        if (nowMs > this.nextGlitch && !this.glitchActive) {
-            this.glitchActive = true;
-            this.glitchEnd = nowMs + 50 + Math.random() * 80;
-            this.glitchSlices = this._generateGlitchSlices();
-            const interval = combat ? (1000 + Math.random() * 2000) : (2000 + Math.random() * 6000);
-            this.nextGlitch = nowMs + this.glitchEnd - nowMs + interval;
-        }
-        if (this.glitchActive && nowMs > this.glitchEnd) {
-            this.glitchActive = false;
-        }
-
-        // Sprite draw position with bob and flicker
-        const sx = this.spriteX + (this.flickerActive ? this.flickerOffsetX : 0);
-        const sy = this.spriteY + bobY;
-        const sw = this.spriteW;
-        const sh = this.spriteH;
-        const globalAlpha = this.flickerActive ? this.flickerOpacity : 1;
-
-        ctx.save();
-        ctx.globalAlpha = globalAlpha;
-
-        // 2. Edge glow (drawn behind sprite via shadow)
-        ctx.save();
-        ctx.shadowColor = combat ? 'rgba(255,60,60,0.5)' : 'rgba(0,255,255,0.45)';
-        ctx.shadowBlur = this.isTalking ? 18 : 12;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        ctx.drawImage(this.img, sx, sy, sw, sh);
-        ctx.restore();
-
-        // 3. Base sprite
-        ctx.drawImage(this.img, sx, sy, sw, sh);
-
-        // 4. Chromatic aberration - red and blue offset passes
-        const caOffset = combat ? 2.0 : 1.2;
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighten';
-        ctx.globalAlpha = 0.12;
-        // Red channel - shift right
-        this._drawTintedSprite(ctx, sx + caOffset, sy, sw, sh, 'rgba(255,0,0,0.5)');
-        // Blue channel - shift left
-        this._drawTintedSprite(ctx, sx - caOffset, sy, sw, sh, 'rgba(0,80,255,0.5)');
-        ctx.restore();
-
-        // 5. Expression tint overlay
-        const tintColor = this.tintColors[this.expression] || this.tintColors.idle;
-        ctx.save();
-        ctx.globalCompositeOperation = 'source-atop';
-        ctx.fillStyle = tintColor;
-        ctx.fillRect(0, 0, w, h);
-        ctx.restore();
-
-        // Combat red shift overlay
-        if (combat) {
-            ctx.save();
-            ctx.globalCompositeOperation = 'source-atop';
-            ctx.fillStyle = 'rgba(255,0,0,0.06)';
-            ctx.fillRect(0, 0, w, h);
-            ctx.restore();
-        }
-
-        // 6. Glitch slices
-        if (this.glitchActive && this.glitchSlices.length > 0) {
-            this._drawGlitchSlices(ctx, sx, sy, sw, sh);
-        }
-
-        ctx.restore(); // restore globalAlpha
-
-        // 7. Scan lines (drawn over everything)
-        ctx.save();
-        ctx.fillStyle = 'rgba(0,0,0,0.18)';
-        for (let ly = 0; ly < h; ly += 3) {
-            ctx.fillRect(0, ly, w, 1);
-        }
-        ctx.restore();
-
-        // 8. Sweep line
-        const sweepCycle = combat ? 1.5 : 3.0;
-        const sweepPos = ((t % sweepCycle) / sweepCycle) * h;
-        ctx.save();
-        const sweepGrad = ctx.createLinearGradient(0, sweepPos - 6, 0, sweepPos + 6);
-        sweepGrad.addColorStop(0, 'rgba(0,255,255,0)');
-        sweepGrad.addColorStop(0.5, combat ? 'rgba(255,100,100,0.18)' : 'rgba(0,255,255,0.18)');
-        sweepGrad.addColorStop(1, 'rgba(0,255,255,0)');
-        ctx.fillStyle = sweepGrad;
-        ctx.fillRect(0, sweepPos - 6, w, 12);
-        ctx.restore();
-
-        // 9. Static noise (sparse)
-        this._drawStaticNoise(ctx, w, h, combat);
-
-        // 10. Talking glow pulse
-        if (this.isTalking) {
-            const talkPulse = 0.5 + Math.abs(Math.sin(this.talkTimer * 8)) * 0.5;
-            // Lower-third brightness boost (mouth area)
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighten';
-            const mouthY = sy + sh * 0.55;
-            const mouthH = sh * 0.35;
-            const talkGrad = ctx.createRadialGradient(
-                sx + sw / 2, mouthY + mouthH / 2, 0,
-                sx + sw / 2, mouthY + mouthH / 2, sw * 0.4
-            );
-            const glowAlpha = (0.06 + talkPulse * 0.08).toFixed(3);
-            talkGrad.addColorStop(0, `rgba(0,255,255,${glowAlpha})`);
-            talkGrad.addColorStop(1, 'rgba(0,255,255,0)');
-            ctx.fillStyle = talkGrad;
-            ctx.fillRect(sx, mouthY, sw, mouthH);
-            ctx.restore();
-        }
-
-        // 11. Combat beacon flash at top
-        if (combat) {
-            const beaconOn = Math.sin(t * 4) > 0.3;
-            if (beaconOn) {
-                ctx.save();
-                ctx.globalCompositeOperation = 'lighten';
-                const beaconGrad = ctx.createRadialGradient(w / 2, 6, 0, w / 2, 6, 20);
-                beaconGrad.addColorStop(0, 'rgba(255,30,0,0.35)');
-                beaconGrad.addColorStop(1, 'rgba(255,0,0,0)');
-                ctx.fillStyle = beaconGrad;
-                ctx.fillRect(0, 0, w, 30);
-                ctx.restore();
-            }
-        }
-
-        // 12. Vignette (subtle darkening at edges)
-        ctx.save();
-        const vigGrad = ctx.createRadialGradient(w / 2, h / 2, w * 0.25, w / 2, h / 2, w * 0.7);
-        vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
-        vigGrad.addColorStop(1, 'rgba(0,0,0,0.35)');
-        ctx.fillStyle = vigGrad;
-        ctx.fillRect(0, 0, w, h);
-        ctx.restore();
-
-        // 13. Thin border glow
-        ctx.save();
-        ctx.strokeStyle = combat ? 'rgba(255,50,50,0.25)' : 'rgba(0,255,255,0.15)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
-        ctx.restore();
-    };
-
-    // ---- Draw sprite with a color tint (for chromatic aberration) ----
-    _drawTintedSprite(ctx, x, y, w, h, tint) {
-        // Draw sprite to offscreen, then overlay tint, then draw to main
-        const oc = this._offCtx;
-        const cw = this.displayW;
-        const ch = this.displayH;
-        oc.clearRect(0, 0, cw, ch);
-
-        // Draw sprite
-        oc.globalCompositeOperation = 'source-over';
-        oc.globalAlpha = 1;
-        oc.drawImage(this.img, x, y, w, h);
-
-        // Tint it - multiply with color
-        oc.globalCompositeOperation = 'source-atop';
-        oc.fillStyle = tint;
-        oc.fillRect(0, 0, cw, ch);
-
-        // Draw result onto main canvas (inherits main canvas composite mode + alpha)
-        ctx.drawImage(this._offscreen, 0, 0, this._offscreen.width, this._offscreen.height, 0, 0, cw, ch);
-    }
-
-    // ---- Glitch slice generation ----
-    _generateGlitchSlices() {
-        const sliceCount = 3 + Math.floor(Math.random() * 4);
-        const slices = [];
-        for (let i = 0; i < sliceCount; i++) {
-            slices.push({
-                yPct: Math.random(),       // Position as % of sprite height
-                hPct: 0.02 + Math.random() * 0.06, // Height as % of sprite
-                offset: (Math.random() - 0.5) * 12, // Horizontal pixel offset
-            });
-        }
-        return slices;
-    }
-
-    // ---- Draw glitch slices ----
-    _drawGlitchSlices(ctx, sx, sy, sw, sh) {
-        ctx.save();
-        for (const slice of this.glitchSlices) {
-            const sliceY = sy + slice.yPct * sh;
-            const sliceH = slice.hPct * sh;
-
-            // Source rect from the sprite's position in the image
-            const srcY = slice.yPct * this.img.naturalHeight;
-            const srcH = slice.hPct * this.img.naturalHeight;
-
-            // Draw offset slice
-            ctx.drawImage(
-                this.img,
-                0, srcY, this.img.naturalWidth, srcH,       // source rect
-                sx + slice.offset, sliceY, sw, sliceH       // dest rect (offset)
-            );
-
-            // Cyan tint on glitch slice
-            ctx.globalCompositeOperation = 'lighten';
-            ctx.fillStyle = 'rgba(0,255,255,0.08)';
-            ctx.fillRect(sx + slice.offset, sliceY, sw, sliceH);
-            ctx.globalCompositeOperation = 'source-over';
-        }
-        ctx.restore();
-    }
-
-    // ---- Static noise ----
-    _drawStaticNoise(ctx, w, h, combat) {
-        const density = combat ? 35 : 18;
-        ctx.save();
-        for (let i = 0; i < density; i++) {
-            const nx = Math.random() * w;
-            const ny = Math.random() * h;
-            const brightness = 150 + Math.floor(Math.random() * 105);
-            ctx.fillStyle = `rgba(${brightness},${brightness + 30},${brightness + 50},${(0.15 + Math.random() * 0.25).toFixed(2)})`;
-            ctx.fillRect(nx, ny, 1, 1);
-        }
-        ctx.restore();
+        // Forward to both so inactive stays synced
+        this.beerCan?.updateGameState(state);
+        this.hologram?.updateGameState(state);
     }
 
     dispose() {
         this.disposed = true;
-        if (this.animFrameId) {
-            cancelAnimationFrame(this.animFrameId);
+        this.beerCan?.dispose();
+        this.hologram?.dispose();
+        if (this.transitionOverlay && this.transitionOverlay.parentNode) {
+            this.transitionOverlay.remove();
         }
-        const canvas = this.container.querySelector('canvas');
-        if (canvas) canvas.remove();
-        this._offscreen = null;
-        this._offCtx = null;
-        this.img = null;
+        if (this._projectionBeam && this._projectionBeam.parentNode) {
+            this._projectionBeam.remove();
+        }
+        this.container?.classList.remove('skippy-projection-mode');
+        this.beerCan = null;
+        this.hologram = null;
+        this.transitionOverlay = null;
+        this._projectionBeam = null;
     }
 }

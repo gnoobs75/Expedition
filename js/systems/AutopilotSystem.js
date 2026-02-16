@@ -164,7 +164,7 @@ export class AutopilotSystem {
     }
 
     /**
-     * Update orbit command with elliptical path for 3D perspective effect
+     * Update orbit command - true circular path at specified distance
      */
     updateOrbit(player, dt) {
         const dist = wrappedDistance(
@@ -182,61 +182,54 @@ export class AutopilotSystem {
             CONFIG.SECTOR_SIZE
         );
 
-        // Orbit direction (counterclockwise)
-        const orbitSpeed = player.maxSpeed / orbitRadius; // Angular velocity (rad/s)
-        const angularStep = orbitSpeed * dt * 5;
-        const targetAngle = currentAngle + angularStep;
+        // Angular velocity: v/r gives consistent circular speed
+        const orbitSpeed = (player.maxSpeed * 0.7) / orbitRadius;
+        const angularStep = orbitSpeed * dt;
+        const nextAngle = currentAngle + angularStep;
 
         // Update player's orbit phase for visual effects (player-only)
         if (player.isPlayer) {
             player.orbitPhase += angularStep;
-            // Keep phase in [0, 2π] range
             if (player.orbitPhase >= Math.PI * 2) {
                 player.orbitPhase -= Math.PI * 2;
             }
         }
 
-        // Elliptical orbit path for perspective effect
-        // tiltFactor < 1 compresses the Y axis, making orbit appear tilted
-        const tiltFactor = player.orbitTilt || 0.7;
-        const targetX = this.target.x + Math.cos(targetAngle) * orbitRadius;
-        const targetY = this.target.y + Math.sin(targetAngle) * orbitRadius * tiltFactor;
+        // Desired position on the circle (true circle, no ellipse compression)
+        const goalX = this.target.x + Math.cos(nextAngle) * orbitRadius;
+        const goalY = this.target.y + Math.sin(nextAngle) * orbitRadius;
 
-        // Radial correction: blend tangent with inward/outward push to maintain orbit distance
+        // Steer toward the goal point on the circle
+        const steerAngle = wrappedDirection(
+            player.x, player.y,
+            goalX, goalY,
+            CONFIG.SECTOR_SIZE
+        );
+
+        // Tangent direction (perpendicular to radius, counterclockwise)
+        const tangentAngle = currentAngle + Math.PI / 2;
+
+        // Radial error
         const radiusError = dist - orbitRadius;
         const radiusErrorAbs = Math.abs(radiusError);
 
-        // Tangent direction along ellipse
-        const tangentAngle = Math.atan2(
-            Math.cos(targetAngle),
-            -Math.sin(targetAngle) * tiltFactor
-        );
-
-        if (radiusErrorAbs > 100) {
-            // Far from orbit — spiral approach toward orbit position
-            const adjustAngle = wrappedDirection(
-                player.x, player.y,
-                targetX, targetY,
-                CONFIG.SECTOR_SIZE
-            );
-            player.desiredRotation = adjustAngle;
-        } else if (radiusErrorAbs > 15) {
-            // Near orbit but drifting — blend tangent with radial correction
-            const correctionAngle = wrappedDirection(
-                player.x, player.y,
-                targetX, targetY,
-                CONFIG.SECTOR_SIZE
-            );
-            // Stronger correction the further from desired radius
-            const correctionWeight = Math.min(radiusErrorAbs / 100, 0.5);
-            // Blend angles using atan2 of weighted sin/cos sums
+        if (radiusErrorAbs > 150) {
+            // Far from orbit — fly directly to the goal point on the circle
+            player.desiredRotation = steerAngle;
+        } else if (radiusErrorAbs > 5) {
+            // Near orbit — blend tangent with radial correction proportionally
+            const correctionWeight = Math.min(radiusErrorAbs / 150, 0.6);
+            // Radial correction: inward if too far, outward if too close
+            const radialAngle = radiusError > 0
+                ? wrappedDirection(player.x, player.y, this.target.x, this.target.y, CONFIG.SECTOR_SIZE)
+                : wrappedDirection(this.target.x, this.target.y, player.x, player.y, CONFIG.SECTOR_SIZE);
             const blendedAngle = Math.atan2(
-                Math.sin(tangentAngle) * (1 - correctionWeight) + Math.sin(correctionAngle) * correctionWeight,
-                Math.cos(tangentAngle) * (1 - correctionWeight) + Math.cos(correctionAngle) * correctionWeight
+                Math.sin(tangentAngle) * (1 - correctionWeight) + Math.sin(radialAngle) * correctionWeight,
+                Math.cos(tangentAngle) * (1 - correctionWeight) + Math.cos(radialAngle) * correctionWeight
             );
             player.desiredRotation = blendedAngle;
         } else {
-            // On orbit — follow tangent
+            // On orbit — pure tangent
             player.desiredRotation = tangentAngle;
         }
 

@@ -201,6 +201,19 @@ export class StationUIController {
         this.ui.elements.stationName.textContent = station.name;
         this.ui.elements.stationPanel.classList.remove('hidden');
 
+        // Hide/show tabs based on station type (POS vs NPC station)
+        const isPOS = station.type === 'player-station';
+        const npcOnlyTabs = ['ships', 'equipment', 'cantina', 'guild', 'commerce', 'insurance', 'bounty', 'drones', 'manufacturing'];
+        const tabBtns = this.ui.elements.stationPanel.querySelectorAll('.modal-tabs .tab-btn');
+        tabBtns.forEach(btn => {
+            const tab = btn.dataset.tab;
+            if (isPOS && npcOnlyTabs.includes(tab)) {
+                btn.style.display = 'none';
+            } else {
+                btn.style.display = '';
+            }
+        });
+
         // Start station ambient particles
         this.startStationAmbient();
 
@@ -473,6 +486,20 @@ export class StationUIController {
             return;
         }
 
+        // Check for POS foundry bonus (docked at POS or POS in sector)
+        let foundryBonus = 1.0;
+        const dockedStation = this.game.dockedAt;
+        if (dockedStation?.type === 'player-station') {
+            foundryBonus = dockedStation.refineryBonus || 1.0;
+        } else {
+            const posInSector = this.game.playerStations?.find(p =>
+                p.sectorId === this.game.currentSector?.id && p.alive
+            );
+            if (posInSector) {
+                foundryBonus = posInSector.refineryBonus || 1.0;
+            }
+        }
+
         let totalRefined = 0;
         const results = [];
 
@@ -481,7 +508,7 @@ export class StationUIController {
             const conv = conversions[oreType];
             if (!conv) continue;
 
-            const ingotAmount = Math.floor(data.units * conv.rate);
+            const ingotAmount = Math.floor(data.units * conv.rate * foundryBonus);
             if (ingotAmount <= 0) continue;
 
             // Add ingots to materials
@@ -513,8 +540,9 @@ export class StationUIController {
 
         // Log results
         const summary = results.map(r => `${r.amount} ${r.ingot}`).join(', ');
-        this.ui.log(`Refined ${totalRefined.toLocaleString()} units of ore into ${summary}`, 'mining');
-        this.ui.toast(`Refined ore into ingots!`, 'success');
+        const bonusStr = foundryBonus > 1.0 ? ` (Foundry Bonus +${Math.round((foundryBonus - 1) * 100)}%)` : '';
+        this.ui.log(`Refined ${totalRefined.toLocaleString()} units of ore into ${summary}${bonusStr}`, 'mining');
+        this.ui.toast(`Refined ore into ingots!${bonusStr}`, 'success');
         this.game.audio?.play('scan-complete');
         this.ui.addShipLogEntry(`Refined ore: ${summary}`, 'industry');
 

@@ -130,8 +130,9 @@ export class CombatSystem {
                 // Power routing removed — damage at full rate
                 let finalDamage = damage;
 
-                // Apply damage (with damage type from weapon config)
-                const dmgType = moduleConfig?.damageType || 'em';
+                // Apply damage (with damage profile from weapon config)
+                const dmgProfile = moduleConfig?.damageProfile || null;
+                const dmgType = dmgProfile || moduleConfig?.damageType || 'em';
                 target.takeDamage(finalDamage, source, dmgType);
 
                 // Emit hit event for combat log

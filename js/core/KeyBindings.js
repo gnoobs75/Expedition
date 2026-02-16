@@ -54,6 +54,7 @@ export const DEFAULT_BINDINGS = {
     'toggleShipLog': { key: 'KeyL', description: 'Toggle Ship Log', category: 'UI' },
     'toggleTactical': { key: 'KeyX', description: 'Toggle Tactical Overlay', category: 'UI' },
     'toggleCombatLog': { key: 'KeyY', description: 'Toggle Combat Log', category: 'UI' },
+    'toggleLocalChat': { key: 'Enter', description: 'Toggle Local Chat', category: 'UI' },
     'toggleSkippy': { key: 'Backslash', description: 'Toggle Skippy', category: 'UI' },
     'toggleSkillTree': { key: 'ctrl+KeyT', description: 'Toggle Skill Tree', category: 'UI' },
     'toggleSensorSweep': { key: 'Semicolon', description: 'Toggle Sensor Sweep', category: 'UI' },

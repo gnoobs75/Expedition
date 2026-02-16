@@ -3,7 +3,7 @@
 // Station tab for trade goods market + transport quests
 // =============================================
 
-import { TRADE_GOODS, TRADE_CATEGORIES, STATION_SPECIALTIES, getStationPrice, getBestTradeRoute, recordTrade } from '../data/tradeGoodsDatabase.js';
+import { TRADE_GOODS, TRADE_CATEGORIES, STATION_SPECIALTIES, getStationPrice, getBestTradeRoute, recordTrade, getOrderBook, placeBuyOrder, placeSellOrder, cancelOrder, matchOrders, getSpread, getPriceHistory, getPlayerOrders } from '../data/tradeGoodsDatabase.js';
 import { COMMERCE_RANKS } from '../systems/CommerceSystem.js';
 import { formatCredits } from '../utils/math.js';
 
@@ -19,8 +19,9 @@ const COMMERCE_AGENT = {
 export class CommercePanelManager {
     constructor(game) {
         this.game = game;
-        this.activeTab = 'market'; // market or contracts
+        this.activeTab = 'market'; // market, contracts, or orders
         this.categoryFilter = 'all';
+        this.selectedOrderGood = null; // goodId for order book view
     }
 
     /**
@@ -41,6 +42,9 @@ export class CommercePanelManager {
                     <button class="commerce-tab ${this.activeTab === 'market' ? 'active' : ''}" data-ctab="market">
                         TRADE GOODS
                     </button>
+                    <button class="commerce-tab ${this.activeTab === 'orders' ? 'active' : ''}" data-ctab="orders">
+                        ORDER BOOK
+                    </button>
                     <button class="commerce-tab ${this.activeTab === 'contracts' ? 'active' : ''}" data-ctab="contracts">
                         TRANSPORT CONTRACTS
                     </button>
@@ -48,6 +52,8 @@ export class CommercePanelManager {
                 <div class="commerce-content">
                     ${this.activeTab === 'market'
                         ? this.renderMarket(station)
+                        : this.activeTab === 'orders'
+                        ? this.renderOrderBook(station)
                         : this.renderContracts(station)}
                 </div>
             </div>
@@ -65,6 +71,7 @@ export class CommercePanelManager {
         // Wire market buttons
         this.wireMarketButtons(container, station);
         this.wireContractButtons(container, station);
+        this.wireOrderBookButtons(container, station);
     }
 
     renderMarket(station) {
@@ -285,6 +292,276 @@ export class CommercePanelManager {
                 </div>
             </div>
         `;
+    }
+
+    renderOrderBook(station) {
+        const sectorId = station.sectorId;
+        const specialty = STATION_SPECIALTIES[sectorId];
+        if (!specialty) return '<div class="trade-no-goods">No market data</div>';
+
+        // All goods tradeable at this station
+        const allGoods = [...new Set([...(specialty.produces || []), ...(specialty.consumes || [])])];
+
+        // Good selector
+        if (!this.selectedOrderGood || !allGoods.includes(this.selectedOrderGood)) {
+            this.selectedOrderGood = allGoods[0] || null;
+        }
+
+        const goodInfo = TRADE_GOODS[this.selectedOrderGood];
+        const spread = this.selectedOrderGood ? getSpread(sectorId, this.selectedOrderGood) : { bid: null, ask: null };
+        const book = this.selectedOrderGood ? getOrderBook(sectorId, this.selectedOrderGood) : { buyOrders: [], sellOrders: [] };
+        const history = this.selectedOrderGood ? getPriceHistory(sectorId, this.selectedOrderGood) : [];
+        const playerOrders = getPlayerOrders('player').filter(o => o.sectorId === sectorId);
+
+        // Top 5 sell orders (ascending - lowest ask first) and top 5 buy orders (descending - highest bid first)
+        const topSells = book.sellOrders.slice(0, 5);
+        const topBuys = book.buyOrders.slice(0, 5);
+
+        return `
+            <div class="order-book-panel">
+                <div class="order-good-selector">
+                    <label>COMMODITY:</label>
+                    <select class="order-good-select">
+                        ${allGoods.map(gid => {
+                            const g = TRADE_GOODS[gid];
+                            return `<option value="${gid}" ${gid === this.selectedOrderGood ? 'selected' : ''}>${g?.name || gid}</option>`;
+                        }).join('')}
+                    </select>
+                    ${goodInfo ? `<span class="order-base-price">Base: ${goodInfo.basePrice} ISK</span>` : ''}
+                </div>
+
+                <div class="order-book-spread">
+                    <span class="spread-bid">BID: ${spread.bid !== null ? spread.bid + ' ISK' : '--'}</span>
+                    <span class="spread-separator">|</span>
+                    <span class="spread-ask">ASK: ${spread.ask !== null ? spread.ask + ' ISK' : '--'}</span>
+                    ${spread.spread !== null ? `<span class="spread-value">SPREAD: ${spread.spread} ISK</span>` : ''}
+                </div>
+
+                <div class="order-book-columns">
+                    <div class="order-book-col sell-side">
+                        <div class="order-col-header sell">SELL ORDERS (ASK)</div>
+                        ${topSells.length > 0 ? topSells.map(o => `
+                            <div class="order-row sell">
+                                <span class="order-price">${o.price}</span>
+                                <span class="order-qty">${o.quantity - o.filled}</span>
+                                <span class="order-owner">${o.owner === 'player' ? 'YOU' : 'NPC'}</span>
+                            </div>
+                        `).join('') : '<div class="order-empty">No sell orders</div>'}
+                    </div>
+                    <div class="order-book-col buy-side">
+                        <div class="order-col-header buy">BUY ORDERS (BID)</div>
+                        ${topBuys.length > 0 ? topBuys.map(o => `
+                            <div class="order-row buy">
+                                <span class="order-price">${o.price}</span>
+                                <span class="order-qty">${o.quantity - o.filled}</span>
+                                <span class="order-owner">${o.owner === 'player' ? 'YOU' : 'NPC'}</span>
+                            </div>
+                        `).join('') : '<div class="order-empty">No buy orders</div>'}
+                    </div>
+                </div>
+
+                <div class="order-place-form">
+                    <div class="order-form-title">PLACE LIMIT ORDER</div>
+                    <div class="order-form-row">
+                        <label>Type:</label>
+                        <select class="order-type-select">
+                            <option value="buy">BUY</option>
+                            <option value="sell">SELL</option>
+                        </select>
+                        <label>Price:</label>
+                        <input type="number" class="order-price-input" value="${goodInfo?.basePrice || 100}" min="1" step="10">
+                        <label>Qty:</label>
+                        <input type="number" class="order-qty-input" value="5" min="1" max="100">
+                        <button class="order-place-btn">PLACE ORDER</button>
+                    </div>
+                </div>
+
+                ${history.length > 0 ? `
+                    <div class="order-price-chart">
+                        <div class="order-chart-title">PRICE HISTORY</div>
+                        <canvas class="price-history-canvas" width="400" height="120"></canvas>
+                    </div>
+                ` : ''}
+
+                ${playerOrders.length > 0 ? `
+                    <div class="order-player-orders">
+                        <div class="order-section-title">YOUR OPEN ORDERS</div>
+                        ${playerOrders.map(o => `
+                            <div class="order-player-row">
+                                <span class="order-type-tag ${o.type}">${o.type.toUpperCase()}</span>
+                                <span>${TRADE_GOODS[o.goodId]?.name || o.goodId}</span>
+                                <span>${o.quantity - o.filled} @ ${o.price} ISK</span>
+                                <button class="order-cancel-btn" data-order-id="${o.id}" data-good-id="${o.goodId}">CANCEL</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    drawPriceChart(canvas, sectorId, goodId) {
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const history = getPriceHistory(sectorId, goodId);
+        if (history.length < 2) return;
+
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        const prices = history.map(p => p.price);
+        const minP = Math.min(...prices) * 0.95;
+        const maxP = Math.max(...prices) * 1.05;
+        const range = maxP - minP || 1;
+
+        // Background
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillRect(0, 0, w, h);
+
+        // Grid lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 4; i++) {
+            const y = (h / 4) * i;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(w, y);
+            ctx.stroke();
+        }
+
+        // Price line
+        ctx.strokeStyle = '#44aaff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < history.length; i++) {
+            const x = (i / (history.length - 1)) * w;
+            const y = h - ((history[i].price - minP) / range) * h;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Volume bars
+        const maxVol = Math.max(...history.map(p => p.volume));
+        ctx.fillStyle = 'rgba(68, 170, 255, 0.2)';
+        for (let i = 0; i < history.length; i++) {
+            const x = (i / (history.length - 1)) * w;
+            const barH = (history[i].volume / (maxVol || 1)) * (h * 0.3);
+            ctx.fillRect(x - 2, h - barH, 4, barH);
+        }
+
+        // Price labels
+        ctx.fillStyle = '#888';
+        ctx.font = '10px monospace';
+        ctx.fillText(Math.round(maxP), 2, 12);
+        ctx.fillText(Math.round(minP), 2, h - 4);
+    }
+
+    wireOrderBookButtons(container, station) {
+        // Good selector
+        const goodSelect = container.querySelector('.order-good-select');
+        if (goodSelect) {
+            goodSelect.addEventListener('change', () => {
+                this.selectedOrderGood = goodSelect.value;
+                this.render(container, station);
+            });
+        }
+
+        // Place order button
+        const placeBtn = container.querySelector('.order-place-btn');
+        if (placeBtn) {
+            placeBtn.addEventListener('click', () => {
+                const type = container.querySelector('.order-type-select')?.value;
+                const price = parseInt(container.querySelector('.order-price-input')?.value);
+                const qty = parseInt(container.querySelector('.order-qty-input')?.value);
+                const goodId = this.selectedOrderGood;
+                const sectorId = station.sectorId;
+
+                if (!goodId || !price || !qty || price < 1 || qty < 1) {
+                    this.game.ui?.toast('Invalid order parameters', 'warning');
+                    return;
+                }
+
+                if (type === 'buy') {
+                    // Check player can afford escrow
+                    const cost = price * qty;
+                    if (this.game.player.credits < cost) {
+                        this.game.ui?.toast('Insufficient ISK for buy order escrow', 'warning');
+                        return;
+                    }
+                    this.game.player.credits -= cost; // Escrow
+                    placeBuyOrder(sectorId, goodId, price, qty, 'player');
+                    this.game.ui?.toast(`Buy order placed: ${qty}x @ ${price} ISK`, 'success');
+                } else {
+                    // Check player has goods
+                    const inCargo = this.game.player.getTradeGoodQuantity(goodId);
+                    if (inCargo < qty) {
+                        this.game.ui?.toast('Not enough goods in cargo', 'warning');
+                        return;
+                    }
+                    this.game.player.removeTradeGood(goodId, qty);
+                    placeSellOrder(sectorId, goodId, price, qty, 'player');
+                    this.game.ui?.toast(`Sell order placed: ${qty}x @ ${price} ISK`, 'success');
+                }
+
+                // Try to match immediately
+                const fills = matchOrders(sectorId, goodId);
+                for (const fill of fills) {
+                    if (fill.buyOrder.owner === 'player') {
+                        const good = TRADE_GOODS[goodId];
+                        if (good) this.game.player.addTradeGood(goodId, fill.quantity, good.volume);
+                        this.game.ui?.toast(`Filled: Bought ${fill.quantity} @ ${fill.price}`, 'success');
+                    }
+                    if (fill.sellOrder.owner === 'player') {
+                        this.game.player.credits += fill.price * fill.quantity;
+                        this.game.ui?.toast(`Filled: Sold ${fill.quantity} @ ${fill.price}`, 'success');
+                    }
+                }
+
+                this.game.audio?.play('click');
+                this.render(container, station);
+            });
+        }
+
+        // Cancel order buttons
+        container.querySelectorAll('.order-cancel-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const orderId = btn.dataset.orderId;
+                const goodId = btn.dataset.goodId;
+                const sectorId = station.sectorId;
+
+                // Refund escrowed ISK/goods
+                const book = getOrderBook(sectorId, goodId);
+                const buyOrder = book.buyOrders.find(o => o.id === orderId);
+                const sellOrder = book.sellOrders.find(o => o.id === orderId);
+
+                if (buyOrder) {
+                    const refund = buyOrder.price * (buyOrder.quantity - buyOrder.filled);
+                    this.game.player.credits += refund;
+                }
+                if (sellOrder) {
+                    const returnQty = sellOrder.quantity - sellOrder.filled;
+                    const good = TRADE_GOODS[goodId];
+                    if (good && returnQty > 0) {
+                        this.game.player.addTradeGood(goodId, returnQty, good.volume);
+                    }
+                }
+
+                cancelOrder(sectorId, goodId, orderId);
+                this.game.ui?.toast('Order cancelled', 'info');
+                this.game.audio?.play('click');
+                this.render(container, station);
+            });
+        });
+
+        // Draw price chart if canvas exists
+        const canvas = container.querySelector('.price-history-canvas');
+        if (canvas && this.selectedOrderGood) {
+            requestAnimationFrame(() => {
+                this.drawPriceChart(canvas, station.sectorId, this.selectedOrderGood);
+            });
+        }
     }
 
     wireMarketButtons(container, station) {

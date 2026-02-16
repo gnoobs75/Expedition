@@ -30,6 +30,8 @@ import { ManufacturingPanelManager } from './ManufacturingPanelManager.js';
 import { FittingTemplateManager } from './FittingTemplateManager.js';
 import { HackingMinigame } from './HackingMinigame.js';
 import { BountyBoardManager } from './BountyBoardManager.js';
+import { MissionBoardManager } from './MissionBoardManager.js';
+import { LocalChatManager } from './LocalChatManager.js';
 import { MinimapRenderer } from './MinimapRenderer.js';
 import { CombatLogManager } from './CombatLogManager.js';
 import { DScanManager } from './DScanManager.js';
@@ -111,6 +113,13 @@ export class UIManager {
 
         // Bounty board manager (station tab)
         this.bountyBoardManager = new BountyBoardManager(game);
+
+        // Mission board manager (station tab)
+        this.missionBoardManager = new MissionBoardManager(game);
+
+        // Local chat manager (NPC callouts + chat bubbles)
+        this.localChatManager = new LocalChatManager(game);
+        this.localChatManager.init();
 
         // Minimap renderer
         this.minimapRenderer = new MinimapRenderer(this.game, this);
@@ -1020,6 +1029,7 @@ export class UIManager {
             this.updateDroneBar();
             this.updateAutopilotIndicator();
             this.minimapRenderer.update();
+            this.localChatManager?.update(dt);
             this.updateTacticalOverlay();
             this.updateGateLabels();
             this.checkProximityWarnings();
@@ -2519,7 +2529,9 @@ export class UIManager {
 
             // Rich tooltip data attributes
             const bountyVal = entity.bounty ? `${entity.bounty} ISK` : '';
-            const factionName = entity.factionName || '';
+            const factionData = entity.faction ? (window.__FACTIONS?.[entity.faction]) : null;
+            const factionName = factionData?.nickname || entity.factionName || '';
+            const factionColor = factionData?.color || '';
             const roleName = entity.role || '';
 
             // Size comparison to player
@@ -2544,7 +2556,7 @@ export class UIManager {
                     data-tip-bounty="${bountyVal}" data-tip-faction="${factionName}" data-tip-role="${roleName}"
                     data-tip-threat="${threat.label || ''}" data-tip-size="${sizeCompare}">
                     <td class="col-icon overview-icon"><span class="threat-dot ${threat.cls}"></span>${icon}</td>
-                    <td class="col-name">${entity.name}</td>
+                    <td class="col-name"${factionColor ? ` style="color:${factionColor}"` : ''}>${entity.name}</td>
                     <td class="col-type">${typeLabel}</td>
                     <td class="col-dist">${distStr}</td>
                     <td class="col-vel">${velocity}</td>

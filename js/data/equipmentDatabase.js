@@ -1257,7 +1257,187 @@ export const EQUIPMENT_DATABASE = {
         capPerCycle: 50,
         price: 300000,
     },
+
+    // =============================================
+    // MODULES - Resistance Hardeners
+    // =============================================
+
+    'em-shield-hardener': {
+        name: 'EM Shield Hardener I',
+        slot: 'module',
+        size: 'small',
+        category: 'shield-hardener',
+        description: 'Increases shield EM resistance when active.',
+        resistBonus: { layer: 'shield', type: 'em', amount: 0.30 },
+        capacitorUse: 4,
+        cpu: 25,
+        powergrid: 1,
+        price: 5000,
+    },
+    'thermal-shield-hardener': {
+        name: 'Thermal Shield Hardener I',
+        slot: 'module',
+        size: 'small',
+        category: 'shield-hardener',
+        description: 'Increases shield thermal resistance when active.',
+        resistBonus: { layer: 'shield', type: 'thermal', amount: 0.30 },
+        capacitorUse: 4,
+        cpu: 25,
+        powergrid: 1,
+        price: 5000,
+    },
+    'kinetic-shield-hardener': {
+        name: 'Kinetic Shield Hardener I',
+        slot: 'module',
+        size: 'small',
+        category: 'shield-hardener',
+        description: 'Increases shield kinetic resistance when active.',
+        resistBonus: { layer: 'shield', type: 'kinetic', amount: 0.30 },
+        capacitorUse: 4,
+        cpu: 25,
+        powergrid: 1,
+        price: 5000,
+    },
+    'explosive-shield-hardener': {
+        name: 'Explosive Shield Hardener I',
+        slot: 'module',
+        size: 'small',
+        category: 'shield-hardener',
+        description: 'Increases shield explosive resistance when active.',
+        resistBonus: { layer: 'shield', type: 'explosive', amount: 0.30 },
+        capacitorUse: 4,
+        cpu: 25,
+        powergrid: 1,
+        price: 5000,
+    },
+    'em-armor-hardener': {
+        name: 'EM Armor Hardener I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'armor-hardener',
+        description: 'Passively increases armor EM resistance.',
+        resistBonus: { layer: 'armor', type: 'em', amount: 0.25 },
+        cpu: 15,
+        powergrid: 1,
+        price: 5000,
+    },
+    'thermal-armor-hardener': {
+        name: 'Thermal Armor Hardener I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'armor-hardener',
+        description: 'Passively increases armor thermal resistance.',
+        resistBonus: { layer: 'armor', type: 'thermal', amount: 0.25 },
+        cpu: 15,
+        powergrid: 1,
+        price: 5000,
+    },
+    'kinetic-armor-hardener': {
+        name: 'Kinetic Armor Hardener I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'armor-hardener',
+        description: 'Passively increases armor kinetic resistance.',
+        resistBonus: { layer: 'armor', type: 'kinetic', amount: 0.25 },
+        cpu: 15,
+        powergrid: 1,
+        price: 5000,
+    },
+    'explosive-armor-hardener': {
+        name: 'Explosive Armor Hardener I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'armor-hardener',
+        description: 'Passively increases armor explosive resistance.',
+        resistBonus: { layer: 'armor', type: 'explosive', amount: 0.25 },
+        cpu: 15,
+        powergrid: 1,
+        price: 5000,
+    },
+    'hull-energizer': {
+        name: 'Hull Energizer I',
+        slot: 'subsystem',
+        size: 'small',
+        category: 'hull-hardener',
+        description: 'Reinforces hull against all damage types.',
+        resistBonus: { layer: 'hull', type: 'all', amount: 0.20 },
+        cpu: 10,
+        powergrid: 1,
+        price: 4000,
+    },
+    'hull-energizer-2': {
+        name: 'Hull Energizer II',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'hull-hardener',
+        description: 'Advanced hull reinforcement system.',
+        resistBonus: { layer: 'hull', type: 'all', amount: 0.30 },
+        cpu: 20,
+        powergrid: 2,
+        price: 12000,
+    },
+    'adaptive-invulnerability-field': {
+        name: 'Adaptive Invulnerability Field I',
+        slot: 'module',
+        size: 'medium',
+        category: 'shield-hardener',
+        description: 'Active module that boosts all shield resistances. Stacks with diminishing returns.',
+        resistBonus: { layer: 'shield', type: 'all', amount: 0.25 },
+        capacitorUse: 6,
+        cpu: 35,
+        powergrid: 3,
+        price: 15000,
+    },
+    'energized-adaptive-membrane': {
+        name: 'Energized Adaptive Membrane I',
+        slot: 'subsystem',
+        size: 'medium',
+        category: 'armor-hardener',
+        description: 'Passive module that boosts all armor resistances.',
+        resistBonus: { layer: 'armor', type: 'all', amount: 0.20 },
+        cpu: 25,
+        powergrid: 2,
+        price: 14000,
+    },
 };
+
+// =============================================
+// POST-PROCESSING: CPU/PG DEFAULTS & DAMAGE PROFILES
+// =============================================
+
+// Default CPU/PG costs by slot type and size
+const EQUIP_RESOURCE_DEFAULTS = {
+    weapon: { small: { cpu: 15, powergrid: 3 }, medium: { cpu: 25, powergrid: 8 }, large: { cpu: 40, powergrid: 15 }, xlarge: { cpu: 60, powergrid: 25 } },
+    module: { small: { cpu: 20, powergrid: 2 }, medium: { cpu: 30, powergrid: 5 }, large: { cpu: 45, powergrid: 10 }, xlarge: { cpu: 60, powergrid: 15 } },
+    subsystem: { small: { cpu: 10, powergrid: 1 }, medium: { cpu: 20, powergrid: 3 }, large: { cpu: 30, powergrid: 5 }, xlarge: { cpu: 45, powergrid: 8 } },
+    high: { small: { cpu: 15, powergrid: 3 }, medium: { cpu: 25, powergrid: 8 }, large: { cpu: 40, powergrid: 15 }, xlarge: { cpu: 60, powergrid: 25 } },
+    mid: { small: { cpu: 20, powergrid: 5 }, medium: { cpu: 30, powergrid: 8 }, large: { cpu: 45, powergrid: 12 }, xlarge: { cpu: 60, powergrid: 15 } },
+    low: { small: { cpu: 10, powergrid: 1 }, medium: { cpu: 20, powergrid: 3 }, large: { cpu: 30, powergrid: 5 }, xlarge: { cpu: 45, powergrid: 8 } },
+};
+
+// Default damage profiles by weapon category
+const WEAPON_DAMAGE_PROFILES = {
+    laser:   { em: 0.5, thermal: 0.5, kinetic: 0.0, explosive: 0.0 },
+    railgun: { em: 0.0, thermal: 0.0, kinetic: 0.8, explosive: 0.2 },
+    missile: { em: 0.0, thermal: 0.0, kinetic: 0.2, explosive: 0.8 },
+};
+
+// Apply defaults to all equipment
+for (const [id, eq] of Object.entries(EQUIPMENT_DATABASE)) {
+    // CPU/PG defaults
+    const slotDefaults = EQUIP_RESOURCE_DEFAULTS[eq.slot];
+    const sizeDefaults = slotDefaults?.[eq.size];
+    if (sizeDefaults) {
+        if (eq.cpu === undefined) eq.cpu = sizeDefaults.cpu;
+        if (eq.powergrid === undefined) eq.powergrid = sizeDefaults.powergrid;
+    }
+    // Damage profile for weapons (replace single damageType)
+    if (eq.damage && eq.category && WEAPON_DAMAGE_PROFILES[eq.category]) {
+        if (!eq.damageProfile) {
+            eq.damageProfile = { ...WEAPON_DAMAGE_PROFILES[eq.category] };
+        }
+    }
+}
 
 // =============================================
 // HELPER FUNCTIONS

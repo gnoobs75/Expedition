@@ -628,3 +628,249 @@ export function getBestTradeRoute(goodId, sourceSectorId) {
 
     return { profit: bestProfit, destination: bestDest };
 }
+
+// ==================================
+// Order Book System
+// Buy/sell limit orders per station per good
+// ==================================
+
+const _orderBooks = {}; // key: "sectorId:goodId" -> { buyOrders: [], sellOrders: [] }
+const _priceHistory = {}; // key: "sectorId:goodId" -> [{price, timestamp, volume}]
+let _orderIdCounter = 1;
+
+function getOrderBookKey(sectorId, goodId) {
+    return `${sectorId}:${goodId}`;
+}
+
+/**
+ * Get or create order book for a station+good pair
+ */
+export function getOrderBook(sectorId, goodId) {
+    const key = getOrderBookKey(sectorId, goodId);
+    if (!_orderBooks[key]) {
+        _orderBooks[key] = { buyOrders: [], sellOrders: [] };
+    }
+    return _orderBooks[key];
+}
+
+/**
+ * Place a buy limit order (player wants to buy at this price or lower)
+ */
+export function placeBuyOrder(sectorId, goodId, price, quantity, playerId = 'player') {
+    const book = getOrderBook(sectorId, goodId);
+    const order = {
+        id: `order_${_orderIdCounter++}`,
+        type: 'buy',
+        goodId,
+        sectorId,
+        price,
+        quantity,
+        filled: 0,
+        owner: playerId,
+        timestamp: Date.now(),
+    };
+    book.buyOrders.push(order);
+    // Sort buy orders by price descending (highest first = best bid)
+    book.buyOrders.sort((a, b) => b.price - a.price);
+    return order;
+}
+
+/**
+ * Place a sell limit order (player wants to sell at this price or higher)
+ */
+export function placeSellOrder(sectorId, goodId, price, quantity, playerId = 'player') {
+    const book = getOrderBook(sectorId, goodId);
+    const order = {
+        id: `order_${_orderIdCounter++}`,
+        type: 'sell',
+        goodId,
+        sectorId,
+        price,
+        quantity,
+        filled: 0,
+        owner: playerId,
+        timestamp: Date.now(),
+    };
+    book.sellOrders.push(order);
+    // Sort sell orders by price ascending (lowest first = best ask)
+    book.sellOrders.sort((a, b) => a.price - b.price);
+    return order;
+}
+
+/**
+ * Cancel an order by ID
+ */
+export function cancelOrder(sectorId, goodId, orderId) {
+    const book = getOrderBook(sectorId, goodId);
+    book.buyOrders = book.buyOrders.filter(o => o.id !== orderId);
+    book.sellOrders = book.sellOrders.filter(o => o.id !== orderId);
+}
+
+/**
+ * Match orders in a book. Returns array of fills: [{buyOrder, sellOrder, price, quantity}]
+ */
+export function matchOrders(sectorId, goodId) {
+    const book = getOrderBook(sectorId, goodId);
+    const fills = [];
+
+    while (book.buyOrders.length > 0 && book.sellOrders.length > 0) {
+        const bestBuy = book.buyOrders[0];
+        const bestSell = book.sellOrders[0];
+
+        // Buy price must be >= sell price for a match
+        if (bestBuy.price < bestSell.price) break;
+
+        // Fill at the older order's price (price-time priority)
+        const fillPrice = bestBuy.timestamp <= bestSell.timestamp ? bestBuy.price : bestSell.price;
+        const buyRemaining = bestBuy.quantity - bestBuy.filled;
+        const sellRemaining = bestSell.quantity - bestSell.filled;
+        const fillQty = Math.min(buyRemaining, sellRemaining);
+
+        bestBuy.filled += fillQty;
+        bestSell.filled += fillQty;
+
+        fills.push({
+            buyOrder: bestBuy,
+            sellOrder: bestSell,
+            price: fillPrice,
+            quantity: fillQty,
+        });
+
+        // Remove fully filled orders
+        if (bestBuy.filled >= bestBuy.quantity) book.buyOrders.shift();
+        if (bestSell.filled >= bestSell.quantity) book.sellOrders.shift();
+    }
+
+    // Record price history for fills
+    if (fills.length > 0) {
+        const key = getOrderBookKey(sectorId, goodId);
+        if (!_priceHistory[key]) _priceHistory[key] = [];
+        for (const fill of fills) {
+            _priceHistory[key].push({
+                price: fill.price,
+                volume: fill.quantity,
+                timestamp: Date.now(),
+            });
+        }
+        // Keep last 50 data points
+        if (_priceHistory[key].length > 50) {
+            _priceHistory[key] = _priceHistory[key].slice(-50);
+        }
+    }
+
+    return fills;
+}
+
+/**
+ * Get spread (best bid/ask) for display
+ */
+export function getSpread(sectorId, goodId) {
+    const book = getOrderBook(sectorId, goodId);
+    const bestBid = book.buyOrders.length > 0 ? book.buyOrders[0].price : null;
+    const bestAsk = book.sellOrders.length > 0 ? book.sellOrders[0].price : null;
+    return { bid: bestBid, ask: bestAsk, spread: (bestAsk && bestBid) ? bestAsk - bestBid : null };
+}
+
+/**
+ * Get price history for a good at a station
+ */
+export function getPriceHistory(sectorId, goodId) {
+    const key = getOrderBookKey(sectorId, goodId);
+    return _priceHistory[key] || [];
+}
+
+/**
+ * Get all player open orders across all stations
+ */
+export function getPlayerOrders(playerId = 'player') {
+    const orders = [];
+    for (const [key, book] of Object.entries(_orderBooks)) {
+        for (const o of book.buyOrders) {
+            if (o.owner === playerId) orders.push(o);
+        }
+        for (const o of book.sellOrders) {
+            if (o.owner === playerId) orders.push(o);
+        }
+    }
+    return orders;
+}
+
+/**
+ * Seed NPC orders from station supply/demand data
+ */
+export function seedNPCOrders(sectorId) {
+    const specialty = STATION_SPECIALTIES[sectorId];
+    if (!specialty) return;
+
+    // Seed sell orders for goods the station produces
+    for (const goodId of specialty.produces) {
+        const good = TRADE_GOODS[goodId];
+        if (!good) continue;
+        const book = getOrderBook(sectorId, goodId);
+        // Only seed if few NPC orders exist
+        const npcSells = book.sellOrders.filter(o => o.owner === 'npc');
+        if (npcSells.length < 3) {
+            const basePrice = getStationPrice(goodId, sectorId).buy;
+            for (let i = 0; i < 3; i++) {
+                const price = Math.floor(basePrice * (0.95 + i * 0.05));
+                const qty = 5 + Math.floor(Math.random() * 15);
+                placeSellOrder(sectorId, goodId, price, qty, 'npc');
+            }
+        }
+    }
+
+    // Seed buy orders for goods the station consumes
+    for (const goodId of specialty.consumes) {
+        const good = TRADE_GOODS[goodId];
+        if (!good) continue;
+        const book = getOrderBook(sectorId, goodId);
+        const npcBuys = book.buyOrders.filter(o => o.owner === 'npc');
+        if (npcBuys.length < 3) {
+            const basePrice = getStationPrice(goodId, sectorId).sell;
+            for (let i = 0; i < 3; i++) {
+                const price = Math.floor(basePrice * (1.05 - i * 0.05));
+                const qty = 5 + Math.floor(Math.random() * 15);
+                placeBuyOrder(sectorId, goodId, price, qty, 'npc');
+            }
+        }
+    }
+}
+
+/**
+ * Refresh NPC orders (call periodically ~60s)
+ */
+export function refreshNPCOrders() {
+    for (const sectorId of Object.keys(STATION_SPECIALTIES)) {
+        // Clean filled NPC orders
+        const keys = Object.keys(_orderBooks).filter(k => k.startsWith(sectorId + ':'));
+        for (const key of keys) {
+            const book = _orderBooks[key];
+            book.buyOrders = book.buyOrders.filter(o => o.owner !== 'npc' || (o.quantity - o.filled) > 0);
+            book.sellOrders = book.sellOrders.filter(o => o.owner !== 'npc' || (o.quantity - o.filled) > 0);
+        }
+        seedNPCOrders(sectorId);
+    }
+}
+
+/**
+ * Save/load order book state
+ */
+export function getOrderBookState() {
+    return {
+        orderBooks: JSON.parse(JSON.stringify(_orderBooks)),
+        priceHistory: JSON.parse(JSON.stringify(_priceHistory)),
+        orderIdCounter: _orderIdCounter,
+    };
+}
+
+export function loadOrderBookState(data) {
+    // Clear
+    for (const key of Object.keys(_orderBooks)) delete _orderBooks[key];
+    for (const key of Object.keys(_priceHistory)) delete _priceHistory[key];
+
+    if (data) {
+        if (data.orderBooks) Object.assign(_orderBooks, data.orderBooks);
+        if (data.priceHistory) Object.assign(_priceHistory, data.priceHistory);
+        if (data.orderIdCounter) _orderIdCounter = data.orderIdCounter;
+    }
+}

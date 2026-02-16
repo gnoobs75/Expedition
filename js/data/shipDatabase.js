@@ -49,11 +49,45 @@ export const SHIP_SIZES = {
 //   Salvager/Harvester: Like mining/hauler with salvage/harvest bonuses
 // =============================================================================
 
+// CPU/Powergrid defaults by ship size
+const SIZE_RESOURCES = {
+    frigate:       { cpu: 125,  powergrid: 37 },
+    destroyer:     { cpu: 200,  powergrid: 70 },
+    cruiser:       { cpu: 350,  powergrid: 150 },
+    battlecruiser: { cpu: 500,  powergrid: 300 },
+    battleship:    { cpu: 650,  powergrid: 450 },
+    capital:       { cpu: 900,  powergrid: 700 },
+};
+
+// Default resist profiles by role tendency
+// Shield: weak to EM, strong to explosive/kinetic
+// Armor: strong to EM/thermal, weak to explosive
+// Hull: minimal resists
+const ROLE_RESIST_PROFILES = {
+    mining:     { shield: { em: 0.0, thermal: 0.2, kinetic: 0.4, explosive: 0.5 }, armor: { em: 0.5, thermal: 0.35, kinetic: 0.25, explosive: 0.1 }, hull: { em: 0.0, thermal: 0.0, kinetic: 0.0, explosive: 0.0 } },
+    hauler:     { shield: { em: 0.0, thermal: 0.2, kinetic: 0.4, explosive: 0.5 }, armor: { em: 0.5, thermal: 0.35, kinetic: 0.25, explosive: 0.1 }, hull: { em: 0.0, thermal: 0.0, kinetic: 0.0, explosive: 0.0 } },
+    salvager:   { shield: { em: 0.0, thermal: 0.2, kinetic: 0.4, explosive: 0.5 }, armor: { em: 0.5, thermal: 0.35, kinetic: 0.25, explosive: 0.1 }, hull: { em: 0.0, thermal: 0.0, kinetic: 0.0, explosive: 0.0 } },
+    harvester:  { shield: { em: 0.0, thermal: 0.2, kinetic: 0.4, explosive: 0.5 }, armor: { em: 0.5, thermal: 0.35, kinetic: 0.25, explosive: 0.1 }, hull: { em: 0.0, thermal: 0.0, kinetic: 0.0, explosive: 0.0 } },
+    mercenary:  { shield: { em: 0.0, thermal: 0.2, kinetic: 0.3, explosive: 0.4 }, armor: { em: 0.4, thermal: 0.3, kinetic: 0.25, explosive: 0.1 }, hull: { em: 0.0, thermal: 0.0, kinetic: 0.0, explosive: 0.0 } },
+    pirate:     { shield: { em: 0.0, thermal: 0.15, kinetic: 0.3, explosive: 0.4 }, armor: { em: 0.35, thermal: 0.25, kinetic: 0.2, explosive: 0.15 }, hull: { em: 0.0, thermal: 0.0, kinetic: 0.0, explosive: 0.0 } },
+    police:     { shield: { em: 0.1, thermal: 0.3, kinetic: 0.4, explosive: 0.5 }, armor: { em: 0.5, thermal: 0.4, kinetic: 0.3, explosive: 0.15 }, hull: { em: 0.0, thermal: 0.0, kinetic: 0.0, explosive: 0.0 } },
+    military:   { shield: { em: 0.1, thermal: 0.3, kinetic: 0.45, explosive: 0.5 }, armor: { em: 0.5, thermal: 0.45, kinetic: 0.3, explosive: 0.15 }, hull: { em: 0.1, thermal: 0.1, kinetic: 0.1, explosive: 0.1 } },
+    surveyor:   { shield: { em: 0.0, thermal: 0.2, kinetic: 0.4, explosive: 0.5 }, armor: { em: 0.5, thermal: 0.35, kinetic: 0.25, explosive: 0.1 }, hull: { em: 0.0, thermal: 0.0, kinetic: 0.0, explosive: 0.0 } },
+    logistics:  { shield: { em: 0.1, thermal: 0.3, kinetic: 0.45, explosive: 0.55 }, armor: { em: 0.55, thermal: 0.4, kinetic: 0.3, explosive: 0.15 }, hull: { em: 0.0, thermal: 0.0, kinetic: 0.0, explosive: 0.0 } },
+};
+
+// AI profile defaults by role
+const ROLE_AI_PROFILES = {
+    mining: 'coward', hauler: 'coward', salvager: 'coward', harvester: 'coward',
+    mercenary: 'brawler', pirate: 'brawler', police: 'brawler',
+    military: 'sniper', surveyor: 'kiter', logistics: 'logi',
+};
+
 // Full ship database
 // Each ship has: name, description, size, role, maxSpeed, acceleration, turnSpeed,
 // shield, armor, hull, capacitor, capacitorRegen, signatureRadius,
 // weaponSlots, moduleSlots, subsystemSlots, cargoCapacity,
-// droneCapacity, droneBandwidth, price, bonuses
+// droneCapacity, droneBandwidth, price, bonuses, cpu, powergrid, resistProfile, aiProfile
 export const SHIP_DATABASE = {
 
     // =============================================
@@ -2178,6 +2212,23 @@ export const SHIP_DATABASE = {
         isFlagship: true,
     },
 };
+
+// =============================================
+// POST-PROCESSING: Apply defaults to all ships
+// =============================================
+
+// Apply default CPU/PG/resistProfile/aiProfile to all ships that don't have them
+for (const [id, ship] of Object.entries(SHIP_DATABASE)) {
+    const sizeRes = SIZE_RESOURCES[ship.size] || SIZE_RESOURCES.frigate;
+    if (ship.cpu === undefined) ship.cpu = sizeRes.cpu;
+    if (ship.powergrid === undefined) ship.powergrid = sizeRes.powergrid;
+    if (ship.resistProfile === undefined) {
+        ship.resistProfile = ROLE_RESIST_PROFILES[ship.role] || ROLE_RESIST_PROFILES.mercenary;
+    }
+    if (ship.aiProfile === undefined) {
+        ship.aiProfile = ROLE_AI_PROFILES[ship.role] || 'brawler';
+    }
+}
 
 // =============================================
 // HELPER FUNCTIONS

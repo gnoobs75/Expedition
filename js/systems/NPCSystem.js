@@ -7,6 +7,21 @@ import { CONFIG } from '../config.js';
 import { NPCShip } from '../entities/NPCShip.js';
 import { EnemyShip } from '../entities/EnemyShip.js';
 import { evaluatePursuit, calculateInterceptPoint, activateTackleModules } from '../utils/PursuitAI.js';
+import { FACTIONS } from '../data/factionDatabase.js';
+
+// Sector faction pools - which factions control which difficulty tiers
+const SECTOR_FACTIONS = {
+    easy:   ['ruhar', 'unef', 'mavericks'],
+    medium: ['jeraptha', 'ruhar', 'unef', 'esselgin'],
+    hard:   ['thuranin', 'bosphuraq', 'kristang', 'wurgalan'],
+    deadly: ['maxolhx', 'thuranin', 'kristang'],
+};
+
+// Pick a random faction for a sector based on difficulty
+function pickSectorFaction(difficulty) {
+    const pool = SECTOR_FACTIONS[difficulty] || SECTOR_FACTIONS.medium;
+    return pool[Math.floor(Math.random() * pool.length)];
+}
 
 export class NPCSystem {
     constructor(game) {
@@ -64,6 +79,12 @@ export class NPCSystem {
         const asteroids = sector.getAsteroids();
         if (asteroids.length === 0) return;
 
+        // Pick faction for this sector's NPCs
+        const sectorFaction = sector.controllingFaction || pickSectorFaction(sector.difficulty);
+        if (!sector.controllingFaction) sector.controllingFaction = sectorFaction;
+        const factionData = FACTIONS[sectorFaction];
+        const prefix = factionData?.shipPrefix || 'NPC';
+
         for (let i = 0; i < config.count; i++) {
             // Pick a random asteroid field to start near
             const targetAsteroid = asteroids[Math.floor(Math.random() * asteroids.length)];
@@ -75,7 +96,8 @@ export class NPCSystem {
                 shipClass: config.shipClass,
                 droneCount: config.droneCount,
                 homeStation: station,
-                name: `Mining Vessel ${i + 1}`,
+                name: `${prefix} Mining ${i + 1}`,
+                faction: sectorFaction,
             });
 
             sector.addEntity(miner);
@@ -102,13 +124,18 @@ export class NPCSystem {
             const angle = (i / config.count) * Math.PI * 2 + Math.random() * 0.5;
             const dist = 4000 + Math.random() * 4000;
 
+            const secFaction = sector.controllingFaction || pickSectorFaction(sector.difficulty);
+            const secFactionData = FACTIONS[secFaction];
+            const secPrefix = secFactionData?.shipPrefix || 'SEC';
+
             const sec = new NPCShip(this.game, {
                 x: centerX + Math.cos(angle) * dist,
                 y: centerY + Math.sin(angle) * dist,
                 role: 'security',
                 shipClass: config.shipClass,
                 homeStation: station,
-                name: `Security ${i + 1}`,
+                name: `${secPrefix} Patrol ${i + 1}`,
+                faction: secFaction,
             });
 
             // Set patrol center
@@ -778,11 +805,17 @@ export class NPCSystem {
             const angle = spawnAngle + (i - count / 2) * 0.3;
             const enemyType = Math.random() > 0.8 ? 'pirate-cruiser' : 'pirate-frigate';
 
+            // Assign hostile faction to pirates
+            const pirateFactions = ['kristang', 'bosphuraq', 'thuranin'];
+            const pirateFaction = pirateFactions[Math.floor(Math.random() * pirateFactions.length)];
+            const piratePrefix = FACTIONS[pirateFaction]?.shipPrefix || 'PIR';
+
             const pirate = new EnemyShip(this.game, {
                 x: targetMiner.x + Math.cos(angle) * spawnDist,
                 y: targetMiner.y + Math.sin(angle) * spawnDist,
                 enemyType,
-                name: `Raider ${i + 1}`,
+                name: `${piratePrefix} Raider ${i + 1}`,
+                faction: pirateFaction,
             });
 
             // Set AI to chase the miner (or player if nearby)

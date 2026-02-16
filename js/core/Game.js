@@ -36,6 +36,7 @@ import { AnomalySystem } from '../systems/AnomalySystem.js';
 import { SectorEventSystem } from '../systems/SectorEventSystem.js';
 import { BountySystem } from '../systems/BountySystem.js';
 import { IntelSystem } from '../systems/IntelSystem.js';
+import { MissionSystem } from '../systems/MissionSystem.js';
 import { PlayerStationDefenseSystem } from '../systems/PlayerStationDefenseSystem.js';
 import { PlayerStation } from '../entities/PlayerStation.js';
 import { AdminDashboardManager } from '../ui/AdminDashboardManager.js';
@@ -47,8 +48,9 @@ import { UIManager } from '../ui/UIManager.js';
 import { AudioManager } from './AudioManager.js';
 import { SaveManager } from './SaveManager.js';
 import { EventBus } from './EventBus.js';
-import { decayMarketState, getMarketState, loadMarketState } from '../data/tradeGoodsDatabase.js';
+import { decayMarketState, getMarketState, loadMarketState, getOrderBookState, loadOrderBookState } from '../data/tradeGoodsDatabase.js';
 import { formatCredits } from '../utils/math.js';
+import { FACTIONS, getDefaultStandings, calculateStandingChanges, getStandingInfo, getStandingPriceModifier } from '../data/factionDatabase.js';
 
 export class Game {
     constructor() {
@@ -79,6 +81,9 @@ export class Game {
 
         // Player faction
         this.faction = { name: 'Unnamed Faction', color: '#00ccff', treasury: 0 };
+
+        // Faction standings (ExForce lore factions)
+        this.factionStandings = getDefaultStandings();
 
         // Player-owned stations (POS)
         this.playerStations = [];
@@ -151,6 +156,9 @@ export class Game {
     async init() {
         console.log('Initializing Expedition...');
 
+        // Expose FACTIONS globally for UI lookups
+        window.__FACTIONS = FACTIONS;
+
         // Create renderer first
         this.renderer = new Renderer(this);
         await this.renderer.init();
@@ -200,6 +208,7 @@ export class Game {
         this.sectorEventSystem = new SectorEventSystem(this);
         this.bountySystem = new BountySystem(this);
         this.intelSystem = new IntelSystem(this);
+        this.missionSystem = new MissionSystem(this);
         this.posDefenseSystem = new PlayerStationDefenseSystem(this);
 
         // Create UI manager (last, needs other systems)
@@ -440,6 +449,12 @@ export class Game {
 
                 // Check bounty board completion
                 this.ui?.checkBountyCompletion(entity);
+
+                // Faction standing change on kill
+                if (entity.faction && FACTIONS[entity.faction]) {
+                    const standingDelta = entity.type === 'enemy' ? 0.1 : -0.3; // Pirates give +, NPCs give -
+                    this.modifyStanding(entity.faction, standingDelta);
+                }
             }
 
             // Spawn wreck for ship-type entities
@@ -1009,6 +1024,40 @@ export class Game {
     }
 
     /**
+     * Modify standing with a faction (with coalition spillover)
+     */
+    modifyStanding(factionId, delta) {
+        if (!FACTIONS[factionId]) return;
+        const changes = calculateStandingChanges(factionId, delta);
+        for (const [id, change] of Object.entries(changes)) {
+            const old = this.factionStandings[id] || 0;
+            this.factionStandings[id] = Math.max(-10, Math.min(10, old + change));
+        }
+        this.events.emit('faction:standing-changed', { factionId, delta, standings: this.factionStandings });
+    }
+
+    /**
+     * Get standing with a faction
+     */
+    getStanding(factionId) {
+        return this.factionStandings[factionId] || 0;
+    }
+
+    /**
+     * Get standing info (label, color) for a faction
+     */
+    getStandingInfo(factionId) {
+        return getStandingInfo(this.getStanding(factionId));
+    }
+
+    /**
+     * Get price modifier based on faction standing
+     */
+    getStandingPriceModifier(factionId) {
+        return getStandingPriceModifier(this.getStanding(factionId));
+    }
+
+    /**
      * Dock at station
      */
     dockAtStation(station) {
@@ -1191,6 +1240,7 @@ export class Game {
         if (this.bountySystem) this._safeUpdate(this.bountySystem, 'Bounty', dt);
         if (this.intelSystem) this._safeUpdate(this.intelSystem, 'Intel', dt);
         if (this.posDefenseSystem) this._safeUpdate(this.posDefenseSystem, 'POSDefense', dt);
+        if (this.missionSystem) this._safeUpdate(this.missionSystem, 'Mission', dt);
 
         // Auto-loot tractor beam
         try { this.updateTractorBeams(dt); } catch (e) { console.error('[TractorBeam] error:', e); }
@@ -1617,6 +1667,11 @@ export class Game {
             this.faction = { ...data.faction };
         }
 
+        // 3c. Faction standings
+        if (data.factionStandings) {
+            this.factionStandings = { ...data.factionStandings };
+        }
+
         // 4. Insurance
         if (data.insurance) {
             this.insurance = { ...data.insurance };
@@ -1692,6 +1747,7 @@ export class Game {
         if (data.intelData) this.intelSystem?.loadState(data.intelData);
         if (data.fleet?.activeDoctrine) this.fleetSystem?.setDoctrine(data.fleet.activeDoctrine);
         if (data.sectorEvents) this.sectorEventSystem?.loadState(data.sectorEvents);
+        if (data.missions) this.missionSystem?.loadState(data.missions);
 
         // Restore player stations (POS)
         if (data.playerStations && Array.isArray(data.playerStations)) {
@@ -1742,6 +1798,11 @@ export class Game {
             loadMarketState(data.marketState);
         }
 
+        // 11. Order book state
+        if (data.orderBookState) {
+            loadOrderBookState(data.orderBookState);
+        }
+
         console.log('Game state restored from save');
     }
 
@@ -1750,5 +1811,12 @@ export class Game {
      */
     getMarketState() {
         return getMarketState();
+    }
+
+    /**
+     * Get order book state for saving
+     */
+    getOrderBookState() {
+        return getOrderBookState();
     }
 }

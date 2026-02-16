@@ -4,7 +4,7 @@
 // trade route management, and hauling economy
 // =============================================
 
-import { TRADE_GOODS, STATION_SPECIALTIES, getStationPrice, getBestTradeRoute } from '../data/tradeGoodsDatabase.js';
+import { TRADE_GOODS, STATION_SPECIALTIES, getStationPrice, getBestTradeRoute, refreshNPCOrders, matchOrders, seedNPCOrders } from '../data/tradeGoodsDatabase.js';
 import { formatCredits } from '../utils/math.js';
 
 // Commerce Guild ranks (same structure as other guilds)
@@ -138,6 +138,13 @@ export class CommerceSystem {
         // Trade volume tracking per sector (for strategic map overlay)
         this.tradeVolume = {}; // sectorId -> { total, recent }
         this.tradeVolumeDecayTimer = 0;
+
+        // NPC order refresh timer
+        this.npcOrderRefreshTimer = 0;
+        this.npcOrderRefreshInterval = 60; // seconds
+
+        // Seed initial NPC orders
+        this._seedInitialOrders();
 
         // Event price modifiers: { sectorId: { goodId: multiplier } }
         this.eventPriceModifiers = {};
@@ -555,7 +562,53 @@ export class CommerceSystem {
     }
 
     /**
-     * Update - called each frame (currently no per-frame logic needed)
+     * Seed initial NPC orders for all stations
+     */
+    _seedInitialOrders() {
+        for (const sectorId of Object.keys(STATION_SPECIALTIES)) {
+            seedNPCOrders(sectorId);
+        }
+    }
+
+    /**
+     * Run order matching for all books at a station, process fills
+     */
+    processOrderMatching(sectorId) {
+        const specialty = STATION_SPECIALTIES[sectorId];
+        if (!specialty) return;
+        const allGoods = [...(specialty.produces || []), ...(specialty.consumes || [])];
+        for (const goodId of allGoods) {
+            const fills = matchOrders(sectorId, goodId);
+            for (const fill of fills) {
+                // If player is the buyer, deduct credits and add goods
+                if (fill.buyOrder.owner === 'player') {
+                    const cost = fill.price * fill.quantity;
+                    if (this.game.player) {
+                        this.game.player.credits -= cost;
+                        const good = TRADE_GOODS[goodId];
+                        if (good) {
+                            this.game.player.addTradeGood(goodId, fill.quantity, good.volume);
+                        }
+                        this.game.ui?.toast(`Order filled: Bought ${fill.quantity} ${good?.name || goodId} @ ${fill.price}`, 'success');
+                        this.game.events?.emit('order:filled', fill);
+                    }
+                }
+                // If player is the seller, add credits
+                if (fill.sellOrder.owner === 'player') {
+                    const revenue = fill.price * fill.quantity;
+                    if (this.game.player) {
+                        this.game.player.credits += revenue;
+                        const good = TRADE_GOODS[goodId];
+                        this.game.ui?.toast(`Order filled: Sold ${fill.quantity} ${good?.name || goodId} @ ${fill.price}`, 'success');
+                        this.game.events?.emit('order:filled', fill);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Update - called each frame
      */
     update(dt) {
         // Decay recent trade volume every 60s
@@ -564,6 +617,18 @@ export class CommerceSystem {
             this.tradeVolumeDecayTimer = 0;
             for (const sid of Object.keys(this.tradeVolume)) {
                 this.tradeVolume[sid].recent = Math.floor(this.tradeVolume[sid].recent * 0.8);
+            }
+        }
+
+        // Refresh NPC orders periodically
+        this.npcOrderRefreshTimer += dt;
+        if (this.npcOrderRefreshTimer >= this.npcOrderRefreshInterval) {
+            this.npcOrderRefreshTimer = 0;
+            refreshNPCOrders();
+            // Match orders at current sector
+            const sectorId = this.game.currentSector?.id;
+            if (sectorId) {
+                this.processOrderMatching(sectorId);
             }
         }
     }

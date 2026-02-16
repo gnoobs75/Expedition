@@ -253,6 +253,9 @@ export class SaveManager {
             // Faction
             faction: game.faction ? { ...game.faction } : { name: 'Unnamed Faction', color: '#00ccff', treasury: 0 },
 
+            // Faction standings (ExForce lore)
+            factionStandings: game.factionStandings ? { ...game.factionStandings } : null,
+
             // Insurance
             insurance: { ...game.insurance },
 
@@ -299,12 +302,16 @@ export class SaveManager {
                 hangar: (game.fleetSystem.flagship.hangar || []).map(s => s.fleetId),
             } : null,
             sectorEvents: game.sectorEventSystem?.saveState() || null,
+            missions: game.missionSystem?.saveState() || null,
 
             // Player-owned stations
             playerStations: (game.playerStations || []).map(pos => pos.serialize()),
 
             // Dynamic market state
             marketState: game.getMarketState ? game.getMarketState() : null,
+
+            // Order book state
+            orderBookState: game.getOrderBookState ? game.getOrderBookState() : null,
         };
 
         return data;

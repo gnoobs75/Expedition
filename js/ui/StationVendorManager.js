@@ -97,6 +97,11 @@ export class StationVendorManager {
                     document.getElementById('bounty-content')
                 );
                 break;
+            case 'missions':
+                this.game.ui?.missionBoardManager?.show(
+                    document.getElementById('missions-content')
+                );
+                break;
         }
     }
 
@@ -941,8 +946,28 @@ export class StationVendorManager {
                 `;
             }).join('');
 
+        // CPU/PG
+        const cpuUsed = player.getUsedCpu();
+        const cpuMax = player.maxCpu;
+        const pgUsed = player.getUsedPowergrid();
+        const pgMax = player.maxPowergrid;
+        const cpuOver = cpuUsed > cpuMax;
+        const pgOver = pgUsed > pgMax;
+
+        // Resists
+        const resists = player.getEffectiveResists();
+        const rCell = (v) => {
+            const c = v >= 0.7 ? '#44ff44' : v >= 0.4 ? '#aaff44' : v >= 0.2 ? '#ffcc44' : '#ff4444';
+            return `<span style="color:${c}">${Math.round(v*100)}%</span>`;
+        };
+
         // Build live stats
         const statsHtml = `
+            <div class="fitting-stat-group">
+                <h4>FITTING</h4>
+                <div class="detail-row"><span>CPU</span><span class="${cpuOver ? 'overfit' : ''}">${cpuUsed}/${cpuMax} tf</span></div>
+                <div class="detail-row"><span>Powergrid</span><span class="${pgOver ? 'overfit' : ''}">${pgUsed}/${pgMax} MW</span></div>
+            </div>
             <div class="fitting-stat-group">
                 <h4>MOBILITY</h4>
                 <div class="detail-row"><span>Speed</span><span>${player.maxSpeed} m/s</span></div>
@@ -953,6 +978,16 @@ export class StationVendorManager {
                 <div class="detail-row"><span>Shield</span><span>${Math.floor(player.shield)} / ${player.maxShield}</span></div>
                 <div class="detail-row"><span>Armor</span><span>${Math.floor(player.armor)} / ${player.maxArmor}</span></div>
                 <div class="detail-row"><span>Hull</span><span>${Math.floor(player.hull)} / ${player.maxHull}</span></div>
+                <div class="detail-row"><span>EHP</span><span>${Math.floor(player.getEffectiveHp()).toLocaleString()}</span></div>
+            </div>
+            <div class="fitting-stat-group">
+                <h4>RESISTANCES</h4>
+                <div class="resist-mini-grid">
+                    <div class="resist-row"><span></span><span style="color:#44aaff">EM</span><span style="color:#ff8844">TH</span><span style="color:#aaa">KI</span><span style="color:#ffcc44">EX</span></div>
+                    <div class="resist-row"><span>SH</span>${rCell(resists.shield.em)}${rCell(resists.shield.thermal)}${rCell(resists.shield.kinetic)}${rCell(resists.shield.explosive)}</div>
+                    <div class="resist-row"><span>AR</span>${rCell(resists.armor.em)}${rCell(resists.armor.thermal)}${rCell(resists.armor.kinetic)}${rCell(resists.armor.explosive)}</div>
+                    <div class="resist-row"><span>HL</span>${rCell(resists.hull.em)}${rCell(resists.hull.thermal)}${rCell(resists.hull.kinetic)}${rCell(resists.hull.explosive)}</div>
+                </div>
             </div>
             <div class="fitting-stat-group">
                 <h4>CAPACITOR</h4>

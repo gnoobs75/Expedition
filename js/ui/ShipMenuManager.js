@@ -631,6 +631,8 @@ export class ShipMenuManager {
                     ${moduleConfig?.shieldBoost ? `<span class="fitting-slot-stat">+${moduleConfig.shieldBoost} SH</span>` : ''}
                     ${moduleConfig?.armorRepair ? `<span class="fitting-slot-stat">+${moduleConfig.armorRepair} AR</span>` : ''}
                     ${moduleConfig?.speedBonus ? `<span class="fitting-slot-stat">+${Math.round(moduleConfig.speedBonus * 100)}% SPD</span>` : ''}
+                    ${moduleConfig?.resistBonus ? `<span class="fitting-slot-stat" style="color:#44ff88">+${Math.round(moduleConfig.resistBonus.amount * 100)}% ${moduleConfig.resistBonus.type.toUpperCase()}</span>` : ''}
+                    ${moduleConfig?.cpu ? `<span class="fitting-slot-stat dim">${moduleConfig.cpu}cpu ${moduleConfig.powergrid || 0}pg</span>` : ''}
                     ${weaponGroup ? `<span class="fitting-weapon-group">G${weaponGroup}</span>` : ''}
                     ${mod.moduleId ? `<button class="fitting-unfit-btn" data-slot-id="${mod.slotId}" title="Remove module">&#10005;</button>` : ''}
                 </div>
@@ -659,6 +661,9 @@ export class ShipMenuManager {
                                 ${config.speedBonus ? `<span>Speed: +${Math.round(config.speedBonus * 100)}%</span>` : ''}
                                 ${config.capacitorUse ? `<span>Cap: ${config.capacitorUse}/s</span>` : ''}
                                 ${config.cycleTime ? `<span>Cycle: ${config.cycleTime}s</span>` : ''}
+                                ${config.cpu ? `<span>CPU: ${config.cpu}</span>` : ''}
+                                ${config.powergrid ? `<span>PG: ${config.powergrid}</span>` : ''}
+                                ${config.resistBonus ? `<span>+${Math.round(config.resistBonus.amount * 100)}% ${config.resistBonus.type} ${config.resistBonus.layer}</span>` : ''}
                             </div>
                             <button class="fitting-equip-btn" data-module-id="${item.id}" data-inv-index="${item.originalIndex}">EQUIP</button>
                         </div>
@@ -669,9 +674,41 @@ export class ShipMenuManager {
             inventoryHtml = `<div class="fitting-inv-empty">Select a slot to see compatible modules</div>`;
         }
 
+        // CPU/PG usage
+        const cpuUsed = player.getUsedCpu();
+        const cpuMax = player.maxCpu;
+        const pgUsed = player.getUsedPowergrid();
+        const pgMax = player.maxPowergrid;
+        const cpuPct = Math.min(100, (cpuUsed / cpuMax) * 100);
+        const pgPct = Math.min(100, (pgUsed / pgMax) * 100);
+        const cpuOver = cpuUsed > cpuMax;
+        const pgOver = pgUsed > pgMax;
+
+        // Effective resists
+        const resists = player.getEffectiveResists();
+        const resistColor = (val) => {
+            if (val >= 0.7) return '#44ff44';
+            if (val >= 0.4) return '#aaff44';
+            if (val >= 0.2) return '#ffcc44';
+            return '#ff4444';
+        };
+        const resistCell = (val) => `<td style="color:${resistColor(val)}">${Math.round(val * 100)}%</td>`;
+
         container.innerHTML = `
             <div class="fittings-layout">
                 <div class="fittings-slots-panel">
+                    <div class="fitting-resources">
+                        <div class="fitting-resource-bar">
+                            <span class="res-label">CPU</span>
+                            <div class="res-bar-track"><div class="res-bar-fill ${cpuOver ? 'overfit' : ''}" style="width:${cpuPct}%"></div></div>
+                            <span class="res-value ${cpuOver ? 'overfit' : ''}">${cpuUsed}/${cpuMax} tf</span>
+                        </div>
+                        <div class="fitting-resource-bar">
+                            <span class="res-label">PG</span>
+                            <div class="res-bar-track"><div class="res-bar-fill ${pgOver ? 'overfit' : ''}" style="width:${pgPct}%"></div></div>
+                            <span class="res-value ${pgOver ? 'overfit' : ''}">${pgUsed}/${pgMax} MW</span>
+                        </div>
+                    </div>
                     <div class="fitting-section">
                         <h4>HIGH SLOTS (Weapons)</h4>
                         ${highSlots.map(renderSlotRow).join('')}
@@ -683,6 +720,16 @@ export class ShipMenuManager {
                     <div class="fitting-section">
                         <h4>LOW SLOTS (Passive)</h4>
                         ${lowSlots.map(renderSlotRow).join('')}
+                    </div>
+                    <div class="fitting-resist-grid">
+                        <h4>RESISTANCES</h4>
+                        <table class="resist-table">
+                            <tr><th></th><th style="color:#44aaff">EM</th><th style="color:#ff8844">TH</th><th style="color:#aaaaaa">KI</th><th style="color:#ffcc44">EX</th></tr>
+                            <tr><td>Shield</td>${resistCell(resists.shield.em)}${resistCell(resists.shield.thermal)}${resistCell(resists.shield.kinetic)}${resistCell(resists.shield.explosive)}</tr>
+                            <tr><td>Armor</td>${resistCell(resists.armor.em)}${resistCell(resists.armor.thermal)}${resistCell(resists.armor.kinetic)}${resistCell(resists.armor.explosive)}</tr>
+                            <tr><td>Hull</td>${resistCell(resists.hull.em)}${resistCell(resists.hull.thermal)}${resistCell(resists.hull.kinetic)}${resistCell(resists.hull.explosive)}</tr>
+                        </table>
+                        <div class="ehp-display">EHP: ${Math.floor(player.getEffectiveHp()).toLocaleString()}</div>
                     </div>
                     <div class="fitting-docked-notice">
                         ${this.game.dockedAt ? '' : 'Dock at a station to change fittings'}

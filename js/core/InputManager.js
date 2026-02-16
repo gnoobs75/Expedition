@@ -586,6 +586,10 @@ export class InputManager {
                 this.game.ui?.toggleCombatLog();
                 break;
 
+            case 'toggleLocalChat':
+                this.game.ui?.localChatManager?.toggle();
+                break;
+
             case 'toggleSkippy':
                 this.game.ui?.toggleSkippy();
                 break;

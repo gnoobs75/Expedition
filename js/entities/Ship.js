@@ -6,6 +6,7 @@
 import { Entity } from './Entity.js';
 import { CONFIG } from '../config.js';
 import { EQUIPMENT_DATABASE } from '../data/equipmentDatabase.js';
+import { SHIP_DATABASE } from '../data/shipDatabase.js';
 import { Vector2, lerp, angleDifference, normalizeAngle } from '../utils/math.js';
 
 /**
@@ -20,6 +21,9 @@ export class Ship extends Entity {
         super(game, options);
 
         this.type = 'ship';
+
+        // Faction identity
+        this.faction = options.faction || null;
 
         // Ship stats
         this.maxSpeed = options.maxSpeed || 200;
@@ -42,6 +46,11 @@ export class Ship extends Entity {
             armor:   { em: 0.5,  thermal: 0.35, kinetic: 0.25, explosive: 0.1 },
             hull:    { em: 0.0,  thermal: 0.0, kinetic: 0.0, explosive: 0.0  },
         };
+
+        // CPU and Powergrid (fitting resources)
+        const shipDbEntry = options.shipClass ? SHIP_DATABASE[options.shipClass] : null;
+        this.maxCpu = options.cpu || shipDbEntry?.cpu || 125;
+        this.maxPowergrid = options.powergrid || shipDbEntry?.powergrid || 37;
 
         // Capacitor (energy)
         this.maxCapacitor = options.capacitor || 100;
@@ -463,6 +472,30 @@ export class Ship extends Entity {
             }
         }
 
+        // CPU/Powergrid check - calculate usage WITH this module fitted
+        if (moduleConfig.cpu || moduleConfig.powergrid) {
+            const prevModule = this.modules[slotType][slotIndex];
+            this.modules[slotType][slotIndex] = moduleId; // temporarily fit
+            const cpuUsed = this.getUsedCpu();
+            const pgUsed = this.getUsedPowergrid();
+            if (cpuUsed > this.maxCpu) {
+                this.modules[slotType][slotIndex] = prevModule; // restore
+                if (this.isPlayer) {
+                    this.game.ui?.toast(`Not enough CPU (${cpuUsed}/${this.maxCpu})`, 'warning');
+                }
+                return false;
+            }
+            if (pgUsed > this.maxPowergrid) {
+                this.modules[slotType][slotIndex] = prevModule; // restore
+                if (this.isPlayer) {
+                    this.game.ui?.toast(`Not enough Powergrid (${pgUsed}/${this.maxPowergrid})`, 'warning');
+                }
+                return false;
+            }
+            // Already fitted above, just return true
+            return true;
+        }
+
         this.modules[slotType][slotIndex] = moduleId;
         return true;
     }
@@ -484,6 +517,176 @@ export class Ship extends Entity {
         const allowed = compat[shipSize];
         if (!allowed) return true; // Unknown ship size, allow all
         return allowed.includes(equipSize);
+    }
+
+    // =============================================
+    // CPU / Powergrid / Resists / DPS / EHP
+    // =============================================
+
+    /**
+     * Get total CPU used by all fitted modules
+     */
+    getUsedCpu() {
+        let total = 0;
+        for (const slotType of ['high', 'mid', 'low']) {
+            for (const moduleId of this.modules[slotType]) {
+                if (!moduleId) continue;
+                const config = getModuleConfig(moduleId);
+                if (config?.cpu) total += config.cpu;
+            }
+        }
+        return total;
+    }
+
+    /**
+     * Get total Powergrid used by all fitted modules
+     */
+    getUsedPowergrid() {
+        let total = 0;
+        for (const slotType of ['high', 'mid', 'low']) {
+            for (const moduleId of this.modules[slotType]) {
+                if (!moduleId) continue;
+                const config = getModuleConfig(moduleId);
+                if (config?.powergrid) total += config.powergrid;
+            }
+        }
+        return total;
+    }
+
+    /**
+     * Get effective resists after applying fitted hardener modules with stacking penalty.
+     * Stacking penalty: effectiveness = e^(-((n-1)/2.67)^2) where n = 1-indexed count
+     * Maximum resist cap: 0.85 (85%)
+     * @returns {{ shield: {em,thermal,kinetic,explosive}, armor: {...}, hull: {...} }}
+     */
+    getEffectiveResists() {
+        // Start with base resists from ship (deep copy)
+        const base = this.resistances;
+        const result = {
+            shield: { ...base.shield },
+            armor:  { ...base.armor },
+            hull:   { ...base.hull },
+        };
+
+        // Collect all resist bonuses from fitted modules, grouped by layer+type
+        const bonuses = {}; // key: "shield_em" -> [0.30, 0.25, ...]
+
+        for (const slotType of ['high', 'mid', 'low']) {
+            for (const moduleId of this.modules[slotType]) {
+                if (!moduleId) continue;
+                const config = getModuleConfig(moduleId);
+                if (!config?.resistBonus) continue;
+
+                const rb = config.resistBonus;
+                const layers = rb.layer === 'all' ? ['shield', 'armor', 'hull'] : [rb.layer];
+                const types = rb.type === 'all' ? ['em', 'thermal', 'kinetic', 'explosive'] : [rb.type];
+
+                for (const layer of layers) {
+                    for (const type of types) {
+                        const key = `${layer}_${type}`;
+                        if (!bonuses[key]) bonuses[key] = [];
+                        bonuses[key].push(rb.amount);
+                    }
+                }
+            }
+        }
+
+        // Also gather flat resist bonuses from damage control modules
+        for (const slotType of ['low']) {
+            for (const moduleId of this.modules[slotType]) {
+                if (!moduleId) continue;
+                const config = getModuleConfig(moduleId);
+                if (!config) continue;
+                // Legacy damage control: shieldResist/armorResist/hullResist
+                if (config.shieldResist) {
+                    for (const t of ['em', 'thermal', 'kinetic', 'explosive']) {
+                        const key = `shield_${t}`;
+                        if (!bonuses[key]) bonuses[key] = [];
+                        bonuses[key].push(config.shieldResist);
+                    }
+                }
+                if (config.armorResist) {
+                    for (const t of ['em', 'thermal', 'kinetic', 'explosive']) {
+                        const key = `armor_${t}`;
+                        if (!bonuses[key]) bonuses[key] = [];
+                        bonuses[key].push(config.armorResist);
+                    }
+                }
+                if (config.hullResist) {
+                    for (const t of ['em', 'thermal', 'kinetic', 'explosive']) {
+                        const key = `hull_${t}`;
+                        if (!bonuses[key]) bonuses[key] = [];
+                        bonuses[key].push(config.hullResist);
+                    }
+                }
+            }
+        }
+
+        // Apply bonuses with stacking penalty
+        const RESIST_CAP = 0.85;
+        for (const [key, amounts] of Object.entries(bonuses)) {
+            const [layer, type] = key.split('_');
+            // Sort by effectiveness (highest first for stacking)
+            amounts.sort((a, b) => b - a);
+
+            let currentResist = result[layer][type];
+            for (let i = 0; i < amounts.length; i++) {
+                // Stacking penalty: e^(-((n-1)/2.67)^2)
+                const n = i + 1;
+                const penalty = Math.exp(-Math.pow((n - 1) / 2.67, 2));
+                const effectiveBonus = amounts[i] * penalty;
+                // Multiplicative stacking: new = 1 - (1 - old) * (1 - bonus)
+                currentResist = 1 - (1 - currentResist) * (1 - effectiveBonus);
+            }
+            result[layer][type] = Math.min(RESIST_CAP, currentResist);
+        }
+
+        return result;
+    }
+
+    /**
+     * Calculate this ship's approximate DPS (damage per second)
+     * Used for AI threat assessment
+     */
+    getDps() {
+        let totalDps = 0;
+        for (const moduleId of this.modules.high) {
+            if (!moduleId) continue;
+            const config = getModuleConfig(moduleId);
+            if (config?.damage && config?.cycleTime) {
+                totalDps += config.damage / config.cycleTime;
+            }
+        }
+        // Apply damage bonuses from subsystems
+        let damageMult = 1;
+        for (const moduleId of this.modules.low) {
+            if (!moduleId) continue;
+            const config = getModuleConfig(moduleId);
+            if (config?.damageBonus) damageMult *= config.damageBonus;
+            if (config?.laserDamageBonus) damageMult *= config.laserDamageBonus;
+            if (config?.missileDamageBonus) damageMult *= config.missileDamageBonus;
+        }
+        return totalDps * damageMult;
+    }
+
+    /**
+     * Calculate effective HP (EHP) accounting for resistances
+     * Uses the lowest resist profile (worst case) for each layer
+     * Used for AI threat assessment
+     */
+    getEffectiveHp() {
+        const resists = this.getEffectiveResists();
+        let ehp = 0;
+
+        for (const layer of ['shield', 'armor', 'hull']) {
+            const maxHp = layer === 'shield' ? this.maxShield :
+                          layer === 'armor' ? this.maxArmor : this.maxHull;
+            // Use average resist across all types for this layer
+            const avgResist = (resists[layer].em + resists[layer].thermal +
+                             resists[layer].kinetic + resists[layer].explosive) / 4;
+            ehp += maxHp / Math.max(0.15, 1 - avgResist);
+        }
+        return ehp;
     }
 
     /**
@@ -796,7 +999,10 @@ export class Ship extends Entity {
     }
 
     /**
-     * Take damage
+     * Take damage with full resist profile support.
+     * @param {number} amount - Raw damage amount
+     * @param {object} source - Source entity
+     * @param {string|object} damageType - Single type string OR damageProfile object {em,thermal,kinetic,explosive}
      */
     takeDamage(amount, source, damageType = 'em') {
         if (!this.alive) return;
@@ -804,49 +1010,94 @@ export class Ship extends Entity {
         this._lastDamageTime = performance.now();
         this.lastDamageSource = source;
 
-        // Doctrine defensive modifiers (shield/armor HP scaling = damage resistance)
-        let shieldResist = 1;
-        let armorResist = 1;
-        if (this.type === 'fleet' || this.isPlayer) {
-            const dDef = this.game.fleetSystem?.getDoctrineModifiers() || {};
-            if (dDef.shield) shieldResist = 1 / dDef.shield; // +25% shield = take 80% shield dmg
-            if (dDef.armor) armorResist = 1 / dDef.armor;    // -15% armor = take 118% armor dmg
+        // Build damage profile: split raw damage into per-type amounts
+        let damageProfile;
+        if (typeof damageType === 'object' && damageType !== null) {
+            // Already a profile object {em: 0.5, thermal: 0.5, ...}
+            damageProfile = damageType;
+        } else {
+            // Single type string - 100% of that type
+            damageProfile = { em: 0, thermal: 0, kinetic: 0, explosive: 0 };
+            damageProfile[damageType] = 1.0;
         }
 
-        let remaining = amount;
+        // Normalize profile and calculate per-type damage
+        const profileSum = (damageProfile.em || 0) + (damageProfile.thermal || 0) +
+                          (damageProfile.kinetic || 0) + (damageProfile.explosive || 0);
+        const dmgByType = {};
+        for (const t of ['em', 'thermal', 'kinetic', 'explosive']) {
+            dmgByType[t] = profileSum > 0 ? amount * ((damageProfile[t] || 0) / profileSum) : 0;
+        }
 
+        // Get effective resists (with hardener stacking)
+        const resists = this.getEffectiveResists();
+
+        // Doctrine defensive modifiers
+        let shieldMod = 1;
+        let armorMod = 1;
+        if (this.type === 'fleet' || this.isPlayer) {
+            const dDef = this.game.fleetSystem?.getDoctrineModifiers() || {};
+            if (dDef.shield) shieldMod = 1 / dDef.shield;
+            if (dDef.armor) armorMod = 1 / dDef.armor;
+        }
+
+        let totalRemaining = amount;
+
+        // Apply damage per-type across layers: shield -> armor -> hull
         // Damage shield first
-        if (this.shield > 0) {
-            const typeResist = this.resistances?.shield?.[damageType] || 0;
-            const effectiveDmg = remaining * shieldResist * (1 - typeResist);
-            const shieldDamage = Math.min(this.shield, effectiveDmg);
-            this.shield -= shieldDamage;
-            remaining -= shieldDamage / (shieldResist * (1 - typeResist));
-            this.addEffect('shield-hit', 0.2);
+        if (this.shield > 0 && totalRemaining > 0) {
+            let shieldDmgTotal = 0;
+            for (const t of ['em', 'thermal', 'kinetic', 'explosive']) {
+                if (dmgByType[t] <= 0) continue;
+                const typeResist = resists.shield[t] || 0;
+                shieldDmgTotal += dmgByType[t] * shieldMod * (1 - typeResist);
+            }
+            const shieldAbsorbed = Math.min(this.shield, shieldDmgTotal);
+            this.shield -= shieldAbsorbed;
+            // Proportion of damage that shield absorbed
+            const absorbRatio = shieldDmgTotal > 0 ? shieldAbsorbed / shieldDmgTotal : 1;
+            totalRemaining *= (1 - absorbRatio);
+            if (shieldAbsorbed > 0) this.addEffect('shield-hit', 0.2);
         }
 
         // Then armor
-        if (remaining > 0 && this.armor > 0) {
-            const typeResist = this.resistances?.armor?.[damageType] || 0;
-            const effectiveDmg = remaining * armorResist * (1 - typeResist);
-            const armorDamage = Math.min(this.armor, effectiveDmg);
-            this.armor -= armorDamage;
-            remaining -= armorDamage / (armorResist * (1 - typeResist));
-            this.addEffect('armor-hit', 0.2);
+        if (this.armor > 0 && totalRemaining > 0) {
+            let armorDmgTotal = 0;
+            for (const t of ['em', 'thermal', 'kinetic', 'explosive']) {
+                if (dmgByType[t] <= 0) continue;
+                const ratio = dmgByType[t] / amount;
+                const typeResist = resists.armor[t] || 0;
+                armorDmgTotal += totalRemaining * ratio * armorMod * (1 - typeResist);
+            }
+            const armorAbsorbed = Math.min(this.armor, armorDmgTotal);
+            this.armor -= armorAbsorbed;
+            const absorbRatio = armorDmgTotal > 0 ? armorAbsorbed / armorDmgTotal : 1;
+            totalRemaining *= (1 - absorbRatio);
+            if (armorAbsorbed > 0) this.addEffect('armor-hit', 0.2);
         }
 
         // Finally hull
-        if (remaining > 0) {
-            const typeResist = this.resistances?.hull?.[damageType] || 0;
-            this.hull -= remaining * (1 - typeResist);
-            this.addEffect('hull-hit', 0.3);
+        if (totalRemaining > 0) {
+            let hullDmgTotal = 0;
+            for (const t of ['em', 'thermal', 'kinetic', 'explosive']) {
+                if (dmgByType[t] <= 0) continue;
+                const ratio = dmgByType[t] / amount;
+                const typeResist = resists.hull[t] || 0;
+                hullDmgTotal += totalRemaining * ratio * (1 - typeResist);
+            }
+            this.hull -= hullDmgTotal;
+            if (hullDmgTotal > 0) this.addEffect('hull-hit', 0.3);
 
             if (this.hull <= 0) {
                 this.destroy();
             }
         }
 
-        this.game.events.emit('combat:hit', { target: this, damage: amount, damageType, source });
+        // Determine primary damage type for event (dominant type in profile)
+        const primaryType = typeof damageType === 'string' ? damageType :
+            Object.entries(damageProfile).sort((a, b) => b[1] - a[1])[0]?.[0] || 'em';
+
+        this.game.events.emit('combat:hit', { target: this, damage: amount, damageType: primaryType, source });
     }
 
     /**

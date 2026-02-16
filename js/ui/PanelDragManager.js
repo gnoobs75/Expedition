@@ -53,7 +53,7 @@ export class PanelDragManager {
 
         // Storage key - bump version to force reset when layout changes
         this.storageKey = 'expedition-panel-layout';
-        this.layoutVersion = 8;
+        this.layoutVersion = 9;
         this.versionKey = 'expedition-panel-layout-version';
         this.tabGroupStorageKey = 'expedition-tab-groups';
 
@@ -132,7 +132,10 @@ export class PanelDragManager {
         if (this.panelToGroup.has(panelId)) return;
 
         // Skip hidden panels - they have no valid rect
-        if (panel.classList.contains('hidden') || panel.offsetParent === null) return;
+        // Note: position:fixed elements have offsetParent===null, so check display instead
+        if (panel.classList.contains('hidden')) return;
+        const cs = getComputedStyle(panel);
+        if (cs.display === 'none') return;
 
         const rect = panel.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return;
@@ -518,6 +521,8 @@ export class PanelDragManager {
         // Switch active tab if needed
         if (groupData.active === panelId && groupData.panels.length > 0) {
             groupData.active = groupData.panels[0];
+            // Actually show the remaining panel so it's not stuck with display:none
+            this.switchTab(groupId, groupData.active);
         }
 
         // Dissolve group if only 1 panel left
@@ -538,25 +543,42 @@ export class PanelDragManager {
 
         const groupRect = groupData.element.getBoundingClientRect();
         const zoom = this.getZoom();
+        const groupLeft = Math.round(groupRect.left / zoom);
+        const groupTop = Math.round(groupRect.top / zoom);
 
-        for (const panelId of [...groupData.panels]) {
+        for (let i = 0; i < groupData.panels.length; i++) {
+            const panelId = groupData.panels[i];
             const panel = document.getElementById(panelId);
             if (!panel) continue;
 
+            // Move panel back to body
             document.body.appendChild(panel);
+
+            // Fully reset all styles that tab-group membership may have set
             panel.style.position = 'fixed';
-            panel.style.left = `${Math.round(groupRect.left / zoom)}px`;
-            panel.style.top = `${Math.round(groupRect.top / zoom)}px`;
+            panel.style.left = `${groupLeft + i * 20}px`;
+            panel.style.top = `${groupTop + i * 20}px`;
             panel.style.right = 'auto';
             panel.style.bottom = 'auto';
             panel.style.width = '';
+            panel.style.zIndex = '';
 
+            // Restore header visibility
             const header = panel.querySelector('.panel-header');
-            if (header) header.style.display = '';
+            if (header) {
+                header.style.display = '';
+                header.style.removeProperty('display');
+            }
 
+            // Force panel to be visible
             panel.classList.remove('hidden');
             panel.style.display = '';
+            panel.style.removeProperty('display');
+
             this.panelToGroup.delete(panelId);
+
+            // Ensure panel is constrained to viewport after a tick
+            requestAnimationFrame(() => this.constrainPanel(panelId));
         }
 
         groupData.element.remove();
@@ -719,12 +741,14 @@ export class PanelDragManager {
         let newX = e.clientX / zoom - this.groupDragging.offsetX;
         let newY = e.clientY / zoom - this.groupDragging.offsetY;
 
-        const rect = groupData.element.getBoundingClientRect();
-        const maxX = window.innerWidth / zoom - rect.width / zoom;
-        const maxY = window.innerHeight / zoom - rect.height / zoom;
+        // Use CSS width (not rendered rect) to avoid border/zoom mismatch
+        const cssWidth = parseFloat(groupData.element.style.width) || groupData.element.offsetWidth / zoom;
+        const cssHeight = groupData.element.offsetHeight / zoom;
+        const vpW = window.innerWidth / zoom;
+        const vpH = window.innerHeight / zoom;
 
-        newX = Math.max(0, Math.min(newX, maxX));
-        newY = Math.max(0, Math.min(newY, maxY));
+        newX = Math.max(0, Math.min(newX, vpW - cssWidth));
+        newY = Math.max(0, Math.min(newY, vpH - cssHeight));
 
         groupData.element.style.left = `${newX}px`;
         groupData.element.style.top = `${newY}px`;
@@ -879,7 +903,9 @@ export class PanelDragManager {
             if (this.panelToGroup.has(panelId)) continue;
 
             const panel = panelData.element;
-            if (panel.classList.contains('hidden') || panel.offsetParent === null) continue;
+            if (panel.classList.contains('hidden')) continue;
+            const panelCS = getComputedStyle(panel);
+            if (panelCS.display === 'none') continue;
 
             const rect = panel.getBoundingClientRect();
             if (rect.width === 0 && rect.height === 0) continue;

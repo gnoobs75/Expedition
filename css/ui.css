@@ -3730,6 +3730,7 @@ select:focus-visible {
 .tab-group {
     position: fixed;
     z-index: 50;
+    box-sizing: border-box;
     background: var(--panel-bg);
     border: 1px solid var(--panel-border);
     border-radius: 4px;

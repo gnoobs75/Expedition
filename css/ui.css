@@ -12251,9 +12251,9 @@ select:focus-visible {
 
 .splash-skippy-container {
     width: 380px;
-    height: 190px;
+    height: 220px;
     position: relative;
-    margin-bottom: 24px;
+    margin-bottom: 54px;
     overflow: visible;
 }
 
@@ -12349,7 +12349,7 @@ select:focus-visible {
 
 .splash-skippy-speech {
     position: absolute;
-    bottom: -32px;
+    bottom: -44px;
     left: 50%;
     transform: translateX(-50%);
     font-size: 16px;

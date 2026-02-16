@@ -95,62 +95,66 @@ export class UniverseMapRenderer3D {
     init() {
         if (this.initialized) return;
 
-        // Initialize Three.js objects (must be after THREE is loaded)
-        this.raycaster = new THREE.Raycaster();
-        this.mouse = new THREE.Vector2();
+        try {
+            // Initialize Three.js objects (must be after THREE is loaded)
+            this.raycaster = new THREE.Raycaster();
+            this.mouse = new THREE.Vector2();
 
-        const rect = this.container.getBoundingClientRect();
-        const width = rect.width || 800;
-        const height = rect.height || 500;
+            const rect = this.container.getBoundingClientRect();
+            const width = rect.width || 800;
+            const height = rect.height || 500;
 
-        // Scene
-        this.scene = new THREE.Scene();
+            // Scene
+            this.scene = new THREE.Scene();
 
-        // Camera
-        this.camera = new THREE.PerspectiveCamera(45, width / height, 1, 5000);
-        this.updateCameraPosition();
+            // Camera
+            this.camera = new THREE.PerspectiveCamera(45, width / height, 1, 5000);
+            this.updateCameraPosition();
 
-        // Renderer
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        this.renderer.setSize(width, height);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        this.renderer.setClearColor(0x000810, 1);
-        this.renderer.domElement.style.width = '100%';
-        this.renderer.domElement.style.height = '100%';
-        this.renderer.domElement.style.display = 'block';
+            // Renderer
+            this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            this.renderer.setSize(width, height);
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            this.renderer.setClearColor(0x000810, 1);
+            this.renderer.domElement.style.width = '100%';
+            this.renderer.domElement.style.height = '100%';
+            this.renderer.domElement.style.display = 'block';
 
-        // Insert canvas into container (hide 2D canvas)
-        const existingCanvas = this.container.querySelector('canvas');
-        if (existingCanvas) existingCanvas.style.display = 'none';
-        this.container.appendChild(this.renderer.domElement);
+            // Insert canvas into container (hide 2D canvas)
+            const existingCanvas = this.container.querySelector('canvas');
+            if (existingCanvas) existingCanvas.style.display = 'none';
+            this.container.appendChild(this.renderer.domElement);
 
-        // Lighting - holographic blue ambient
-        const ambient = new THREE.AmbientLight(0x4488ff, 0.4);
-        this.scene.add(ambient);
+            // Lighting - holographic blue ambient
+            const ambient = new THREE.AmbientLight(0x4488ff, 0.4);
+            this.scene.add(ambient);
 
-        const keyLight = new THREE.PointLight(0xffffff, 1.2, 2000);
-        keyLight.position.set(400, 300, 500);
-        this.scene.add(keyLight);
+            const keyLight = new THREE.PointLight(0xffffff, 1.2, 2000);
+            keyLight.position.set(400, 300, 500);
+            this.scene.add(keyLight);
 
-        const fillLight = new THREE.PointLight(0x00ccff, 0.6, 2000);
-        fillLight.position.set(-300, -200, 400);
-        this.scene.add(fillLight);
+            const fillLight = new THREE.PointLight(0x00ccff, 0.6, 2000);
+            fillLight.position.set(-300, -200, 400);
+            this.scene.add(fillLight);
 
-        // Build scene
-        this.createStarfield();
-        this.createGlobe();
-        this.createSectorNodes();
-        this.createGateConnections();
-        this.createTooltip();
+            // Build scene
+            this.createStarfield();
+            this.createGlobe();
+            this.createSectorNodes();
+            this.createGateConnections();
+            this.createTooltip();
 
-        // UI overlays
-        this.createSearchBar();
-        this.createRouteInfo();
+            // UI overlays
+            this.createSearchBar();
+            this.createRouteInfo();
 
-        // Event listeners
-        this.setupEventListeners();
+            // Event listeners
+            this.setupEventListeners();
 
-        this.initialized = true;
+            this.initialized = true;
+        } catch (err) {
+            console.error('[UniverseMap3D] init failed:', err);
+        }
     }
 
     // ==========================================
@@ -588,7 +592,7 @@ export class UniverseMapRenderer3D {
 
     updateRouteInfo() {
         if (!this.routeInfoEl) return;
-        const route = this.game.autopilot?.routeQueue;
+        const route = this.game.autopilot?.route;
         if (!route || route.length === 0) {
             this.routeInfoEl.classList.add('hidden');
             return;
@@ -982,8 +986,12 @@ export class UniverseMapRenderer3D {
         const animate = () => {
             this.animationId = requestAnimationFrame(animate);
             this.animTime += 0.016;
-            this.update();
-            this.renderer.render(this.scene, this.camera);
+            try {
+                this.update();
+                this.renderer.render(this.scene, this.camera);
+            } catch (err) {
+                console.error('[UniverseMap3D] Animation error:', err);
+            }
         };
         animate();
     }
@@ -1077,8 +1085,10 @@ export class UniverseMapRenderer3D {
     resize() {
         if (!this.renderer || !this.container) return;
         const rect = this.container.getBoundingClientRect();
-        const width = rect.width;
-        const height = rect.height;
+        const width = rect.width || 800;
+        const height = rect.height || 500;
+
+        if (width < 1 || height < 1) return; // Still hidden, skip
 
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();

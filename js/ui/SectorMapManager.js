@@ -140,9 +140,22 @@ export class SectorMapManager {
                 document.getElementById(tabId)?.classList.add('active');
                 this.activeTab = btn.dataset.tab;
                 // Start/stop 3D renderer based on active tab
-                if (this.activeTab === 'universe' && this.universeRenderer3D) {
-                    this.universeRenderer3D.resize();
-                    this.universeRenderer3D.startAnimation();
+                if (this.activeTab === 'universe') {
+                    // Lazy-init on first activation (container must be visible)
+                    if (!this.universeRenderer3D && this.universeCanvas) {
+                        const container = this.universeCanvas.parentElement;
+                        if (container) {
+                            this.universeRenderer3D = new UniverseMapRenderer3D(this.game, container);
+                            this.universeRenderer3D.init();
+                        }
+                    }
+                    if (this.universeRenderer3D) {
+                        // Defer resize to next frame so layout is fully computed
+                        requestAnimationFrame(() => {
+                            this.universeRenderer3D.resize();
+                            this.universeRenderer3D.startAnimation();
+                        });
+                    }
                 } else {
                     this.universeRenderer3D?.stopAnimation();
                 }
@@ -174,13 +187,8 @@ export class SectorMapManager {
             this.localCanvas.addEventListener('contextmenu', (e) => this.handleLocalRightClick(e));
         }
 
-        if (this.universeCanvas && !this.universeRenderer3D) {
-            const container = this.universeCanvas.parentElement;
-            if (container) {
-                this.universeRenderer3D = new UniverseMapRenderer3D(this.game, container);
-                this.universeRenderer3D.init();
-            }
-        }
+        // 3D universe renderer is lazy-initialized when universe tab is first activated
+        // (container must be visible to have non-zero dimensions for Three.js)
 
         if (!this.controlsInitialized) {
             this.controlsInitialized = true;
@@ -201,26 +209,19 @@ export class SectorMapManager {
         this.modal.classList.remove('hidden');
         this.visible = true;
 
-        if (!this.localCtx || !this.universeRenderer3D) {
+        if (!this.localCtx) {
             setTimeout(() => {
                 this.initCanvases();
                 this.centerOnPlayer();
                 this.render();
                 this.startAnimation();
-                // Start 3D animation if on universe tab
-                if (this.activeTab === 'universe' && this.universeRenderer3D) {
-                    this.universeRenderer3D.resize();
-                    this.universeRenderer3D.startAnimation();
-                }
+                this.ensureUniverseRenderer();
             }, 50);
         } else {
             this.centerOnPlayer();
             this.render();
             this.startAnimation();
-            if (this.activeTab === 'universe' && this.universeRenderer3D) {
-                this.universeRenderer3D.resize();
-                this.universeRenderer3D.startAnimation();
-            }
+            this.ensureUniverseRenderer();
         }
         this.game.audio?.play('click');
     }
@@ -232,6 +233,27 @@ export class SectorMapManager {
         this.stopAnimation();
         this.universeRenderer3D?.stopAnimation();
         this.hideTooltip();
+    }
+
+    /**
+     * Lazy-init and start 3D universe renderer if on the universe tab.
+     * Uses rAF to ensure the tab container is laid out before sizing the renderer.
+     */
+    ensureUniverseRenderer() {
+        if (this.activeTab !== 'universe') return;
+        if (!this.universeRenderer3D && this.universeCanvas) {
+            const container = this.universeCanvas.parentElement;
+            if (container) {
+                this.universeRenderer3D = new UniverseMapRenderer3D(this.game, container);
+                this.universeRenderer3D.init();
+            }
+        }
+        if (this.universeRenderer3D) {
+            requestAnimationFrame(() => {
+                this.universeRenderer3D.resize();
+                this.universeRenderer3D.startAnimation();
+            });
+        }
     }
 
     toggle() {

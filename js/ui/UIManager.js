@@ -510,18 +510,12 @@ export class UIManager {
             });
         });
 
-        // Station panel tabs
-        document.querySelectorAll('.tab-btn').forEach(btn => {
+        // Station panel tabs (scoped to #station-panel only - other modals handle their own tabs)
+        const stationPanel = document.getElementById('station-panel');
+        (stationPanel ? stationPanel.querySelectorAll('.tab-btn') : []).forEach(btn => {
             btn.addEventListener('click', () => {
-                // Find parent modal to scope tab switching
-                const parentModal = btn.closest('.modal-content');
-                if (parentModal) {
-                    parentModal.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                    parentModal.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                } else {
-                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                }
+                stationPanel.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                stationPanel.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 btn.classList.add('active');
                 const tabEl = document.getElementById(`tab-${btn.dataset.tab}`);
                 if (tabEl) tabEl.classList.add('active');

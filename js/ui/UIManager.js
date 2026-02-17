@@ -356,6 +356,23 @@ export class UIManager {
 
             // Damage direction
             damageDirectionContainer: document.getElementById('damage-direction-container'),
+
+            // Capacitor ring SVG
+            capRingFill: document.getElementById('cap-ring-fill'),
+
+            // Faction treasury
+            factionTreasuryValue: document.getElementById('faction-treasury-value'),
+
+            // Stardate
+            stardateValue: document.getElementById('stardate-value'),
+
+            // Coalition war bars
+            warBarRindhalu: document.getElementById('war-bar-rindhalu'),
+            warBarMaxolhx: document.getElementById('war-bar-maxolhx'),
+
+            // Velocity compass
+            velocityCompassCanvas: document.getElementById('velocity-compass-canvas'),
+            velocitySpeedLabel: document.getElementById('velocity-speed-label'),
         };
     }
 
@@ -1096,7 +1113,7 @@ export class UIManager {
         this.elements.capacitorContainer?.classList.toggle('critical', health.capacitor < 20);
 
         // Update capacitor ring SVG
-        const capRingFill = document.getElementById('cap-ring-fill');
+        const capRingFill = this.elements.capRingFill;
         if (capRingFill) {
             const circumference = 2 * Math.PI * 19; // r=19
             const offset = circumference * (1 - health.capacitor / 100);
@@ -1121,13 +1138,13 @@ export class UIManager {
         this.elements.creditsValue.textContent = formatCredits(this.game.credits);
 
         // Update faction treasury
-        const treasuryEl = document.getElementById('faction-treasury-value');
+        const treasuryEl = this.elements.factionTreasuryValue;
         if (treasuryEl) {
             treasuryEl.textContent = formatCredits(this.game.faction?.treasury || 0);
         }
 
         // Update stardate
-        const stardateEl = document.getElementById('stardate-value');
+        const stardateEl = this.elements.stardateValue;
         if (stardateEl) {
             stardateEl.textContent = this.game.getStardate();
         }
@@ -1135,8 +1152,8 @@ export class UIManager {
         // Update coalition war progress bar
         const warProgress = this.game.coalitionWarSystem?.getWarProgress();
         if (warProgress) {
-            const rBar = document.getElementById('war-bar-rindhalu');
-            const mBar = document.getElementById('war-bar-maxolhx');
+            const rBar = this.elements.warBarRindhalu;
+            const mBar = this.elements.warBarMaxolhx;
             if (rBar) rBar.style.width = `${warProgress.rindhalu}%`;
             if (mBar) mBar.style.width = `${warProgress.maxolhx}%`;
         }
@@ -1209,11 +1226,15 @@ export class UIManager {
      * Update velocity compass - shows heading arrow and speed
      */
     updateVelocityCompass(player) {
-        const canvas = document.getElementById('velocity-compass-canvas');
-        const label = document.getElementById('velocity-speed-label');
+        if (!this._compassCanvas) {
+            this._compassCanvas = this.elements.velocityCompassCanvas || document.getElementById('velocity-compass-canvas');
+            if (this._compassCanvas) this._compassCtx = this._compassCanvas.getContext('2d');
+        }
+        const canvas = this._compassCanvas;
+        const label = this._compassLabel || (this._compassLabel = this.elements.velocitySpeedLabel || document.getElementById('velocity-speed-label'));
         if (!canvas) return;
 
-        const ctx = canvas.getContext('2d');
+        const ctx = this._compassCtx;
         const W = 50, H = 50;
         if (canvas.width !== W) canvas.width = W;
         if (canvas.height !== H) canvas.height = H;
@@ -1312,8 +1333,9 @@ export class UIManager {
             const bar = this.elements[`${type}Bar`];
             if (bar) {
                 bar.classList.remove('warning-flash');
-                void bar.offsetWidth; // Force reflow
-                bar.classList.add('warning-flash');
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => bar.classList.add('warning-flash'));
+                });
             }
         }
 

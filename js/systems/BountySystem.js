@@ -6,10 +6,12 @@
 
 import { CONFIG, UNIVERSE_LAYOUT } from '../config.js';
 import { BOUNTY_TARGETS, BOUNTY_CONFIG } from '../data/bountyTargetDatabase.js';
+import { formatCredits } from '../utils/math.js';
 
 export class BountySystem {
     constructor(game) {
         this.game = game;
+        this.destroyed = false;
 
         // Bounty board: available contracts at stations
         this.board = []; // [{targetId, accepted}]
@@ -31,13 +33,17 @@ export class BountySystem {
         this.lastSeenInterval = 10; // Update last-seen every 10 seconds
 
         // Listen for kills to check bounty completion
-        game.events.on('entity:destroyed', (entity) => this.checkBountyKill(entity));
+        game.events.on('entity:destroyed', (entity) => { if (!this.destroyed) this.checkBountyKill(entity); });
 
         // Listen for sector changes to spawn bounty targets
-        game.events.on('sector:change', (sectorId) => this.onSectorEnter(sectorId));
+        game.events.on('sector:change', (sectorId) => { if (!this.destroyed) this.onSectorEnter(sectorId); });
 
         // Initial board population
         this.refreshBoard();
+    }
+
+    destroy() {
+        this.destroyed = true;
     }
 
     // ==========================================
@@ -159,7 +165,7 @@ export class BountySystem {
 
         // Notify player
         this.game.ui?.showToast(`Bounty accepted: ${target.name} - ${target.title}`, 'system');
-        this.game.ui?.log(`Bounty contract accepted: ${target.name} "${target.title}" - ${this.formatCredits(target.bounty)} ISK`, 'system');
+        this.game.ui?.log(`Bounty contract accepted: ${target.name} "${target.title}" - ${formatCredits(target.bounty)} ISK`, 'system');
         this.game.ui?.addShipLogEntry(`Accepted bounty: ${target.name}`, 'trade');
         this.game.audio?.play('sell', 0.3);
 
@@ -443,7 +449,7 @@ export class BountySystem {
 
         // Toast notification
         this.game.ui?.showToast(
-            `BOUNTY COMPLETE: ${target.name} - ${this.formatCredits(bountyReward)} ISK`,
+            `BOUNTY COMPLETE: ${target.name} - ${formatCredits(bountyReward)} ISK`,
             'success'
         );
 
@@ -459,11 +465,11 @@ export class BountySystem {
 
         // Log
         this.game.ui?.log(
-            `Bounty collected: ${target.name} "${target.title}" - ${this.formatCredits(bountyReward)} ISK`,
+            `Bounty collected: ${target.name} "${target.title}" - ${formatCredits(bountyReward)} ISK`,
             'combat'
         );
         this.game.ui?.addShipLogEntry(
-            `Bounty complete: ${target.name} +${this.formatCredits(bountyReward)} ISK`,
+            `Bounty complete: ${target.name} +${formatCredits(bountyReward)} ISK`,
             'combat'
         );
 
@@ -555,17 +561,6 @@ export class BountySystem {
      */
     isCompleted(targetId) {
         return this.completedBounties.has(targetId);
-    }
-
-    // ==========================================
-    // Utility
-    // ==========================================
-
-    /**
-     * Format credits for display (thousands separator)
-     */
-    formatCredits(amount) {
-        return amount.toLocaleString();
     }
 
     // ==========================================

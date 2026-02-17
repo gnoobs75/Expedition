@@ -317,16 +317,20 @@ export class StationUIController {
 
         // Repair cost (still handled here)
         const repairCost = station.getRepairCost(this.game.player);
-        document.getElementById('repair-options').innerHTML = `
-            <div class="shop-item">
-                <div class="item-info">
-                    <div class="item-name">Full Repair</div>
-                    <div class="item-desc">Restore all shield, armor, and hull</div>
+        const repairContainer = document.getElementById('repair-options');
+        if (repairContainer) {
+            repairContainer.innerHTML = `
+                <div class="shop-item">
+                    <div class="item-info">
+                        <div class="item-name">Full Repair</div>
+                        <div class="item-desc">Restore all shield, armor, and hull</div>
+                    </div>
+                    <div class="item-price">${formatCredits(repairCost)} ISK</div>
+                    <button class="buy-btn repair-btn">REPAIR</button>
                 </div>
-                <div class="item-price">${formatCredits(repairCost)} ISK</div>
-                <button class="buy-btn" onclick="game.ui.repairShip()">REPAIR</button>
-            </div>
-        `;
+            `;
+            repairContainer.querySelector('.repair-btn')?.addEventListener('click', () => this.repairShip());
+        }
     }
 
     updateRefineryTab() {

@@ -7,8 +7,6 @@ import { Ship } from './Ship.js';
 import { CONFIG } from '../config.js';
 import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
 import { LootContainer } from './LootContainer.js';
-import { Wreck } from './Wreck.js';
-
 export class EnemyShip extends Ship {
     constructor(game, options = {}) {
         const enemyType = options.enemyType || 'pirate-frigate';
@@ -111,18 +109,6 @@ export class EnemyShip extends Ship {
             });
             this.game.currentSector?.addEntity(container);
         }
-
-        // Drop salvageable wreck
-        const wreck = new Wreck(this.game, {
-            x: this.x + (Math.random() - 0.5) * 30,
-            y: this.y + (Math.random() - 0.5) * 30,
-            name: `Wreck of ${this.name}`,
-            credits: Math.floor(this.bounty * 0.3),
-            salvageMaterials: Math.floor(2 + Math.random() * 4),
-            sourceShipName: this.name,
-            sourceShipClass: this.shipClass || this.enemyType,
-        });
-        this.game.currentSector?.addEntity(wreck);
 
         super.destroy();
     }

@@ -64,6 +64,16 @@ export class AISystem {
     update(dt) {
         this.timeSinceUpdate += dt;
 
+        // Periodic cleanup of chat cooldowns for entities no longer in sector
+        this._cooldownCleanupTimer = (this._cooldownCleanupTimer || 0) + dt;
+        if (this._cooldownCleanupTimer > 30) {
+            this._cooldownCleanupTimer = 0;
+            const activeIds = new Set(this.game.currentSector?.entities?.map(e => e.id) || []);
+            for (const key of this._chatCooldowns.keys()) {
+                if (!activeIds.has(key)) this._chatCooldowns.delete(key);
+            }
+        }
+
         if (this.timeSinceUpdate < this.updateInterval) {
             this.updateMovement(dt);
             return;

@@ -34,6 +34,7 @@ for (const sector of Object.values(UNIVERSE_LAYOUT_MAP)) {
 export class CoalitionWarSystem {
     constructor(game) {
         this.game = game;
+        this.destroyed = false;
 
         // Control points per contested sector: { sectorId: { factionId: 0-100 } }
         this.controlPoints = {};
@@ -57,7 +58,11 @@ export class CoalitionWarSystem {
         this.initControlPoints();
 
         // Listen for events
-        this.game.events.on('entity:destroyed', (entity) => this.onEntityDestroyed(entity));
+        this.game.events.on('entity:destroyed', (entity) => { if (!this.destroyed) this.onEntityDestroyed(entity); });
+    }
+
+    destroy() {
+        this.destroyed = true;
     }
 
     initControlPoints() {

@@ -19,20 +19,25 @@ export class MissionSystem {
         this.activeMissions = []; // max 5
         this.completedMissionIds = new Set();
         this.missionCounter = 0;
-        
+        this.destroyed = false;
+
         // Subscribe to events for objective tracking
         this.setupEventListeners();
     }
-    
+
     setupEventListeners() {
         // entity:destroyed -> check kill missions
-        this.game.events.on('entity:destroyed', (entity) => this.checkKillObjective(entity));
-        // mining:complete -> check mine missions  
-        this.game.events.on('mining:complete', (data) => this.checkMineObjective(data));
+        this.game.events.on('entity:destroyed', (entity) => { if (!this.destroyed) this.checkKillObjective(entity); });
+        // mining:complete -> check mine missions
+        this.game.events.on('mining:complete', (data) => { if (!this.destroyed) this.checkMineObjective(data); });
         // sector:change -> check scout missions
-        this.game.events.on('sector:change', (data) => this.checkScoutObjective(data));
+        this.game.events.on('sector:change', (data) => { if (!this.destroyed) this.checkScoutObjective(data); });
         // cargo:updated -> check deliver missions
-        this.game.events.on('cargo:updated', () => this.checkDeliverObjective());
+        this.game.events.on('cargo:updated', () => { if (!this.destroyed) this.checkDeliverObjective(); });
+    }
+
+    destroy() {
+        this.destroyed = true;
     }
     
     // Generate 3-5 missions for a station visit
@@ -170,7 +175,7 @@ export class MissionSystem {
         const mission = this.activeMissions[idx];
         
         // Award credits
-        this.game.credits += mission.reward.credits;
+        this.game.addCredits(mission.reward.credits);
         
         // Award faction standing
         if (mission.faction) {
@@ -190,43 +195,48 @@ export class MissionSystem {
     // Check kill objectives against destroyed entity
     checkKillObjective(entity) {
         if (!entity || entity.isPlayer) return;
+        const toComplete = [];
         for (const mission of this.activeMissions) {
             const obj = mission.objective;
             if (obj.type === 'kill' && (entity.type === 'enemy' || entity.hostility === 'hostile')) {
                 if (entity.lastDamageSource === this.game.player || entity.lastDamageSource?.isFleet) {
                     obj.progress = Math.min(obj.count, (obj.progress || 0) + 1);
-                    if (obj.progress >= obj.count) this.completeMission(mission.id);
+                    if (obj.progress >= obj.count) toComplete.push(mission.id);
                 }
             }
             if (obj.type === 'kill-specific' && entity.name?.includes(obj.targetName)) {
                 obj.progress = 1;
-                this.completeMission(mission.id);
+                toComplete.push(mission.id);
             }
             if (obj.type === 'kill-in-sector' && obj.sectorId === this.game.currentSector?.id) {
                 if (entity.type === 'enemy' && (entity.lastDamageSource === this.game.player || entity.lastDamageSource?.isFleet)) {
                     obj.progress = Math.min(obj.count, (obj.progress || 0) + 1);
-                    if (obj.progress >= obj.count) this.completeMission(mission.id);
+                    if (obj.progress >= obj.count) toComplete.push(mission.id);
                 }
             }
         }
+        for (const id of toComplete) this.completeMission(id);
     }
     
     // Check mine objectives
     checkMineObjective(data) {
         if (!data) return;
+        const toComplete = [];
         for (const mission of this.activeMissions) {
             const obj = mission.objective;
             if (obj.type === 'mine') {
-                if (!obj.oreName || data.oreType === obj.oreName) {
-                    obj.progress = Math.min(obj.count, (obj.progress || 0) + (data.amount || 1));
-                    if (obj.progress >= obj.count) this.completeMission(mission.id);
+                if (!obj.oreName || data.type === obj.oreName) {
+                    obj.progress = Math.min(obj.count, (obj.progress || 0) + (data.units || 1));
+                    if (obj.progress >= obj.count) toComplete.push(mission.id);
                 }
             }
         }
+        for (const id of toComplete) this.completeMission(id);
     }
     
     // Check scout/visit objectives
     checkScoutObjective(data) {
+        const toComplete = [];
         for (const mission of this.activeMissions) {
             const obj = mission.objective;
             if (obj.type === 'visit-sector') {
@@ -234,23 +244,26 @@ export class MissionSystem {
                 if (sectorId && !obj.visitedSectors.includes(sectorId)) {
                     obj.visitedSectors.push(sectorId);
                     obj.progress = obj.visitedSectors.length;
-                    if (obj.progress >= obj.count) this.completeMission(mission.id);
+                    if (obj.progress >= obj.count) toComplete.push(mission.id);
                 }
             }
         }
+        for (const id of toComplete) this.completeMission(id);
     }
     
     // Check deliver objectives (when docking at station with cargo)
     checkDeliverObjective() {
         if (!this.game.dockedAt) return;
+        const toComplete = [];
         for (const mission of this.activeMissions) {
             const obj = mission.objective;
             if (obj.type === 'deliver') {
                 const have = this.game.player?.tradeGoods?.[obj.itemName] || this.game.player?.cargo?.[obj.itemName]?.amount || 0;
                 obj.progress = Math.min(obj.count, have);
-                if (obj.progress >= obj.count) this.completeMission(mission.id);
+                if (obj.progress >= obj.count) toComplete.push(mission.id);
             }
         }
+        for (const id of toComplete) this.completeMission(id);
     }
     
     // Update - check for expired missions

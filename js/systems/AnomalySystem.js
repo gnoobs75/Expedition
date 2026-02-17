@@ -87,6 +87,7 @@ const GAS_TYPES = {
 export class AnomalySystem {
     constructor(game) {
         this.game = game;
+        this.destroyed = false;
 
         // Periodic check timer for spawning new anomalies
         this.spawnTimer = 0;
@@ -111,8 +112,12 @@ export class AnomalySystem {
         this.activeGasHarvests = new Map();
 
         // ---- Event subscriptions ----
-        game.events.on('entity:destroyed', (entity) => this.onEntityDestroyed(entity));
-        game.events.on('sector:change', (sectorId) => this.onSectorChange(sectorId));
+        game.events.on('entity:destroyed', (entity) => { if (!this.destroyed) this.onEntityDestroyed(entity); });
+        game.events.on('sector:change', (sectorId) => { if (!this.destroyed) this.onSectorChange(sectorId); });
+    }
+
+    destroy() {
+        this.destroyed = true;
     }
 
     // =========================================================

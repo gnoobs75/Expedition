@@ -323,6 +323,13 @@ export class PlayerShip extends Ship {
         this.signatureRadius = shipConfig.signatureRadius || 30;
         this.cargoCapacity = shipConfig.cargoCapacity;
 
+        // Snapshot base stats for component upgrades (prevents multiplicative compounding)
+        this._baseStats = {
+            maxSpeed: this.maxSpeed,
+            maxHull: this.maxHull,
+            capacitorRegen: this.capacitorRegen,
+        };
+
         // Update slot counts
         this.highSlots = shipConfig.weaponSlots || shipConfig.highSlots || 3;
         this.midSlots = shipConfig.moduleSlots || shipConfig.midSlots || 2;
@@ -393,6 +400,20 @@ export class PlayerShip extends Ship {
             return;
         }
         if (!upgrades || !this.componentLevels) return;
+
+        // Store base stats if not yet captured (e.g. called from loadFromSave before switchShip)
+        if (!this._baseStats) {
+            this._baseStats = {
+                maxSpeed: this.maxSpeed,
+                maxHull: this.maxHull,
+                capacitorRegen: this.capacitorRegen,
+            };
+        }
+
+        // Always recompute from base stats to prevent multiplicative compounding
+        this.maxSpeed = this._baseStats.maxSpeed;
+        this.maxHull = this._baseStats.maxHull;
+        this.capacitorRegen = this._baseStats.capacitorRegen;
 
         for (const [comp, def] of Object.entries(upgrades)) {
             const level = this.componentLevels[comp] || 0;

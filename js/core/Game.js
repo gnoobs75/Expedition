@@ -52,6 +52,7 @@ import { EventBus } from './EventBus.js';
 import { decayMarketState, getMarketState, loadMarketState, getOrderBookState, loadOrderBookState } from '../data/tradeGoodsDatabase.js';
 import { formatCredits } from '../utils/math.js';
 import { FACTIONS, getDefaultStandings, calculateStandingChanges, getStandingInfo, getStandingPriceModifier } from '../data/factionDatabase.js';
+import { setFleetIdCounter } from '../entities/FleetShip.js';
 
 export class Game {
     constructor() {
@@ -556,6 +557,8 @@ export class Game {
      * Show death screen with respawn / main menu options
      */
     showDeathScreen() {
+        const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
         // Create death overlay
         let overlay = document.getElementById('death-screen');
         if (!overlay) {
@@ -564,12 +567,14 @@ export class Game {
             document.body.appendChild(overlay);
         }
 
+        const creditsLost = esc(formatCredits(Math.floor((this.credits / (1 - CONFIG.DEATH_CREDIT_PENALTY)) * CONFIG.DEATH_CREDIT_PENALTY)));
+
         overlay.innerHTML = `
             <div class="death-screen-content">
                 <div class="death-title">SHIP DESTROYED</div>
                 <div class="death-subtitle">Your capsule has been recovered</div>
                 <div class="death-stats">
-                    <div>Credits lost: ${formatCredits(Math.floor((this.credits / (1 - CONFIG.DEATH_CREDIT_PENALTY)) * CONFIG.DEATH_CREDIT_PENALTY))} ISK</div>
+                    <div>Credits lost: ${creditsLost} ISK</div>
                     ${this.insurance.active ? '' : '<div class="death-no-insurance">No insurance coverage</div>'}
                 </div>
                 <div class="death-buttons">
@@ -827,29 +832,52 @@ export class Game {
             return;
         }
 
-        // Start lock timer
+        // Start lock timer using game-time accumulator (not setTimeout)
         const lockTime = CONFIG.LOCK_TIME_BASE;
 
         this.ui?.log(`Locking ${entity.name}...`, 'system');
         this.audio?.play('lock-start');
 
-        // Track locking progress for visual feedback
+        // Track locking progress for visual feedback and game-time completion
         this.lockingTarget = entity;
+        this.lockProgress = 0;
+        this.lockDuration = lockTime; // seconds (game time)
+        // Keep these for renderer compatibility (lock progress ring)
         this.lockingStartTime = performance.now();
         this.lockingDuration = lockTime * 1000;
+    }
 
-        // Simulate lock time
-        setTimeout(() => {
-            if (entity.alive && this.player?.alive) {
-                this.lockedTargets.push(entity);
-                this.lockedTarget = this.lockedTargets[0];
-                entity.locked = true;
-                this.events.emit('target:locked', entity);
-                this.ui?.log(`Target locked: ${entity.name}`, 'system');
-                this.audio?.play('lock-complete');
-            }
+    /**
+     * Update lock progress using game-time delta (called from update loop)
+     */
+    updateLockProgress(dt) {
+        if (!this.lockingTarget) return;
+
+        // Cancel if target died or player died
+        if (!this.lockingTarget.alive || !this.player?.alive) {
             this.lockingTarget = null;
-        }, lockTime * 1000);
+            this.lockProgress = 0;
+            return;
+        }
+
+        this.lockProgress += dt;
+
+        // Keep renderer's lockingStartTime in sync so the visual progress ring works
+        // Renderer uses: progress = (performance.now() - lockingStartTime) / lockingDuration
+        // We rewrite lockingStartTime so it matches our game-time progress
+        this.lockingStartTime = performance.now() - (this.lockProgress / this.lockDuration) * this.lockingDuration;
+
+        if (this.lockProgress >= this.lockDuration) {
+            const entity = this.lockingTarget;
+            this.lockedTargets.push(entity);
+            this.lockedTarget = this.lockedTargets[0];
+            entity.locked = true;
+            this.events.emit('target:locked', entity);
+            this.ui?.log(`Target locked: ${entity.name}`, 'system');
+            this.audio?.play('lock-complete');
+            this.lockingTarget = null;
+            this.lockProgress = 0;
+        }
     }
 
     /**
@@ -1272,6 +1300,9 @@ export class Game {
         if (this.missionSystem) this._safeUpdate(this.missionSystem, 'Mission', dt);
         if (this.coalitionWarSystem) this._safeUpdate(this.coalitionWarSystem, 'CoalitionWar', dt);
 
+        // Update target lock progress (game-time accumulator)
+        this.updateLockProgress(dt);
+
         // Auto-loot tractor beam
         try { this.updateTractorBeams(dt); } catch (e) { console.error('[TractorBeam] error:', e); }
 
@@ -1311,19 +1342,9 @@ export class Game {
         const now = performance.now();
         const window = this.dpsTracker.window;
 
-        // Prune old entries in-place (avoids allocating new arrays each frame)
-        let i = 0;
-        while (i < this.dpsTracker.incomingLog.length) {
-            if (now - this.dpsTracker.incomingLog[i].time >= window) {
-                this.dpsTracker.incomingLog.splice(i, 1);
-            } else { i++; }
-        }
-        i = 0;
-        while (i < this.dpsTracker.outgoingLog.length) {
-            if (now - this.dpsTracker.outgoingLog[i].time >= window) {
-                this.dpsTracker.outgoingLog.splice(i, 1);
-            } else { i++; }
-        }
+        // Prune old entries using filter (O(n) instead of O(n²) splice)
+        this.dpsTracker.incomingLog = this.dpsTracker.incomingLog.filter(e => now - e.time < window);
+        this.dpsTracker.outgoingLog = this.dpsTracker.outgoingLog.filter(e => now - e.time < window);
 
         // Calculate DPS
         const inTotal = this.dpsTracker.incomingLog.reduce((sum, e) => sum + e.damage, 0);
@@ -1689,6 +1710,12 @@ export class Game {
                         if (group) group.add(ship.fleetId);
                     }
                 }
+            }
+
+            // Sync fleet ID counter to avoid collisions
+            if (this.fleetSystem && this.fleetSystem.ships.length > 0) {
+                const maxId = Math.max(...this.fleetSystem.ships.map(s => parseInt(s.fleetId) || 0));
+                setFleetIdCounter(maxId + 1);
             }
         }
 

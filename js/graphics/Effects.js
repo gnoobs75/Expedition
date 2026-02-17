@@ -14,6 +14,9 @@ export class Effects {
         // Active effects
         this.effects = [];
 
+        // Generation counter for invalidating setTimeout callbacks on sector change
+        this._generation = 0;
+
         // Particle pool for reuse
         this.particlePool = [];
         this.poolSize = CONFIG.PARTICLE_POOL_SIZE;
@@ -238,7 +241,9 @@ export class Effects {
         // === Stage 1: Initial white-hot flash ===
         this.lightPool?.spawn(x, y, 0xffffff, 3.5 * size, 0.15, 300);
         // Delayed orange fireball light
+        const gen1 = this._generation;
         setTimeout(() => {
+            if (this._generation !== gen1) return;
             this.lightPool?.spawn(x, y, 0xff4400, 2.5 * size, 0.6, 600 * size);
         }, 80);
 
@@ -381,11 +386,13 @@ export class Effects {
 
         // === Secondary detonations (delayed small explosions nearby) ===
         const secondaryCount = Math.floor(2 + size);
+        const gen2 = this._generation;
         for (let i = 0; i < Math.min(secondaryCount, 4); i++) {
             const delay = 100 + Math.random() * 400;
             const ox = (Math.random() - 0.5) * 40 * size;
             const oy = (Math.random() - 0.5) * 40 * size;
             setTimeout(() => {
+                if (this._generation !== gen2) return;
                 this.lightPool?.spawn(x + ox, y + oy, 0xff6600, 1.0 * size, 0.2, 200);
                 for (let j = 0; j < 5; j++) {
                     const p = this.getParticle();
@@ -889,7 +896,9 @@ export class Effects {
         this.effects.push(ringEffect);
 
         // Delayed second burst (starburst)
+        const gen3 = this._generation;
         setTimeout(() => {
+            if (this._generation !== gen3) return;
             this.lightPool?.spawn(x, y, 0xffaa00, 2.0, 0.4, 400);
             for (let i = 0; i < 8; i++) {
                 const p = this.getParticle();
@@ -1845,6 +1854,9 @@ export class Effects {
      * Clear all effects
      */
     clear() {
+        // Increment generation to invalidate pending setTimeout callbacks
+        this._generation++;
+
         // Reset all pooled particles
         for (const particle of this.particlePool) {
             particle.visible = false;

@@ -407,11 +407,11 @@ export class UniverseMapRenderer3D {
     createTextSprite(text, color, isCurrent) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = 256;
-        canvas.height = 64;
+        canvas.width = 320;
+        canvas.height = 80;
 
-        ctx.clearRect(0, 0, 256, 64);
-        ctx.font = `${isCurrent ? 'bold ' : ''}${isCurrent ? 18 : 14}px 'Rajdhani', 'Share Tech Mono', monospace`;
+        ctx.clearRect(0, 0, 320, 80);
+        ctx.font = `${isCurrent ? 'bold ' : ''}${isCurrent ? 22 : 17}px 'Rajdhani', 'Share Tech Mono', monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
@@ -420,7 +420,7 @@ export class UniverseMapRenderer3D {
         ctx.shadowColor = hexColor;
         ctx.shadowBlur = 6;
         ctx.fillStyle = isCurrent ? '#ffffff' : hexColor;
-        ctx.fillText(text, 128, 32);
+        ctx.fillText(text, 160, 40);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.minFilter = THREE.LinearFilter;
@@ -428,7 +428,7 @@ export class UniverseMapRenderer3D {
         const mat = new THREE.SpriteMaterial({
             map: texture,
             transparent: true,
-            opacity: isCurrent ? 1.0 : 0.7,
+            opacity: isCurrent ? 1.0 : 0.8,
             depthTest: false,
         });
         const sprite = new THREE.Sprite(mat);
@@ -592,11 +592,12 @@ export class UniverseMapRenderer3D {
             border-radius: 4px;
             padding: 8px 12px;
             font-family: 'Rajdhani', 'Share Tech Mono', monospace;
-            font-size: 13px;
+            font-size: 15px;
             color: #eaf2fa;
             pointer-events: none;
             z-index: 10000;
-            max-width: 220px;
+            max-width: 260px;
+            line-height: 1.5;
             box-shadow: 0 0 12px rgba(0, 100, 200, 0.3);
         `;
         document.body.appendChild(this.tooltipEl);
@@ -909,23 +910,23 @@ export class UniverseMapRenderer3D {
 
         // Build faction line
         const factionLine = factionData
-            ? `<div style="color: ${factionData.color}; font-size: 13px; margin-top: 2px;">${factionData.name} (${factionData.nickname})${coalitionData ? ` &middot; ${coalitionData.name}` : ''}</div>`
+            ? `<div style="color: ${factionData.color}; font-size: 14px; margin-top: 3px;">${factionData.name} (${factionData.nickname})${coalitionData ? ` &middot; ${coalitionData.name}` : ''}</div>`
             : sector.contested
-                ? `<div style="color: #ffdd44; font-size: 13px; margin-top: 2px;">CONTESTED${sector.contestedFactions ? ' - ' + sector.contestedFactions.map(f => FACTIONS[f]?.nickname || f).join(' vs ') : ''}</div>`
+                ? `<div style="color: #ffdd44; font-size: 14px; margin-top: 3px;">CONTESTED${sector.contestedFactions ? ' - ' + sector.contestedFactions.map(f => FACTIONS[f]?.nickname || f).join(' vs ') : ''}</div>`
                 : '';
 
         this.tooltipEl.innerHTML = `
-            <div style="font-size: 14px; font-weight: bold; color: ${diffColor}; margin-bottom: 3px;">${sector.name}</div>
-            <div style="color: #9db0c4; font-size: 13px;">
+            <div style="font-size: 16px; font-weight: bold; color: ${diffColor}; margin-bottom: 4px;">${sector.name}</div>
+            <div style="color: #b0c4d8; font-size: 14px;">
                 <span style="color: ${diffColor};">${(sector.difficulty || '').toUpperCase()}</span>
                 &middot; Tier ${factionData ? factionData.tier : '?'}
             </div>
             ${factionLine}
-            <div style="color: #708498; font-size: 13px; margin-top: 3px;">
+            <div style="color: #8ca0b4; font-size: 14px; margin-top: 3px;">
                 ${sector.hasStation ? 'Station' : 'No Station'}
                 &middot; ${jumpText}
             </div>
-            ${!isCurrent ? '<div style="color: #7799aa; font-size: 12px; margin-top: 4px;">Left-click: Navigate &middot; Right-click: Autopilot</div>' : ''}
+            ${!isCurrent ? '<div style="color: #8ca0b4; font-size: 13px; margin-top: 5px;">Left-click: Navigate &middot; Right-click: Autopilot</div>' : ''}
         `;
 
         this.tooltipEl.classList.remove('hidden');

@@ -58,6 +58,15 @@ export class NPCSystem {
 
         // Track which sectors have had NPCs spawned
         this.spawnedSectors = new Set();
+
+        // Track pending timeouts for cleanup on sector change
+        this._pendingTimeouts = [];
+
+        // Clear pending timeouts on sector change
+        this.game.events.on('sector:change', () => {
+            this._pendingTimeouts.forEach(id => clearTimeout(id));
+            this._pendingTimeouts = [];
+        });
     }
 
     /**
@@ -251,11 +260,11 @@ export class NPCSystem {
             miner.launchAllDrones();
             miner.dronesLaunched = true;
             // Command drones to mine
-            setTimeout(() => {
+            this._pendingTimeouts.push(setTimeout(() => {
                 if (miner.alive) {
                     miner.commandDrones('mine');
                 }
-            }, 500);
+            }, 500));
         }
 
         // Check if cargo is full - return to station
@@ -806,7 +815,7 @@ export class NPCSystem {
                 "Intel says security is spread thin. Hit 'em fast, grab what you can.",
                 "Target acquired. Remember - leave no witnesses.",
             ];
-            setTimeout(() => {
+            this._pendingTimeouts.push(setTimeout(() => {
                 this.game.dialogueManager.open({
                     name: 'Pirate Comms',
                     title: 'Intercepted Transmission',
@@ -815,7 +824,7 @@ export class NPCSystem {
                     text: chatter[Math.floor(Math.random() * chatter.length)],
                     options: [{ label: 'Close channel', action: 'close' }],
                 });
-            }, 1000);
+            }, 1000));
         }
 
         for (let i = 0; i < count; i++) {

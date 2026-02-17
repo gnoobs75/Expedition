@@ -56,6 +56,10 @@ export class SectorMapManager {
         // Tooltip element
         this.tooltip = null;
 
+        // Asteroid cluster cache
+        this._asteroidClusterCache = null;
+        this._asteroidClusterEntityCount = 0;
+
         // Strategic overlays
         this.strategicOverlays = { faction: false, trade: false, threat: false, resources: false, events: false };
 
@@ -445,7 +449,7 @@ export class SectorMapManager {
         // Grid coordinate labels
         if (this.localZoom > 0.3) {
             ctx.fillStyle = 'rgba(0, 180, 255, 0.15)';
-            ctx.font = '9px monospace';
+            ctx.font = '11px monospace';
             ctx.textAlign = 'left';
             for (let x = startX; x <= endX; x += gridSize) {
                 if (x < 0 || x > CONFIG.SECTOR_SIZE) continue;
@@ -462,29 +466,37 @@ export class SectorMapManager {
         const asteroids = (sector.entities || []).filter(e => e.alive && e.type === 'asteroid');
         if (asteroids.length < 3) return;
 
-        // Group nearby asteroids into fields (simple spatial clustering)
-        const fieldRadius = 2000;
-        const fields = [];
-        const assigned = new Set();
+        // Use cached cluster results if entity count hasn't changed
+        let fields;
+        if (this._asteroidClusterCache && this._asteroidClusterEntityCount === asteroids.length) {
+            fields = this._asteroidClusterCache;
+        } else {
+            // Group nearby asteroids into fields (simple spatial clustering)
+            const fieldRadius = 2000;
+            fields = [];
+            const assigned = new Set();
 
-        for (let i = 0; i < asteroids.length; i++) {
-            if (assigned.has(i)) continue;
-            const field = { asteroids: [asteroids[i]], cx: asteroids[i].x, cy: asteroids[i].y };
-            assigned.add(i);
+            for (let i = 0; i < asteroids.length; i++) {
+                if (assigned.has(i)) continue;
+                const field = { asteroids: [asteroids[i]], cx: asteroids[i].x, cy: asteroids[i].y };
+                assigned.add(i);
 
-            for (let j = i + 1; j < asteroids.length; j++) {
-                if (assigned.has(j)) continue;
-                const dx = asteroids[j].x - field.cx;
-                const dy = asteroids[j].y - field.cy;
-                if (Math.sqrt(dx * dx + dy * dy) < fieldRadius) {
-                    field.asteroids.push(asteroids[j]);
-                    assigned.add(j);
-                    // Update centroid
-                    field.cx = field.asteroids.reduce((s, a) => s + a.x, 0) / field.asteroids.length;
-                    field.cy = field.asteroids.reduce((s, a) => s + a.y, 0) / field.asteroids.length;
+                for (let j = i + 1; j < asteroids.length; j++) {
+                    if (assigned.has(j)) continue;
+                    const dx = asteroids[j].x - field.cx;
+                    const dy = asteroids[j].y - field.cy;
+                    if (Math.sqrt(dx * dx + dy * dy) < fieldRadius) {
+                        field.asteroids.push(asteroids[j]);
+                        assigned.add(j);
+                        // Update centroid
+                        field.cx = field.asteroids.reduce((s, a) => s + a.x, 0) / field.asteroids.length;
+                        field.cy = field.asteroids.reduce((s, a) => s + a.y, 0) / field.asteroids.length;
+                    }
                 }
+                if (field.asteroids.length >= 2) fields.push(field);
             }
-            if (field.asteroids.length >= 2) fields.push(field);
+            this._asteroidClusterCache = fields;
+            this._asteroidClusterEntityCount = asteroids.length;
         }
 
         // Draw field boundary clouds
@@ -532,7 +544,7 @@ export class SectorMapManager {
             // Field label
             if (r > 20) {
                 ctx.fillStyle = this.hexToRgba(colorStr, 0.5);
-                ctx.font = '9px monospace';
+                ctx.font = '11px monospace';
                 ctx.textAlign = 'center';
                 const oreName = CONFIG.ASTEROID_TYPES[dominant]?.name || dominant;
                 ctx.fillText(`${oreName} Field (${field.asteroids.length})`, sx, sy - r - 4);
@@ -615,7 +627,7 @@ export class SectorMapManager {
 
             // Label
             ctx.fillStyle = ring.color.replace(/[\d.]+\)$/, '0.5)');
-            ctx.font = '8px monospace';
+            ctx.font = '12px monospace';
             ctx.textAlign = 'left';
             ctx.fillText(`${ring.range}m ${ring.label}`, sx + r + 3, sy - 2);
         }
@@ -717,7 +729,7 @@ export class SectorMapManager {
         if (showLabel) {
             const r = Math.max(6, (entity.radius || 10) * scale * 0.3);
             ctx.fillStyle = isSelected ? '#00ffff' : isHovered ? '#ffffff' : 'rgba(200, 220, 255, 0.7)';
-            ctx.font = isSelected ? 'bold 10px monospace' : '9px monospace';
+            ctx.font = isSelected ? 'bold 12px monospace' : '11px monospace';
             ctx.textAlign = 'center';
             ctx.fillText(entity.name || '', sx, sy - r - 6);
         }
@@ -777,7 +789,7 @@ export class SectorMapManager {
 
         // Label
         ctx.fillStyle = '#8866cc';
-        ctx.font = '10px monospace';
+        ctx.font = '12px monospace';
         ctx.textAlign = 'center';
         ctx.fillText(entity.name || 'Planet', sx, sy - r - 4);
     }
@@ -815,7 +827,7 @@ export class SectorMapManager {
 
         // Always show label
         ctx.fillStyle = '#44ff88';
-        ctx.font = 'bold 10px monospace';
+        ctx.font = 'bold 12px monospace';
         ctx.textAlign = 'center';
         ctx.fillText(entity.name || 'Station', sx, sy - r - 6);
     }
@@ -845,7 +857,7 @@ export class SectorMapManager {
         const dest = entity.destinationSectorId || '';
         const destSector = UNIVERSE_LAYOUT.sectors.find(s => s.id === dest);
         ctx.fillStyle = '#66aaff';
-        ctx.font = '9px monospace';
+        ctx.font = '11px monospace';
         ctx.textAlign = 'center';
         ctx.fillText(entity.name || 'Elder Wormhole', sx, sy - r - 8);
         if (destSector) {
@@ -1022,7 +1034,7 @@ export class SectorMapManager {
 
         // Label
         ctx.fillStyle = '#00ffff';
-        ctx.font = 'bold 10px monospace';
+        ctx.font = 'bold 12px monospace';
         ctx.textAlign = 'center';
         ctx.fillText('YOU', sx, sy - r - 8);
     }
@@ -1094,7 +1106,7 @@ export class SectorMapManager {
 
         // Text
         ctx.fillStyle = '#ccddee';
-        ctx.font = '10px monospace';
+        ctx.font = '12px monospace';
         ctx.textAlign = 'left';
         for (let i = 0; i < lines.length; i++) {
             ctx.fillStyle = i === 0 ? '#ffffff' : '#aabbcc';
@@ -1116,12 +1128,12 @@ export class SectorMapManager {
         ctx.strokeRect(5, 5, 190, 80);
 
         ctx.fillStyle = '#00ccff';
-        ctx.font = 'bold 13px monospace';
+        ctx.font = 'bold 15px monospace';
         ctx.textAlign = 'left';
         ctx.fillText(sector?.name || 'Unknown Sector', 12, 22);
 
         ctx.fillStyle = diffColor;
-        ctx.font = '10px monospace';
+        ctx.font = '12px monospace';
         ctx.fillText(`Security: ${difficulty.toUpperCase()}`, 12, 38);
 
         ctx.fillStyle = '#778899';
@@ -1136,7 +1148,7 @@ export class SectorMapManager {
         const player = this.game.player;
         if (player) {
             ctx.fillStyle = '#556677';
-            ctx.font = '9px monospace';
+            ctx.font = '11px monospace';
             ctx.fillText(`Pos: ${Math.round(player.x)}, ${Math.round(player.y)}`, 12, 80);
         }
     }
@@ -1157,7 +1169,7 @@ export class SectorMapManager {
         ctx.fillStyle = 'rgba(0, 10, 20, 0.6)';
         ctx.fillRect(startX - 5, y - 5, 115, items.length * 15 + 10);
 
-        ctx.font = '9px monospace';
+        ctx.font = '11px monospace';
         for (const item of items) {
             const ix = startX + 5;
             ctx.fillStyle = item.color;
@@ -1246,7 +1258,7 @@ export class SectorMapManager {
 
         // Label
         ctx.fillStyle = 'rgba(0, 200, 255, 0.4)';
-        ctx.font = '8px monospace';
+        ctx.font = '12px monospace';
         ctx.textAlign = 'right';
         ctx.fillText('MINIMAP', mx + size - 3, my + size - 3);
     }
@@ -1272,7 +1284,7 @@ export class SectorMapManager {
         ctx.fillStyle = 'rgba(0, 8, 16, 0.7)';
         ctx.fillRect(0, barY, w, barH);
         ctx.fillStyle = 'rgba(0, 180, 255, 0.5)';
-        ctx.font = '9px monospace';
+        ctx.font = '11px monospace';
         ctx.textAlign = 'center';
         ctx.fillText(text, w / 2, barY + 12);
     }
@@ -1794,7 +1806,7 @@ export class SectorMapManager {
 
         // Difficulty label
         ctx.fillStyle = isCurrent ? '#005555' : 'rgba(150, 180, 200, 0.6)';
-        ctx.font = '8px monospace';
+        ctx.font = '12px monospace';
         ctx.fillText(sector.difficulty.toUpperCase(), pos.x, pos.y + radius + 14);
     }
 
@@ -1834,7 +1846,7 @@ export class SectorMapManager {
         }
 
         // Draw tooltip
-        ctx.font = '10px monospace';
+        ctx.font = '12px monospace';
         const padding = 8;
         const lineH = 15;
         const tooltipW = Math.max(...lines.map(l => ctx.measureText(l).width)) + padding * 2 + 10;
@@ -1965,7 +1977,7 @@ export class SectorMapManager {
         ctx.fillStyle = 'rgba(0, 10, 20, 0.6)';
         ctx.fillRect(legendX - 5, legendY - 5, 390, 45);
 
-        ctx.font = '9px monospace';
+        ctx.font = '11px monospace';
         let x = legendX;
         for (const item of items) {
             ctx.fillStyle = item.color;

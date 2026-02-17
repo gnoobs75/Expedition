@@ -202,15 +202,8 @@ export class ShipMenuManager {
     setupDragRotation() {
         if (!this.statsCanvas) return;
 
-        this.statsCanvas.addEventListener('mousedown', (e) => {
-            this.isDragging = true;
-            this.autoRotate = false;
-            this.previousMouseX = e.clientX;
-            this.previousMouseY = e.clientY;
-            this.statsCanvas.style.cursor = 'grabbing';
-        });
-
-        document.addEventListener('mousemove', (e) => {
+        // Store bound handler references for proper cleanup
+        this._onDragMove = (e) => {
             if (!this.isDragging) return;
             const deltaX = e.clientX - this.previousMouseX;
             const deltaY = e.clientY - this.previousMouseY;
@@ -220,13 +213,25 @@ export class ShipMenuManager {
             this.rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.rotationX));
             this.previousMouseX = e.clientX;
             this.previousMouseY = e.clientY;
-        });
+        };
 
-        document.addEventListener('mouseup', () => {
+        this._onDragEnd = () => {
             if (this.isDragging) {
                 this.isDragging = false;
                 this.statsCanvas.style.cursor = 'grab';
             }
+            document.removeEventListener('mousemove', this._onDragMove);
+            document.removeEventListener('mouseup', this._onDragEnd);
+        };
+
+        this.statsCanvas.addEventListener('mousedown', (e) => {
+            this.isDragging = true;
+            this.autoRotate = false;
+            this.previousMouseX = e.clientX;
+            this.previousMouseY = e.clientY;
+            this.statsCanvas.style.cursor = 'grabbing';
+            document.addEventListener('mousemove', this._onDragMove);
+            document.addEventListener('mouseup', this._onDragEnd);
         });
 
         this.statsCanvas.style.cursor = 'grab';

@@ -15,6 +15,58 @@ export class CombatSystem {
 
         // Damage numbers queue
         this.damageNumbers = [];
+
+        // Tick-based pending damage queue (replaces setTimeout)
+        this.pendingDamage = [];
+
+        // DOM element pool for damage numbers / miss indicators
+        this.damageNumberPool = [];
+        this.POOL_SIZE = 30;
+        this.initDamagePool();
+    }
+
+    /**
+     * Pre-create pooled DOM elements for damage numbers
+     */
+    initDamagePool() {
+        const overlay = document.getElementById('ui-overlay');
+        if (!overlay) return;
+        for (let i = 0; i < this.POOL_SIZE; i++) {
+            const el = document.createElement('div');
+            el.style.display = 'none';
+            el.style.position = 'absolute';
+            el.dataset.active = 'false';
+            overlay.appendChild(el);
+            this.damageNumberPool.push(el);
+        }
+    }
+
+    /**
+     * Get an inactive element from the damage number pool
+     */
+    getDamageElement() {
+        for (let i = 0; i < this.damageNumberPool.length; i++) {
+            if (this.damageNumberPool[i].dataset.active !== 'true') {
+                const el = this.damageNumberPool[i];
+                el.dataset.active = 'true';
+                el.style.display = '';
+                el.className = '';
+                el.textContent = '';
+                el.style.fontSize = '';
+                return el;
+            }
+        }
+        return null; // All pool elements in use
+    }
+
+    /**
+     * Release a pooled damage element back to inactive state
+     */
+    releaseDamageElement(el) {
+        el.style.display = 'none';
+        el.dataset.active = 'false';
+        el.className = '';
+        el.textContent = '';
     }
 
     /**
@@ -28,6 +80,24 @@ export class CombatSystem {
 
             if (!projectile.alive) {
                 this.projectiles.splice(i, 1);
+            }
+        }
+
+        // Process pending damage queue (tick-based, replaces setTimeout)
+        for (let i = this.pendingDamage.length - 1; i >= 0; i--) {
+            const pd = this.pendingDamage[i];
+            pd.elapsed += dt;
+            if (pd.elapsed >= pd.delay) {
+                // Check sector hasn't changed
+                if (this.game.currentSector?.id !== pd.sectorId) {
+                    this.pendingDamage.splice(i, 1);
+                    continue;
+                }
+                // Apply the pending damage callback if target still exists and is alive
+                if (pd.target && pd.target.alive && !pd.target.destroyed) {
+                    pd.apply();
+                }
+                this.pendingDamage.splice(i, 1);
             }
         }
 
@@ -99,11 +169,14 @@ export class CombatSystem {
             this.game.ui?.toast('Incoming missile!', 'danger');
         }
 
-        // Apply damage with slight delay (for visual sync, longer for missiles)
-        const impactDelay = isMissile ? 300 : 100;
-        setTimeout(() => {
-            if (this.game.currentSector?.id !== combatSectorId) return;
-            if (target.alive) {
+        // Apply damage with tick-based delay (for visual sync, longer for missiles)
+        const impactDelay = isMissile ? 0.3 : 0.1; // seconds
+        this.pendingDamage.push({
+            target,
+            delay: impactDelay,
+            elapsed: 0,
+            sectorId: combatSectorId,
+            apply: () => {
                 // Miss handling
                 if (!hits) {
                     this.showMissIndicator(target.x, target.y);
@@ -197,7 +270,7 @@ export class CombatSystem {
                     this.game.ui?.toast('You are now flagged as hostile!', 'error');
                 }
             }
-        }, impactDelay);
+        });
     }
 
     /**
@@ -221,16 +294,17 @@ export class CombatSystem {
     }
 
     /**
-     * Show floating damage number
+     * Show floating damage number (uses pooled DOM elements)
      */
     showDamageNumber(x, y, amount, type) {
+        const element = this.getDamageElement();
+        if (!element) return; // Pool exhausted
+
         const screen = this.game.input.worldToScreen(x, y);
 
         // Random spread so numbers don't stack
         const spreadX = (Math.random() - 0.5) * 60;
         const spreadY = (Math.random() - 0.5) * 30;
-
-        const element = document.createElement('div');
 
         // Scale font size by damage magnitude
         const baseDmg = 30;
@@ -244,9 +318,7 @@ export class CombatSystem {
         element.style.top = `${screen.y + spreadY}px`;
         element.style.fontSize = `${fontSize}px`;
 
-        document.getElementById('ui-overlay').appendChild(element);
-
-        setTimeout(() => element.remove(), 1500);
+        setTimeout(() => this.releaseDamageElement(element), 1500);
     }
 
     /**
@@ -353,17 +425,19 @@ export class CombatSystem {
     }
 
     /**
-     * Show miss indicator floating text
+     * Show miss indicator floating text (uses pooled DOM elements)
      */
     showMissIndicator(x, y) {
+        const element = this.getDamageElement();
+        if (!element) return; // Pool exhausted
+
         const screen = this.game.input.worldToScreen(x, y);
-        const element = document.createElement('div');
         element.className = 'damage-number miss';
         element.textContent = 'MISS';
         element.style.left = `${screen.x + (Math.random() - 0.5) * 40}px`;
         element.style.top = `${screen.y}px`;
-        document.getElementById('ui-overlay').appendChild(element);
-        setTimeout(() => element.remove(), 1500);
+
+        setTimeout(() => this.releaseDamageElement(element), 1500);
     }
 
     /**

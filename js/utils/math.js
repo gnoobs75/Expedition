@@ -53,6 +53,7 @@ export function angleBetween(x1, y1, x2, y2) {
  * Normalize angle to 0-2PI range
  */
 export function normalizeAngle(angle) {
+    if (!isFinite(angle)) return 0;
     while (angle < 0) angle += Math.PI * 2;
     while (angle >= Math.PI * 2) angle -= Math.PI * 2;
     return angle;

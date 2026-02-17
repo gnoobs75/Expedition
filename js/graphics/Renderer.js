@@ -72,6 +72,10 @@ export class Renderer {
         this.sensorSweepMesh = null;
         this.sensorSweepPings = [];
 
+        // Sensor sweep ping pool
+        this._sweepPingPool = [];
+        this._sweepPingPoolSize = 20;
+
         // Velocity vector line
         this.velocityVectorMesh = null;
         this.velocityVectorTip = null;
@@ -530,13 +534,45 @@ export class Renderer {
                 this.sensorSweepMesh = null;
             }
             for (const ping of this.sensorSweepPings) {
-                this.effectsGroup.remove(ping);
-                ping.geometry.dispose();
-                ping.material.dispose();
+                ping.visible = false;
+                ping.userData.active = false;
             }
             this.sensorSweepPings = [];
         }
         return this.sensorSweepEnabled;
+    }
+
+    /**
+     * Get a sweep ping mesh from the pool or create one if pool not full
+     */
+    getSweepPing(color) {
+        // Try to find an inactive pooled ping
+        for (const ping of this._sweepPingPool) {
+            if (!ping.userData.active) {
+                ping.material.color.setHex(color);
+                ping.material.opacity = 0.7;
+                ping.scale.setScalar(1);
+                ping.visible = true;
+                ping.userData.active = true;
+                ping.userData.life = 0;
+                return ping;
+            }
+        }
+        // Create a new one if pool not full
+        if (this._sweepPingPool.length < this._sweepPingPoolSize) {
+            const pingGeo = new THREE.RingGeometry(8, 12, 12);
+            const pingMat = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.7,
+            });
+            const pingMesh = new THREE.Mesh(pingGeo, pingMat);
+            pingMesh.userData = { active: true, life: 0, maxLife: 1.5 };
+            this.effectsGroup.add(pingMesh);
+            this._sweepPingPool.push(pingMesh);
+            return pingMesh;
+        }
+        return null; // Pool exhausted
     }
 
     updateSensorSweep(dt) {
@@ -595,20 +631,16 @@ export class Renderer {
                 while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
                 if (Math.abs(angleDiff) < sweepArc / 2 && Math.abs(angleDiff) > sweepArc / 4) {
-                    // Spawn a brief ping circle
-                    const pingGeo = new THREE.RingGeometry(8, 12, 12);
+                    // Spawn a brief ping circle from pool
                     const pingColor = entity.hostility === 'hostile' ? 0xff4444 :
                         (entity.type === 'asteroid' ? 0xffaa00 : 0x00ffaa);
-                    const pingMat = new THREE.MeshBasicMaterial({
-                        color: pingColor,
-                        transparent: true,
-                        opacity: 0.7,
-                    });
-                    const pingMesh = new THREE.Mesh(pingGeo, pingMat);
-                    pingMesh.position.set(entity.x, entity.y, 12);
-                    pingMesh.userData = { life: 0, maxLife: 1.5 };
-                    this.effectsGroup.add(pingMesh);
-                    this.sensorSweepPings.push(pingMesh);
+                    const pingMesh = this.getSweepPing(pingColor);
+                    if (pingMesh) {
+                        pingMesh.position.set(entity.x, entity.y, 12);
+                        pingMesh.userData.life = 0;
+                        pingMesh.userData.maxLife = 1.5;
+                        this.sensorSweepPings.push(pingMesh);
+                    }
                 }
             }
         }
@@ -618,9 +650,9 @@ export class Renderer {
             const ping = this.sensorSweepPings[i];
             ping.userData.life += dt;
             if (ping.userData.life >= ping.userData.maxLife) {
-                this.effectsGroup.remove(ping);
-                ping.geometry.dispose();
-                ping.material.dispose();
+                // Return to pool instead of disposing
+                ping.visible = false;
+                ping.userData.active = false;
                 this.sensorSweepPings.splice(i, 1);
                 continue;
             }
@@ -757,6 +789,15 @@ export class Renderer {
 
         // Clear asteroid belt dust clouds
         this.clearBeltDustClouds();
+
+        // Dispose all pooled sweep ping meshes
+        for (const ping of this._sweepPingPool) {
+            this.effectsGroup.remove(ping);
+            ping.geometry.dispose();
+            ping.material.dispose();
+        }
+        this._sweepPingPool = [];
+        this.sensorSweepPings = [];
 
         // Clear effects, lights, trails, and status effects
         this.effects.clear();
@@ -926,14 +967,14 @@ export class Renderer {
         // Update entity shadows
         this.updateEntityShadows();
 
+        // Use actual delta time from game loop (fall back to 1/60 if unavailable)
+        const dt = this.game.deltaTime || (1 / 60);
+
         // Update selection indicators
-        this.updateSelectionIndicators();
+        this.updateSelectionIndicators(dt);
 
         // Update starfield parallax
         this.starField.update(this.game.camera);
-
-        // Use actual delta time from game loop (fall back to 1/60 if unavailable)
-        const dt = this.game.deltaTime || (1 / 60);
 
         // Update nebula animation
         this.nebula.update(dt);
@@ -1127,9 +1168,9 @@ export class Renderer {
     /**
      * Update selection and lock indicators
      */
-    updateSelectionIndicators() {
+    updateSelectionIndicators(dt) {
         // Track animation time
-        this._animTime = (this._animTime || 0) + 0.016;
+        this._animTime = (this._animTime || 0) + dt;
 
         // Selection brackets
         const selected = this.game.selectedTarget;
@@ -1247,7 +1288,7 @@ export class Renderer {
                 const baseOpacity = this.weaponRangePersist ? 0.06 : 0.08;
                 this.weaponRangeMesh.material.opacity = baseOpacity + Math.sin(this._animTime * 3) * 0.03;
             } else if (this.weaponRangeTimer > 0) {
-                this.weaponRangeTimer -= 0.016;
+                this.weaponRangeTimer -= dt;
                 const player2 = this.game.player;
                 if (player2?.alive) {
                     this.weaponRangeMesh.position.set(player2.x, player2.y, 1);

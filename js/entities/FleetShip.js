@@ -11,6 +11,9 @@ import { wrappedDistance, wrappedDirection } from '../utils/math.js';
 
 let fleetIdCounter = 0;
 
+export function getFleetIdCounter() { return fleetIdCounter; }
+export function setFleetIdCounter(val) { fleetIdCounter = val; }
+
 export class FleetShip extends Ship {
     constructor(game, options = {}) {
         const shipClass = options.shipClass || 'venture';
@@ -537,20 +540,15 @@ export class FleetShip extends Ship {
                     if (!data || !data.units) continue;
                     const units = data.units;
                     const vol = data.volume || units;
-                    if (player.cargoUsed + vol <= player.cargoCapacity) {
-                        if (!player.cargo[ore]) player.cargo[ore] = { units: 0, volume: 0 };
-                        player.cargo[ore].units += units;
-                        player.cargo[ore].volume += vol;
-                        player.cargoUsed += vol;
-                        transferred += units;
-                    }
+                    // Use player's addOre() method for proper cargo management and event emission
+                    const added = player.addOre(ore, units, vol);
+                    transferred += added;
                 }
                 if (transferred > 0) {
                     this.cargo = {};
                     this.cargoUsed = 0;
                     this.game.ui?.showToast(`${this.name} transferred ${transferred} ore`, 'success');
                     this.game.events.emit('fleet:cargo-transferred', { ship: this, units: transferred });
-                    this.game.events.emit('cargo:updated', { ship: player });
                     return;
                 }
             }

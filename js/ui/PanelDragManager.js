@@ -26,6 +26,9 @@ export class PanelDragManager {
         this.tabDragging = null;        // { groupId, panelId, startX, startY, torn }
         this.tabGhost = null;           // floating ghost element during tab tear
 
+        // MutationObservers for each panel (for cleanup)
+        this.observers = new Map();
+
         // Panels that cannot be grouped (special layout)
         this.ungroupable = new Set([
             'minimap', 'ship-indicator', 'drone-bar', 'locked-targets-container',
@@ -237,6 +240,7 @@ export class PanelDragManager {
             }
         });
         classObserver.observe(panel, { attributes: true, attributeFilter: ['class'] });
+        this.observers.set(panelId, classObserver);
 
         // Find header element for drag handle
         const header = panel.querySelector('.panel-header') ||
@@ -1025,5 +1029,23 @@ export class PanelDragManager {
         const groupData = this.tabGroups.get(groupId);
         if (!groupData) return null;
         return { groupId, panels: [...groupData.panels], active: groupData.active };
+    }
+
+    /**
+     * Cleanup all MutationObservers and resize observer
+     */
+    destroy() {
+        for (const [, observer] of this.observers) {
+            observer.disconnect();
+        }
+        this.observers.clear();
+
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
+
+        document.removeEventListener('mousemove', this.handleMouseMove);
+        document.removeEventListener('mouseup', this.handleMouseUp);
     }
 }

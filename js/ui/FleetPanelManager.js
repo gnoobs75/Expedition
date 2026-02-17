@@ -23,6 +23,9 @@ export class FleetPanelManager {
         // Expanded detail row
         this.expandedFleetId = null;
 
+        // Dirty-checking hash to avoid redundant renders
+        this._lastRenderHash = '';
+
         // Sub-tab state: 'fleet' or 'aar'
         this.activeSubTab = 'fleet';
 
@@ -166,6 +169,13 @@ export class FleetPanelManager {
         if (!container) return;
 
         const allShips = (this.game.fleet?.ships || []).filter(s => s.alive);
+
+        // Dirty check: skip render if fleet state hasn't changed
+        const hash = allShips.map(s => s.fleetId + '|' + Math.round(s.shield + s.armor + s.hull) + '|' + s.aiState + '|' + s.groupId + '|' + s.stance).join(',')
+            + '|f' + this.activeGroupFilter + '|s' + this.sortColumn + this.sortAscending + '|e' + (this.expandedFleetId || '') + '|sel' + [...this.selectedFleetIds].join('-');
+        if (hash === this._lastRenderHash) return;
+        this._lastRenderHash = hash;
+
         const ships = this.getFilteredShips();
 
         const stateColors = {

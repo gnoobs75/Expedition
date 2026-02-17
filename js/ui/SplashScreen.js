@@ -436,6 +436,7 @@ export class SplashScreen {
         const buttons = [
             { label: 'NEW EXPEDITION', action: 'new' },
             { label: 'LOAD EXPEDITION', action: 'load' },
+            { label: 'COMBAT SIMULATOR', action: 'simulator' },
             { label: 'OPTIONS', action: 'options' },
             { label: 'KEY MAP', action: 'keys' },
             { label: 'TUTORIAL', action: 'tutorial' },
@@ -468,6 +469,9 @@ export class SplashScreen {
                 break;
             case 'tutorial':
                 this.showFactionNaming(true);
+                break;
+            case 'simulator':
+                this.showCombatSimulator();
                 break;
         }
     }
@@ -819,6 +823,47 @@ export class SplashScreen {
         this.subScreen.querySelector('#splash-keys-back').addEventListener('click', () => {
             this.subScreen.classList.add('hidden');
         });
+    }
+
+    // ==========================================
+    // Combat Simulator (inline iframe)
+    // ==========================================
+
+    showCombatSimulator() {
+        // Create fullscreen overlay with the battle sim iframe
+        const overlay = document.createElement('div');
+        overlay.id = 'combat-sim-overlay';
+        overlay.innerHTML = `
+            <div class="combat-sim-header">
+                <span class="combat-sim-title">COMBAT SIMULATOR</span>
+                <button class="combat-sim-close" id="combat-sim-close">EXIT TO MENU</button>
+            </div>
+            <iframe src="tools/battle-sim.html" class="combat-sim-frame" allowfullscreen></iframe>
+        `;
+        document.body.appendChild(overlay);
+
+        // Pause background animation to save resources
+        if (this.bgAnimId) {
+            cancelAnimationFrame(this.bgAnimId);
+            this.bgAnimId = null;
+        }
+
+        // Close handler
+        overlay.querySelector('#combat-sim-close').addEventListener('click', () => {
+            document.body.removeChild(overlay);
+            // Resume background animation
+            this.animateBackground();
+        });
+
+        // ESC key to close
+        const escHandler = (e) => {
+            if (e.key === 'Escape' && document.getElementById('combat-sim-overlay')) {
+                document.body.removeChild(overlay);
+                this.animateBackground();
+                window.removeEventListener('keydown', escHandler);
+            }
+        };
+        window.addEventListener('keydown', escHandler);
     }
 
     // ==========================================

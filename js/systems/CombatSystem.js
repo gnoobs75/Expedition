@@ -79,7 +79,23 @@ export class CombatSystem {
             projectile.update(dt);
 
             if (!projectile.alive) {
+                // Clean up mesh from scene
+                if (projectile.mesh && this.game.renderer?.scene) {
+                    this.game.renderer.scene.remove(projectile.mesh);
+                    // Dispose geometry/materials
+                    projectile.mesh.traverse(child => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                            else child.material.dispose();
+                        }
+                    });
+                    projectile.mesh = null;
+                }
                 this.projectiles.splice(i, 1);
+            } else {
+                // Sync mesh position with entity
+                projectile.updateMesh();
             }
         }
 
@@ -103,6 +119,27 @@ export class CombatSystem {
 
         // Process damage numbers
         this.updateDamageNumbers(dt);
+    }
+
+    /**
+     * Remove all active projectiles and their meshes (e.g. on sector change)
+     */
+    clearProjectiles() {
+        for (const projectile of this.projectiles) {
+            if (projectile.mesh && this.game.renderer?.scene) {
+                this.game.renderer.scene.remove(projectile.mesh);
+                projectile.mesh.traverse(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                        else child.material.dispose();
+                    }
+                });
+                projectile.mesh = null;
+            }
+            projectile.alive = false;
+        }
+        this.projectiles.length = 0;
     }
 
     /**
@@ -135,20 +172,112 @@ export class CombatSystem {
         const combatSectorId = this.game.currentSector?.id;
 
         if (isMissile) {
-            // Missile: smoke trail from source to target (snapshot positions)
-            const sx = source.x, sy = source.y;
-            const tx = target.x, ty = target.y;
-            const dx = tx - sx;
-            const dy = ty - sy;
-            this.game.renderer.effects.spawn('missile-trail', sx, sy);
-            for (let t = 0.25; t < 1; t += 0.25) {
-                const px = sx + dx * t + (Math.random() - 0.5) * 20;
-                const py = sy + dy * t + (Math.random() - 0.5) * 20;
-                setTimeout(() => {
-                    if (this.game.currentSector?.id !== combatSectorId) return;
-                    this.game.renderer?.effects?.spawn('missile-trail', px, py);
-                }, t * 200);
+            // Missile: create actual projectile entity that flies to target
+            const missileSpeed = moduleConfig?.missileSpeed || 300;
+            const missile = new Projectile(this.game, {
+                x: source.x,
+                y: source.y,
+                source: source,
+                target: target,
+                damage: 0, // Damage handled below on impact
+                speed: missileSpeed,
+                lifetime: (range * 1.5) / missileSpeed, // Enough time to reach max range
+                color: 0xff6600,
+                length: 12,
+                radius: 4,
+            });
+            missile.damageType = moduleConfig?.damageType || 'explosive';
+            missile._isMissile = true;
+            missile._hitChance = hitChance;
+            missile._hits = hits;
+            missile._actualDamage = damage;
+            missile._moduleConfig = moduleConfig;
+            missile._combatSectorId = combatSectorId;
+            missile._combatSystem = this;
+
+            // Override hit() to use combat system damage pipeline
+            missile.hit = () => {
+                if (this.game.currentSector?.id !== missile._combatSectorId) {
+                    missile.destroy();
+                    return;
+                }
+                // Missile impact VFX
+                this.game.renderer?.effects?.spawn('missile-impact', missile.x, missile.y, {
+                    color: 0xff6600, count: 8,
+                });
+                this.game.renderer?.effects?.spawn('explosion', missile.x, missile.y, {
+                    count: 6, color: 0xff8800,
+                });
+                this.game.audio?.play('missile-explosion');
+
+                if (!missile._hits) {
+                    this.showMissIndicator(target.x, target.y);
+                    const weaponName = moduleConfig?.name || 'Missile';
+                    this.game.events.emit('combat:action', {
+                        type: 'miss', source, target, damage: 0,
+                        weapon: weaponName, hitChance: missile._hitChance,
+                    });
+                    this.game.events.emit('combat:miss', { source, target });
+                } else {
+                    let damageType = 'hull';
+                    if (target.shield > 0) damageType = 'shield';
+                    else if (target.armor > 0) damageType = 'armor';
+
+                    const dmgType = moduleConfig?.damageProfile || moduleConfig?.damageType || 'explosive';
+                    target.takeDamage(missile._actualDamage, source, dmgType);
+
+                    const weaponName = moduleConfig?.name || 'Missile';
+                    this.game.events.emit('combat:action', {
+                        type: 'hit', source, target, damage: missile._actualDamage,
+                        damageType, weaponDamageType: dmgType,
+                        weapon: weaponName, hitChance: missile._hitChance,
+                    });
+
+                    // Impact VFX at target
+                    this.game.renderer?.effects?.spawn('hit', target.x, target.y, {
+                        count: 6, color: 0xff8800, damageType: dmgType,
+                    });
+                    if (source.isPlayer || target.isPlayer) {
+                        this.game.audio?.play('weapon-hit');
+                    }
+
+                    // Damage number
+                    this.showDamageNumber(target.x, target.y, missile._actualDamage, damageType);
+                }
+                missile.destroy();
+            };
+
+            // Smoke trail spawner on each update
+            const origUpdate = missile.update.bind(missile);
+            missile._trailTimer = 0;
+            missile.update = (dt) => {
+                origUpdate(dt);
+                missile._trailTimer += dt;
+                if (missile._trailTimer > 0.08 && missile.alive) {
+                    missile._trailTimer = 0;
+                    this.game.renderer?.effects?.spawn('missile-trail', missile.x, missile.y);
+                }
+            };
+
+            this.projectiles.push(missile);
+            // Add mesh to scene
+            if (this.game.renderer?.scene) {
+                const mesh = missile.createMesh();
+                if (mesh) this.game.renderer.scene.add(mesh);
             }
+
+            // Muzzle flash at source
+            this.game.renderer?.effects?.spawn('hit', source.x, source.y, {
+                count: 5, color: 0xff8800,
+            });
+            if (source.isPlayer) this.game.audio?.play('missile-launch');
+
+            // Missile incoming warning for player
+            if (target === this.game.player) {
+                this.game.ui?.showDamageDirection(source, 'missile');
+                this.game.ui?.toast('Incoming missile!', 'danger');
+            }
+            return; // Skip the rest of the damage pipeline - missile handles it on impact
         } else {
             // Laser: beam effect
             this.game.renderer.effects.spawn('laser', source.x, source.y, {
@@ -159,18 +288,12 @@ export class CombatSystem {
 
         // Muzzle flash at source
         this.game.renderer.effects.spawn('hit', source.x, source.y, {
-            count: isMissile ? 5 : 3,
-            color: isMissile ? 0xff8800 : laserColor,
+            count: 3,
+            color: laserColor,
         });
 
-        // Missile incoming warning for player
-        if (isMissile && target === this.game.player) {
-            this.game.ui?.showDamageDirection(source, 'missile');
-            this.game.ui?.toast('Incoming missile!', 'danger');
-        }
-
-        // Apply damage with tick-based delay (for visual sync, longer for missiles)
-        const impactDelay = isMissile ? 0.3 : 0.1; // seconds
+        // Apply damage with tick-based delay (for visual sync)
+        const impactDelay = 0.1; // seconds
         this.pendingDamage.push({
             target,
             delay: impactDelay,
@@ -181,7 +304,7 @@ export class CombatSystem {
                 if (!hits) {
                     this.showMissIndicator(target.x, target.y);
                     // Emit miss event for combat log
-                    const weaponName = moduleConfig?.name || (isMissile ? 'Missile' : 'Laser');
+                    const weaponName = moduleConfig?.name || 'Laser';
                     this.game.events.emit('combat:action', {
                         type: 'miss',
                         source, target, damage: 0,
@@ -209,7 +332,7 @@ export class CombatSystem {
                 target.takeDamage(finalDamage, source, dmgType);
 
                 // Emit hit event for combat log
-                const weaponName = moduleConfig?.name || (isMissile ? 'Missile' : 'Laser');
+                const weaponName = moduleConfig?.name || 'Laser';
                 this.game.events.emit('combat:action', {
                     type: 'hit',
                     source, target, damage: finalDamage, damageType, weaponDamageType: dmgType,
@@ -225,14 +348,8 @@ export class CombatSystem {
                 const sourceAngle = Math.atan2(source.y - target.y, source.x - target.x);
                 this.game.renderer.effects.spawn(effectType, target.x, target.y, {
                     radius: target.radius || 30,
-                    count: isMissile ? 16 : undefined,
                     sourceAngle,
                 });
-
-                // Missile gets an additional fiery impact explosion
-                if (isMissile) {
-                    this.game.renderer.effects.spawn('missile-impact', target.x, target.y);
-                }
 
                 // Shield bubble flash on shield hits
                 if (damageType === 'shield') {
@@ -241,9 +358,7 @@ export class CombatSystem {
 
                 // Damage-type-specific impact sounds
                 if (source.isPlayer || target === this.game.player) {
-                    if (isMissile) {
-                        this.game.audio?.play('missile-explosion');
-                    } else if (damageType === 'shield') {
+                    if (damageType === 'shield') {
                         this.game.audio?.play('shield-hit');
                     } else if (damageType === 'armor') {
                         this.game.audio?.play('armor-hit');

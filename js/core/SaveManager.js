@@ -20,6 +20,8 @@ export class SaveManager {
      * Save current game state to a slot
      */
     save(slotKey) {
+        // Block saving during tactical pause to prevent exploits
+        if (this.game.tacticalPaused) return false;
         try {
             const data = this.gatherSaveData();
             data.slotName = this.getSlotName(slotKey);

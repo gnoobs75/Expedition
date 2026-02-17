@@ -2727,6 +2727,144 @@ class ShipMeshFactory {
     }
 
     /**
+     * Resolve a GLB model path from role + size tier.
+     * Maps to the standard path pattern: {role}/{role}_{sizeTier}.glb
+     * sizeTier is 'frigate' for frigate/destroyer, 'cruiser' for cruiser and above.
+     */
+    getModelPathForRole(role, size) {
+        const sizeTier = (size === 'frigate' || size === 'destroyer') ? 'frigate' : 'cruiser';
+        return `${role}/${role}_${sizeTier}.glb`;
+    }
+
+    /**
+     * Load a GLB model by role + size (for non-player ships that don't have
+     * a SHIP_DATABASE entry matching their shipId).
+     */
+    loadModelForRole(role, size, targetSize = 40) {
+        const path = this.getModelPathForRole(role, size);
+        return this.loadModel_internal(path, targetSize);
+    }
+
+    /**
+     * Internal model loader that takes a direct path, applies orientation.
+     * Reuses the same cache + GLTFLoader pipeline as loadModel().
+     */
+    loadModel_internal(path, targetSize = 40) {
+        if (!path) return Promise.resolve(null);
+
+        // Return cached clone immediately
+        if (MODEL_CACHE[path]?.scene) {
+            const clone = MODEL_CACHE[path].scene.clone();
+            this.normalizeModelSize(clone, targetSize);
+            this.applyOrientation(clone, path);
+            return Promise.resolve(clone);
+        }
+
+        // Already loading - queue a callback
+        if (MODEL_CACHE[path]?.loading) {
+            return new Promise((resolve) => {
+                MODEL_CACHE[path].callbacks.push((scene) => {
+                    if (scene) {
+                        const clone = scene.clone();
+                        this.normalizeModelSize(clone, targetSize);
+                        this.applyOrientation(clone, path);
+                        resolve(clone);
+                    } else {
+                        resolve(null);
+                    }
+                });
+            });
+        }
+
+        // Start loading
+        MODEL_CACHE[path] = { scene: null, loading: true, callbacks: [] };
+
+        return new Promise((resolve) => {
+            if (typeof THREE.GLTFLoader === 'undefined') {
+                MODEL_CACHE[path].loading = false;
+                resolve(null);
+                return;
+            }
+
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                path,
+                (gltf) => {
+                    const scene = gltf.scene;
+                    this._enhanceGLBMaterials(scene);
+
+                    MODEL_CACHE[path].scene = scene;
+                    MODEL_CACHE[path].loading = false;
+
+                    const clone = scene.clone();
+                    this.normalizeModelSize(clone, targetSize);
+                    this.applyOrientation(clone, path);
+                    resolve(clone);
+
+                    for (const cb of MODEL_CACHE[path].callbacks) {
+                        cb(scene);
+                    }
+                    MODEL_CACHE[path].callbacks = [];
+                },
+                undefined,
+                (error) => {
+                    MODEL_CACHE[path].loading = false;
+                    resolve(null);
+                    for (const cb of MODEL_CACHE[path].callbacks) {
+                        cb(null);
+                    }
+                    MODEL_CACHE[path].callbacks = [];
+                }
+            );
+        });
+    }
+
+    /**
+     * Enhance GLB materials so they look vivid in dark space rather than washed out.
+     * Boosts saturation, adds stronger emissive, ensures good contrast.
+     */
+    _enhanceGLBMaterials(scene) {
+        scene.traverse((child) => {
+            if (!child.isMesh || !child.material) return;
+            const mat = child.material;
+            mat.side = THREE.DoubleSide;
+
+            // PBR tuning - more metallic + less rough = shinier space-worthy hull
+            if (mat.metalness !== undefined) {
+                mat.metalness = Math.max(mat.metalness, 0.4);
+                mat.roughness = Math.min(Math.max(mat.roughness, 0.25), 0.65);
+            }
+
+            // Boost color saturation if the base color is too pale/grey
+            if (mat.color) {
+                const hsl = {};
+                mat.color.getHSL(hsl);
+                // If desaturated (s < 0.3) or too bright (l > 0.7), fix it
+                if (hsl.s < 0.3 && hsl.l > 0.3) {
+                    hsl.s = Math.min(hsl.s + 0.2, 0.5);
+                }
+                if (hsl.l > 0.7) {
+                    hsl.l = 0.55; // darken overly bright surfaces
+                } else if (hsl.l < 0.15) {
+                    hsl.l = 0.2; // lighten pure black surfaces slightly
+                }
+                mat.color.setHSL(hsl.h, hsl.s, hsl.l);
+            }
+
+            // Stronger emissive glow for space visibility
+            if (mat.color && mat.emissive !== undefined) {
+                mat.emissive = mat.color.clone().multiplyScalar(0.15);
+                mat.emissiveIntensity = 1.5;
+            }
+
+            // Ensure textures use sRGB encoding for correct color
+            if (mat.map) {
+                mat.map.encoding = THREE.sRGBEncoding;
+            }
+        });
+    }
+
+    /**
      * Check if a GLB model is already loaded and cached for a ship
      */
     hasLoadedModel(shipId) {
@@ -2797,20 +2935,7 @@ class ShipMeshFactory {
                     const scene = gltf.scene;
 
                     // Upgrade materials for visibility in space
-                    scene.traverse((child) => {
-                        if (child.isMesh && child.material) {
-                            child.material.side = THREE.DoubleSide;
-                            if (child.material.metalness !== undefined) {
-                                child.material.metalness = Math.min(child.material.metalness, 0.6);
-                                child.material.roughness = Math.max(child.material.roughness, 0.3);
-                            }
-                            // Add emissive glow based on base color so models are visible in dark space
-                            if (child.material.color && child.material.emissive !== undefined) {
-                                child.material.emissive = child.material.color.clone().multiplyScalar(0.3);
-                                child.material.emissiveIntensity = 1.0;
-                            }
-                        }
-                    });
+                    this._enhanceGLBMaterials(scene);
 
                     MODEL_CACHE[path].scene = scene;
                     MODEL_CACHE[path].loading = false;

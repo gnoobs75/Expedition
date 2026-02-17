@@ -1043,19 +1043,20 @@ export class StationVendorManager {
             </div>
         `;
 
-        // Wire slot click events
+        // Wire slot click events - opens equipment picker
         fittingDisplay.querySelectorAll('.fitting-slot').forEach(slot => {
             slot.addEventListener('click', (e) => {
                 const slotId = slot.dataset.slotId;
                 if (e.target.closest('[data-action="unfit"]')) {
                     this.unfitModule(slotId);
-                } else if (slot.classList.contains('empty') && this.selectedInventoryIndex !== null) {
-                    this.fitModuleToSlot(slotId);
+                    return;
                 }
+                // Toggle equipment picker for this slot
+                this._openEquipmentPicker(slot, slotId);
             });
         });
 
-        // Wire inventory click events
+        // Wire inventory click events (keep as fallback)
         fittingDisplay.querySelectorAll('.fitting-inventory-item').forEach(item => {
             item.addEventListener('click', () => {
                 const index = parseInt(item.dataset.index);
@@ -1210,6 +1211,202 @@ export class StationVendorManager {
     // =============================================
     // FITTING LOGIC
     // =============================================
+
+    /**
+     * Open an equipment picker popup below a fitting slot.
+     * Shows compatible inventory items with stat comparison vs currently fitted module.
+     */
+    _openEquipmentPicker(slotEl, slotId) {
+        // Close any existing picker
+        const existing = document.querySelector('.fitting-equipment-picker');
+        if (existing) {
+            // If clicking same slot, just close
+            if (existing.dataset.slotId === slotId) { existing.remove(); return; }
+            existing.remove();
+        }
+
+        const player = this.game.player;
+        if (!player) return;
+
+        const [slotType, slotNum] = slotId.split('-');
+        const slotIndex = parseInt(slotNum) - 1;
+
+        // Get currently fitted module
+        const currentId = player.modules[slotType]?.[slotIndex];
+        const currentConfig = currentId ? (EQUIPMENT_DATABASE[currentId] || CONFIG.MODULES[currentId]) : null;
+
+        // Map internal slot type to equipment slot field
+        const reverseMap = { high: 'weapon', mid: 'module', low: 'subsystem' };
+        const equipSlot = reverseMap[slotType];
+
+        // Filter inventory for compatible items
+        const inventory = player.moduleInventory || [];
+        const compatible = [];
+        inventory.forEach((item, idx) => {
+            const cfg = item.config || EQUIPMENT_DATABASE[item.id] || CONFIG.MODULES[item.id];
+            if (!cfg) return;
+            const itemInternalSlot = cfg.slot === 'weapon' ? 'high' : cfg.slot === 'module' ? 'mid' : cfg.slot === 'subsystem' ? 'low' : cfg.slot;
+            if (itemInternalSlot === slotType) {
+                compatible.push({ index: idx, id: item.id, config: cfg });
+            }
+        });
+
+        // Build picker HTML
+        const picker = document.createElement('div');
+        picker.className = 'fitting-equipment-picker';
+        picker.dataset.slotId = slotId;
+
+        if (compatible.length === 0 && !currentId) {
+            picker.innerHTML = `
+                <div class="picker-header">No compatible modules in inventory</div>
+                <div class="picker-hint">Buy modules from the MARKET tab</div>
+            `;
+        } else {
+            // Build stat comparison helper
+            const statDiff = (label, newVal, oldVal, unit = '', higher = true) => {
+                if (newVal === undefined && oldVal === undefined) return '';
+                const nv = newVal || 0, ov = oldVal || 0;
+                const diff = nv - ov;
+                if (diff === 0 && nv === 0) return '';
+                const cls = diff > 0 ? (higher ? 'stat-better' : 'stat-worse') :
+                            diff < 0 ? (higher ? 'stat-worse' : 'stat-better') : 'stat-same';
+                const arrow = diff > 0 ? '+' : '';
+                const diffStr = diff !== 0 ? `<span class="${cls}">${arrow}${diff.toFixed?.(1) || diff}${unit}</span>` : '';
+                return `<div class="picker-stat"><span class="stat-label">${label}</span><span class="stat-val">${nv}${unit}</span>${diffStr}</div>`;
+            };
+
+            // Build item rows
+            let itemsHtml = '';
+            for (const item of compatible) {
+                const c = item.config;
+                let statsHtml = '';
+
+                // Weapon stats
+                if (c.damage !== undefined) statsHtml += statDiff('DMG', c.damage, currentConfig?.damage, '');
+                if (c.optimalRange !== undefined) statsHtml += statDiff('Range', c.optimalRange, currentConfig?.optimalRange, 'm');
+                if (c.cycleTime !== undefined) statsHtml += statDiff('Cycle', c.cycleTime, currentConfig?.cycleTime, 's', false);
+                if (c.trackingSpeed !== undefined) statsHtml += statDiff('Track', c.trackingSpeed, currentConfig?.trackingSpeed, '');
+                // DPS calc
+                if (c.damage && c.cycleTime) {
+                    const newDps = (c.damage / c.cycleTime).toFixed(1);
+                    const oldDps = currentConfig?.damage && currentConfig?.cycleTime ? (currentConfig.damage / currentConfig.cycleTime).toFixed(1) : 0;
+                    statsHtml += statDiff('DPS', parseFloat(newDps), parseFloat(oldDps), '');
+                }
+
+                // Defense stats
+                if (c.shieldRepair !== undefined) statsHtml += statDiff('Shield Rep', c.shieldRepair, currentConfig?.shieldRepair, '/s');
+                if (c.armorRepair !== undefined) statsHtml += statDiff('Armor Rep', c.armorRepair, currentConfig?.armorRepair, '/s');
+                if (c.shieldBonus !== undefined) statsHtml += statDiff('Shield+', c.shieldBonus, currentConfig?.shieldBonus, '');
+                if (c.armorBonus !== undefined) statsHtml += statDiff('Armor+', c.armorBonus, currentConfig?.armorBonus, '');
+
+                // Utility stats
+                if (c.speedBonus !== undefined) statsHtml += statDiff('Speed', c.speedBonus, currentConfig?.speedBonus, '%');
+                if (c.maxSpeedBonus !== undefined) statsHtml += statDiff('Speed', c.maxSpeedBonus, currentConfig?.maxSpeedBonus, '%');
+                if (c.miningYield !== undefined) statsHtml += statDiff('Yield', c.miningYield, currentConfig?.miningYield, '');
+                if (c.miningYieldBonus !== undefined) statsHtml += statDiff('Yield+', c.miningYieldBonus, currentConfig?.miningYieldBonus, '%');
+                if (c.capacitorUse !== undefined) statsHtml += statDiff('Cap Use', c.capacitorUse, currentConfig?.capacitorUse, ' GJ', false);
+
+                // EWAR
+                if (c.warpDisrupt !== undefined) statsHtml += statDiff('Disrupt', c.warpDisrupt, currentConfig?.warpDisrupt, '');
+                if (c.webFactor !== undefined) statsHtml += statDiff('Web', Math.round((c.webFactor || 0) * 100), Math.round((currentConfig?.webFactor || 0) * 100), '%');
+
+                itemsHtml += `
+                    <div class="picker-item" data-inv-index="${item.index}">
+                        <div class="picker-item-header">
+                            <span class="picker-icon">${this.getModuleIcon(c)}</span>
+                            <span class="picker-name">${c.name}</span>
+                            ${c.size ? `<span class="picker-size">${c.size.toUpperCase()}</span>` : ''}
+                        </div>
+                        <div class="picker-stats">${statsHtml || '<div class="picker-stat"><span class="stat-label">Utility module</span></div>'}</div>
+                    </div>
+                `;
+            }
+
+            // Unfit option if slot is occupied
+            let unfitHtml = '';
+            if (currentId && currentConfig) {
+                unfitHtml = `<div class="picker-item picker-unfit" data-action="unfit-slot">
+                    <span class="picker-icon" style="color:#ff6644">&#10006;</span>
+                    <span class="picker-name">Remove ${currentConfig.name}</span>
+                </div>`;
+            }
+
+            picker.innerHTML = `
+                <div class="picker-header">${currentConfig ? 'Replace' : 'Fit'}: ${currentConfig?.name || 'Empty Slot'}</div>
+                ${unfitHtml}
+                ${itemsHtml || '<div class="picker-hint">No compatible modules in inventory</div>'}
+            `;
+        }
+
+        // Insert picker after the slot element
+        slotEl.parentNode.insertBefore(picker, slotEl.nextSibling);
+
+        // Wire picker item clicks
+        picker.querySelectorAll('.picker-item[data-inv-index]').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const invIndex = parseInt(el.dataset.invIndex);
+                this._fitFromPicker(slotId, invIndex);
+            });
+        });
+
+        // Wire unfit button
+        const unfitBtn = picker.querySelector('[data-action="unfit-slot"]');
+        if (unfitBtn) {
+            unfitBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.unfitModule(slotId);
+            });
+        }
+
+        // Close picker when clicking outside
+        const closePicker = (e) => {
+            if (!picker.contains(e.target) && !slotEl.contains(e.target)) {
+                picker.remove();
+                document.removeEventListener('click', closePicker);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closePicker), 0);
+    }
+
+    /**
+     * Fit a module from a specific inventory index to a slot (used by equipment picker).
+     */
+    _fitFromPicker(slotId, inventoryIndex) {
+        const player = this.game.player;
+        if (!player) return;
+
+        const inventory = player.moduleInventory || [];
+        const module = inventory[inventoryIndex];
+        if (!module) return;
+
+        const config = module.config || EQUIPMENT_DATABASE[module.id] || CONFIG.MODULES[module.id];
+        if (!config) return;
+
+        const [slotType, slotNum] = slotId.split('-');
+        const slotIndex = parseInt(slotNum) - 1;
+
+        // Unfit existing module (move to inventory)
+        const existingModuleId = player.modules[slotType]?.[slotIndex];
+        if (existingModuleId) {
+            const existingConfig = EQUIPMENT_DATABASE[existingModuleId] || CONFIG.MODULES[existingModuleId];
+            player.moduleInventory.push({ id: existingModuleId, config: existingConfig });
+            player.activeModules?.delete(slotId);
+        }
+
+        // Fit new module
+        if (!player.modules[slotType]) player.modules[slotType] = [];
+        player.modules[slotType][slotIndex] = module.id;
+
+        // Remove from inventory (adjust index if we just pushed an existing module)
+        const adjustedIndex = existingModuleId ? inventoryIndex : inventoryIndex;
+        inventory.splice(adjustedIndex, 1);
+
+        this.game.audio?.play('click');
+        this.game.ui?.toast(`Fitted ${config.name}`, 'success');
+        this.selectedInventoryIndex = null;
+        this.renderFitting();
+    }
 
     fitModuleToSlot(slotId) {
         const player = this.game.player;

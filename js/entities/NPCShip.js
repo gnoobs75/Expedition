@@ -148,6 +148,30 @@ export class NPCShip extends Ship {
         // Add weapon turrets
         this.addTurretHardpoints();
 
+        // Try async GLB load to replace procedural mesh
+        this._tryLoadGLB(factoryRole, factorySize);
+
         return this.mesh;
+    }
+
+    /** Attempt async GLB model swap */
+    _tryLoadGLB(role, size) {
+        if (!shipMeshFactory || !this.mesh) return;
+        const targetSize = this.radius * 2.5;
+        shipMeshFactory.loadModelForRole(role, size, targetSize).then(glbGroup => {
+            if (!glbGroup || !this.alive || !this.mesh) return;
+            while (this.mesh.children.length > 0) {
+                const child = this.mesh.children[0];
+                this.mesh.remove(child);
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                    else child.material.dispose();
+                }
+            }
+            this.mesh.add(glbGroup);
+            this.mesh.scale.set(1, 1, 1);
+            this.glbLoaded = true;
+        });
     }
 }

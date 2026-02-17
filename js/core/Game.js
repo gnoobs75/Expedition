@@ -53,12 +53,14 @@ import { decayMarketState, getMarketState, loadMarketState, getOrderBookState, l
 import { formatCredits } from '../utils/math.js';
 import { FACTIONS, getDefaultStandings, calculateStandingChanges, getStandingInfo, getStandingPriceModifier } from '../data/factionDatabase.js';
 import { setFleetIdCounter } from '../entities/FleetShip.js';
+import { TacticalPauseManager } from '../ui/TacticalPauseManager.js';
 
 export class Game {
     constructor() {
         // Core state
         this.running = false;
         this.paused = false;
+        this.tacticalPaused = false;
         this.lastTime = 0;
         this.deltaTime = 0;
         this.fps = 60;
@@ -233,6 +235,9 @@ export class Game {
         // Create skill tree UI (after Skippy)
         this.skillTreeRenderer = new SkillTreeRenderer(this);
         this.skillFlashManager = new SkillFlashManager(this);
+
+        // Create tactical pause manager (after UI + Skippy)
+        this.tacticalPause = new TacticalPauseManager(this);
 
         // Apply skill bonuses to player
         this.skillGainSystem.applyBonuses();
@@ -656,6 +661,9 @@ export class Game {
      * Change to a different sector
      */
     changeSector(sectorId) {
+        // Auto-cancel tactical pause on sector change
+        if (this.tacticalPaused) this.tacticalPause?.deactivate();
+
         const sector = this.universe.getSector(sectorId);
         if (!sector) {
             console.error(`Sector ${sectorId} not found`);
@@ -687,6 +695,9 @@ export class Game {
 
         // End any active engagement recording on sector change
         this.engagementRecorder?.forceEnd();
+
+        // Clear in-flight projectiles from previous sector
+        this.combat?.clearProjectiles();
 
         // Add player-owned stations in this sector
         for (const pos of this.playerStations) {
@@ -1118,6 +1129,8 @@ export class Game {
      * Dock at station
      */
     dockAtStation(station) {
+        // Cancel tactical pause before docking
+        if (this.tacticalPaused) this.tacticalPause?.deactivate();
         this.dockedAt = station;
         this.player.velocity.set(0, 0);
         this.paused = true;
@@ -1260,6 +1273,9 @@ export class Game {
      */
     update(dt) {
         this._lastDt = dt;
+
+        // Update tactical pause cooldown
+        this.tacticalPause?.updateCooldown(dt);
 
         // Update autopilot FIRST (sets desiredSpeed/desiredRotation)
         this._safeUpdate(this.autopilot, 'Autopilot', dt);

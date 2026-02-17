@@ -385,11 +385,25 @@ export class InputManager {
      * Execute a keybinding action
      */
     executeAction(action, e) {
+        // During tactical pause, only allow stop (to unpause) and targeting/UI actions
+        if (this.game.tacticalPaused && action !== 'stop' && action !== 'lockTarget'
+            && action !== 'unlockTarget' && action !== 'cycleTargets'
+            && action !== 'nearestHostile' && action !== 'deselectTarget') {
+            return;
+        }
+
         switch (action) {
             // Navigation
             case 'stop':
                 e.preventDefault();
-                this.game.autopilot.stop();
+                // Context-sensitive: tactical pause if hostiles nearby, otherwise stop ship
+                if (this.game.tacticalPaused) {
+                    this.game.tacticalPause?.deactivate();
+                } else if (this.game.tacticalPause?.canToggle() && this.game.tacticalPause.hasNearbyHostiles()) {
+                    this.game.tacticalPause.activate();
+                } else {
+                    this.game.autopilot.stop();
+                }
                 break;
 
             case 'approach':

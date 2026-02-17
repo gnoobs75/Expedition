@@ -509,7 +509,6 @@ export class UniverseMapRenderer3D {
             }
 
             const geom = new THREE.BufferGeometry().setFromPoints(points);
-            geom.computeLineDistances(); // Required for dashed material
 
             const color = isUnlocked ? 0xffb020 : 0x664400;
             const mat = new THREE.LineDashedMaterial({
@@ -520,6 +519,7 @@ export class UniverseMapRenderer3D {
                 gapSize: 6,
             });
             const line = new THREE.Line(geom, mat);
+            line.computeLineDistances(); // Required for dashed material (must be on Line, not geometry)
             line.userData = {
                 isSecretWormhole: true,
                 wormholeId: wh.id,

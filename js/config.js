@@ -52,6 +52,11 @@ export const CONFIG = {
     WEAPON_RANGE_LONG: 2000,
     LOCK_TIME_BASE: 2,           // Seconds to lock target
 
+    // Point Defense System
+    PDS_BASE: { frigate: 0.05, destroyer: 0.08, cruiser: 0.10, battlecruiser: 0.12, battleship: 0.15, capital: 0.20 },
+    PDS_RANGE: 150,              // Distance from target where PDS check occurs
+    PDS_SKILL_BONUS: 0.02,      // Per engineering skill level
+
     // Mining
     MINING_RANGE: 200,
     MINING_CYCLE_TIME: 5,        // Seconds per mining cycle
@@ -200,20 +205,20 @@ export const CONFIG = {
     // Modules
     MODULES: {
         // High Slot - Weapons
-        'small-laser': {
-            name: 'Small Pulse Laser',
+        'small-maser': {
+            name: 'Small Pulse Maser',
             slot: 'high',
             damage: 15,
-            range: 500,
+            range: 350,
             cycleTime: 2,
             capacitorUse: 5,
             price: 1000,
         },
-        'medium-laser': {
-            name: 'Medium Pulse Laser',
+        'medium-maser': {
+            name: 'Medium Pulse Maser',
             slot: 'high',
             damage: 35,
-            range: 800,
+            range: 550,
             cycleTime: 3,
             capacitorUse: 12,
             price: 5000,

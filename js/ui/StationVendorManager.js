@@ -1081,7 +1081,7 @@ export class StationVendorManager {
         if (config.armorRepair) return '&#9881;';
         if (config.speedBonus) return '&#10148;';
         if (config.warpDisrupt) return '&#10006;';
-        if (config.damageBonus || config.laserDamageBonus || config.missileDamageBonus) return '&#9733;';
+        if (config.damageBonus || config.maserDamageBonus || config.missileDamageBonus) return '&#9733;';
         if (config.maxSpeedBonus) return '&#10148;';
         if (config.capacitorRegenBonus || config.capacitorBonus) return '&#9889;';
         if (config.shieldResistance || config.armorResistance || config.hullResistance) return '&#9730;';

@@ -286,8 +286,8 @@ export class Game {
             modelId: 'hero-frigate',
         });
 
-        // Default modules: 1 Laser + 1 Railgun + 1 Mining Laser
-        this.player.fitModule('high-1', 'small-pulse-laser');
+        // Default modules: 1 Maser + 1 Railgun + 1 Mining Laser
+        this.player.fitModule('high-1', 'small-pulse-maser');
         this.player.fitModule('high-2', 'small-railgun');
         this.player.fitModule('high-3', 'mining-laser');
         this.player.fitModule('mid-1', 'shield-booster');
@@ -1642,6 +1642,20 @@ export class Game {
                 this.player.switchShip(data.shipClass);
             }
 
+            // Save migration: laser → maser rename
+            const LASER_TO_MASER = {
+                'small-pulse-laser': 'small-pulse-maser',
+                'small-pulse-laser-2': 'small-pulse-maser-2',
+                'medium-pulse-laser': 'medium-pulse-maser',
+                'medium-pulse-laser-2': 'medium-pulse-maser-2',
+                'large-beam-laser': 'large-beam-maser',
+                'large-beam-laser-2': 'large-beam-maser-2',
+                'xlarge-turbo-laser': 'xlarge-turbo-maser',
+                'small-laser': 'small-maser',
+                'medium-laser': 'medium-maser',
+            };
+            const migrateModuleId = (id) => LASER_TO_MASER[id] || id;
+
             // Restore fitted modules
             if (data.shipModules) {
                 // Clear first
@@ -1652,12 +1666,12 @@ export class Game {
                 };
                 this.player.activeModules = new Set();
 
-                // Re-fit saved modules
+                // Re-fit saved modules (with migration)
                 for (const slotType of ['high', 'mid', 'low']) {
                     const mods = data.shipModules[slotType] || [];
                     for (let i = 0; i < mods.length; i++) {
                         if (mods[i]) {
-                            this.player.fitModule(`${slotType}-${i + 1}`, mods[i]);
+                            this.player.fitModule(`${slotType}-${i + 1}`, migrateModuleId(mods[i]));
                         }
                     }
                 }
@@ -1684,9 +1698,9 @@ export class Game {
                 this.player.materials = { ...data.materials };
             }
 
-            // Restore module inventory
+            // Restore module inventory (with laser→maser migration)
             if (data.moduleInventory) {
-                this.player.moduleInventory = [...data.moduleInventory];
+                this.player.moduleInventory = data.moduleInventory.map(migrateModuleId);
             }
 
             // Restore drone bay

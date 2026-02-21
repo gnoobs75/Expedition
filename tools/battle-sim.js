@@ -35,6 +35,10 @@ const AI_PROFILES = {
     support:    { preferredRange: 0.6, fleeHpPct: 0.35, orbitSpeed: 0.5, aggressionMod: 0.4 },
 };
 
+const PDS_BASE = CONFIG.PDS_BASE || { frigate: 0.05, destroyer: 0.08, cruiser: 0.10, battlecruiser: 0.12, battleship: 0.15, capital: 0.20 };
+const PDS_RANGE = CONFIG.PDS_RANGE || 150;
+const PDS_STACKING_PENALTY = [1.0, 0.87, 0.57, 0.28];
+
 const FORMATION_OFFSETS = {
     none: () => [],
     line: (count) => Array.from({ length: count }, (_, i) => ({ x: 0, y: (i - (count - 1) / 2) * 120 })),
@@ -56,32 +60,32 @@ const FORMATION_OFFSETS = {
 
 const DEFAULT_LOADOUTS = {
     // Combat roles
-    'mercenary-frigate':     { high: ['small-pulse-laser', 'small-pulse-laser', 'small-railgun'], mid: ['shield-booster', 'afterburner'], low: ['damage-mod'] },
-    'mercenary-destroyer':   { high: ['small-pulse-laser', 'small-pulse-laser', 'small-railgun', 'small-railgun'], mid: ['shield-booster', 'afterburner'], low: ['damage-mod', 'damage-control'] },
-    'mercenary-cruiser':     { high: ['medium-pulse-laser', 'medium-pulse-laser', 'medium-railgun', 'medium-railgun'], mid: ['shield-booster', 'afterburner', 'sensor-booster'], low: ['damage-mod', 'damage-control', 'armor-plate'] },
-    'mercenary-battlecruiser': { high: ['medium-pulse-laser', 'medium-pulse-laser', 'medium-railgun', 'medium-railgun', 'medium-railgun'], mid: ['shield-booster', 'afterburner', 'sensor-booster'], low: ['damage-mod', 'gyrostabilizer', 'damage-control', 'armor-plate'] },
-    'mercenary-battleship':  { high: ['large-beam-laser', 'large-beam-laser', 'large-railgun', 'large-railgun', 'large-railgun', 'large-railgun'], mid: ['shield-booster', 'afterburner', 'sensor-booster', 'capacitor-booster'], low: ['damage-mod', 'gyrostabilizer', 'damage-control', 'armor-plate', 'armor-plate'] },
-    'pirate-frigate':        { high: ['small-pulse-laser', 'small-pulse-laser', 'small-pulse-laser'], mid: ['afterburner', 'warp-scrambler'], low: ['damage-mod'] },
-    'pirate-destroyer':      { high: ['small-railgun', 'small-railgun', 'small-pulse-laser', 'small-pulse-laser'], mid: ['shield-booster', 'afterburner', 'stasis-webifier'], low: ['damage-mod', 'damage-control'] },
-    'pirate-cruiser':        { high: ['medium-pulse-laser', 'medium-pulse-laser', 'medium-railgun', 'medium-railgun'], mid: ['shield-booster', 'afterburner', 'warp-disruptor'], low: ['damage-mod', 'damage-control', 'gyrostabilizer'] },
+    'mercenary-frigate':     { high: ['small-pulse-maser', 'small-pulse-maser', 'small-railgun'], mid: ['shield-booster', 'afterburner'], low: ['damage-mod'] },
+    'mercenary-destroyer':   { high: ['small-pulse-maser', 'small-pulse-maser', 'small-railgun', 'small-railgun'], mid: ['shield-booster', 'afterburner'], low: ['damage-mod', 'damage-control'] },
+    'mercenary-cruiser':     { high: ['medium-pulse-maser', 'medium-pulse-maser', 'medium-railgun', 'medium-railgun'], mid: ['shield-booster', 'afterburner', 'sensor-booster'], low: ['damage-mod', 'damage-control', 'armor-plate'] },
+    'mercenary-battlecruiser': { high: ['medium-pulse-maser', 'medium-pulse-maser', 'medium-railgun', 'medium-railgun', 'medium-railgun'], mid: ['shield-booster', 'afterburner', 'sensor-booster'], low: ['damage-mod', 'gyrostabilizer', 'damage-control', 'point-defense-system'] },
+    'mercenary-battleship':  { high: ['large-beam-maser', 'large-beam-maser', 'large-railgun', 'large-railgun', 'large-railgun', 'large-railgun'], mid: ['shield-booster', 'afterburner', 'sensor-booster', 'capacitor-booster'], low: ['damage-mod', 'gyrostabilizer', 'damage-control', 'point-defense-system-2', 'armor-plate'] },
+    'pirate-frigate':        { high: ['small-pulse-maser', 'small-pulse-maser', 'small-pulse-maser'], mid: ['afterburner', 'warp-scrambler'], low: ['damage-mod'] },
+    'pirate-destroyer':      { high: ['small-railgun', 'small-railgun', 'small-pulse-maser', 'small-pulse-maser'], mid: ['shield-booster', 'afterburner', 'stasis-webifier'], low: ['damage-mod', 'damage-control'] },
+    'pirate-cruiser':        { high: ['medium-pulse-maser', 'medium-pulse-maser', 'medium-railgun', 'medium-railgun'], mid: ['shield-booster', 'afterburner', 'warp-disruptor'], low: ['damage-mod', 'damage-control', 'gyrostabilizer'] },
     'military-frigate':      { high: ['small-railgun', 'small-railgun', 'light-missile'], mid: ['shield-booster', 'afterburner'], low: ['damage-control'] },
     'military-destroyer':    { high: ['small-railgun', 'small-railgun', 'small-railgun', 'light-missile'], mid: ['shield-booster', 'afterburner', 'sensor-booster'], low: ['damage-control', 'ballistic-control'] },
     'military-cruiser':      { high: ['medium-railgun', 'medium-railgun', 'heavy-missile', 'heavy-missile'], mid: ['shield-booster', 'afterburner', 'sensor-booster'], low: ['damage-control', 'ballistic-control', 'armor-plate'] },
-    'military-battlecruiser': { high: ['medium-railgun', 'medium-railgun', 'heavy-missile', 'heavy-missile', 'heavy-missile'], mid: ['shield-booster', 'afterburner', 'sensor-booster'], low: ['damage-control', 'ballistic-control', 'armor-plate', 'shield-extender'] },
-    'military-battleship':   { high: ['large-railgun', 'large-railgun', 'cruise-missile', 'cruise-missile', 'cruise-missile', 'cruise-missile'], mid: ['shield-booster', 'afterburner', 'sensor-booster', 'capacitor-booster'], low: ['damage-control', 'ballistic-control', 'armor-plate', 'armor-plate', 'shield-extender'] },
-    'police-frigate':        { high: ['small-pulse-laser', 'small-pulse-laser'], mid: ['warp-scrambler', 'afterburner'], low: ['damage-control'] },
-    'police-destroyer':      { high: ['small-pulse-laser', 'small-pulse-laser', 'small-pulse-laser'], mid: ['warp-scrambler', 'afterburner', 'stasis-webifier'], low: ['damage-control', 'damage-mod'] },
-    'police-cruiser':        { high: ['medium-pulse-laser', 'medium-pulse-laser', 'medium-pulse-laser'], mid: ['warp-disruptor', 'afterburner', 'stasis-webifier'], low: ['damage-control', 'damage-mod', 'armor-plate'] },
+    'military-battlecruiser': { high: ['medium-railgun', 'medium-railgun', 'heavy-missile', 'heavy-missile', 'heavy-missile'], mid: ['shield-booster', 'afterburner', 'sensor-booster'], low: ['damage-control', 'ballistic-control', 'point-defense-system', 'shield-extender'] },
+    'military-battleship':   { high: ['large-railgun', 'large-railgun', 'cruise-missile', 'cruise-missile', 'cruise-missile', 'cruise-missile'], mid: ['shield-booster', 'afterburner', 'sensor-booster', 'capacitor-booster'], low: ['damage-control', 'ballistic-control', 'point-defense-system-2', 'armor-plate', 'shield-extender'] },
+    'police-frigate':        { high: ['small-pulse-maser', 'small-pulse-maser'], mid: ['warp-scrambler', 'afterburner'], low: ['damage-control'] },
+    'police-destroyer':      { high: ['small-pulse-maser', 'small-pulse-maser', 'small-pulse-maser'], mid: ['warp-scrambler', 'afterburner', 'stasis-webifier'], low: ['damage-control', 'damage-mod'] },
+    'police-cruiser':        { high: ['medium-pulse-maser', 'medium-pulse-maser', 'medium-pulse-maser'], mid: ['warp-disruptor', 'afterburner', 'stasis-webifier'], low: ['damage-control', 'damage-mod', 'armor-plate'] },
     // Non-combat roles (minimal weapons)
     'mining-frigate':        { high: ['mining-laser'], mid: ['shield-booster', 'afterburner'], low: ['damage-control'] },
     'mining-destroyer':      { high: ['mining-laser', 'mining-laser'], mid: ['shield-booster', 'afterburner'], low: ['damage-control', 'mining-upgrade'] },
     'mining-cruiser':        { high: ['modulated-miner', 'modulated-miner'], mid: ['shield-booster', 'afterburner'], low: ['damage-control', 'mining-upgrade', 'mining-upgrade'] },
-    'hauler-frigate':        { high: ['small-pulse-laser'], mid: ['shield-booster', 'afterburner'], low: ['damage-control'] },
-    'hauler-destroyer':      { high: ['small-pulse-laser', 'small-pulse-laser'], mid: ['shield-booster', 'afterburner'], low: ['damage-control', 'nanofiber'] },
-    'hauler-cruiser':        { high: ['medium-pulse-laser', 'medium-pulse-laser'], mid: ['shield-booster', 'afterburner'], low: ['damage-control', 'nanofiber', 'armor-plate'] },
-    'logistics-frigate':     { high: ['small-pulse-laser'], mid: ['remote-shield-repairer', 'afterburner'], low: ['damage-control'] },
-    'logistics-destroyer':   { high: ['small-pulse-laser', 'small-pulse-laser'], mid: ['remote-shield-repairer', 'afterburner'], low: ['damage-control', 'capacitor-flux-coil'] },
-    'logistics-cruiser':     { high: ['medium-pulse-laser', 'medium-pulse-laser'], mid: ['remote-shield-repairer', 'remote-armor-repairer', 'afterburner'], low: ['damage-control', 'capacitor-flux-coil', 'reactor-control'] },
+    'hauler-frigate':        { high: ['small-pulse-maser'], mid: ['shield-booster', 'afterburner'], low: ['damage-control'] },
+    'hauler-destroyer':      { high: ['small-pulse-maser', 'small-pulse-maser'], mid: ['shield-booster', 'afterburner'], low: ['damage-control', 'nanofiber'] },
+    'hauler-cruiser':        { high: ['medium-pulse-maser', 'medium-pulse-maser'], mid: ['shield-booster', 'afterburner'], low: ['damage-control', 'nanofiber', 'armor-plate'] },
+    'logistics-frigate':     { high: ['small-pulse-maser'], mid: ['remote-shield-repairer', 'afterburner'], low: ['damage-control'] },
+    'logistics-destroyer':   { high: ['small-pulse-maser', 'small-pulse-maser'], mid: ['remote-shield-repairer', 'afterburner'], low: ['damage-control', 'capacitor-flux-coil'] },
+    'logistics-cruiser':     { high: ['medium-pulse-maser', 'medium-pulse-maser'], mid: ['remote-shield-repairer', 'remote-armor-repairer', 'afterburner'], low: ['damage-control', 'capacitor-flux-coil', 'reactor-control'] },
 };
 
 function getModuleConfig(moduleId) {
@@ -189,6 +193,8 @@ class SimShip {
             timeInCombat: 0,
             firstShotTime: -1,
             deathTime: -1,
+            pdsIntercepted: 0,
+            pdsFired: 0,
         };
 
         // AI state tracking (for inspector)
@@ -227,10 +233,46 @@ class SimShip {
             if (!moduleId) continue;
             const config = getModuleConfig(moduleId);
             if (config?.damageBonus) damageMult *= config.damageBonus;
-            if (config?.laserDamageBonus) damageMult *= config.laserDamageBonus;
+            if (config?.maserDamageBonus) damageMult *= config.maserDamageBonus;
             if (config?.missileDamageBonus) damageMult *= config.missileDamageBonus;
         }
         return totalDps * damageMult;
+    }
+
+    getPdsChance(allies) {
+        const base = PDS_BASE[this.shipSize] || PDS_BASE.frigate || 0.05;
+
+        // Module bonuses with stacking penalty
+        const pdsBonuses = [];
+        for (const moduleId of [...this.modules.mid, ...this.modules.low]) {
+            if (!moduleId) continue;
+            const config = getModuleConfig(moduleId);
+            if (config?.pdsBonus) pdsBonuses.push(config.pdsBonus);
+        }
+        pdsBonuses.sort((a, b) => b - a);
+        let moduleBonus = 0;
+        for (let i = 0; i < pdsBonuses.length; i++) {
+            moduleBonus += pdsBonuses[i] * (PDS_STACKING_PENALTY[i] || 0.28);
+        }
+
+        // Fleet PDS bonus from nearby allies with fleet-pds-array
+        let fleetBonus = 0;
+        if (allies) {
+            for (const ally of allies) {
+                if (ally === this || !ally.alive) continue;
+                for (const moduleId of [...ally.modules.mid, ...ally.modules.low]) {
+                    if (!moduleId) continue;
+                    const config = getModuleConfig(moduleId);
+                    if (!config?.fleetPdsBonus || !config?.fleetPdsRange) continue;
+                    const dist = distance(this.x, this.y, ally.x, ally.y);
+                    if (dist <= config.fleetPdsRange) {
+                        fleetBonus += config.fleetPdsBonus;
+                    }
+                }
+            }
+        }
+
+        return Math.min(0.95, base + moduleBonus + fleetBonus);
     }
 
     getMaxWeaponRange() {
@@ -785,7 +827,7 @@ class BattleEngine {
                 if (!moduleId) continue;
                 const config = getModuleConfig(moduleId);
                 if (config?.damageBonus) lowDmgMult *= config.damageBonus;
-                if (config?.laserDamageBonus) lowDmgMult *= config.laserDamageBonus;
+                if (config?.maserDamageBonus) lowDmgMult *= config.maserDamageBonus;
                 if (config?.missileDamageBonus) lowDmgMult *= config.missileDamageBonus;
             }
 
@@ -857,6 +899,29 @@ class BattleEngine {
                 // Track shot
                 ship.stats.totalShots++;
                 if (ship.stats.weapons[cooldownKey]) ship.stats.weapons[cooldownKey].shots++;
+
+                // PDS intercept check for missiles
+                if (isMissile) {
+                    const allies = this.ships.filter(s => s.team === target.team && s.alive);
+                    const pdsChance = target.getPdsChance(allies);
+                    target.stats.pdsFired++;
+                    if (pdsChance > 0 && Math.random() < pdsChance) {
+                        target.stats.pdsIntercepted++;
+                        // Intercepted - still counts as a "miss" for accuracy
+                        ship.stats.totalMisses++;
+                        if (ship.stats.weapons[cooldownKey]) ship.stats.weapons[cooldownKey].misses++;
+                        // Projectile visual (still show it, but it's intercepted)
+                        this.projectiles.push({
+                            sx: ship.x, sy: ship.y,
+                            tx: target.x, ty: target.y,
+                            life: 0.3, maxLife: 0.3,
+                            team: ship.team,
+                            isMissile: true,
+                            intercepted: true,
+                        });
+                        continue; // Skip damage
+                    }
+                }
 
                 if (isMissile || Math.random() < hitChance) {
                     let dmg = config.damage * damageMult * lowDmgMult;
@@ -1039,6 +1104,9 @@ class BattleEngine {
                 deathTime: st.deathTime >= 0 ? +st.deathTime.toFixed(2) : -1,
                 overkillDamage: Math.round(st.overkillDamage),
                 kills: s.kills,
+                pdsChance: +s.getPdsChance(this.ships.filter(sh => sh.team === s.team && sh.alive)).toFixed(3),
+                pdsFired: st.pdsFired,
+                pdsIntercepted: st.pdsIntercepted,
             };
         });
 
@@ -1661,7 +1729,7 @@ class BattleRenderer {
 
         // Color per weapon category
         const WEAPON_COLORS = {
-            laser:   0x3b82f6,   // blue
+            maser:   0x3b82f6,   // blue
             railgun: 0x22c55e,   // green
             missile: 0xef4444,   // red
             mining:  0xf59e0b,   // amber
@@ -1674,10 +1742,10 @@ class BattleRenderer {
             if (!w.range || w.range <= 0) continue;
             let cat = 'default';
             const id = (w.moduleId || '').toLowerCase();
-            if (id.includes('laser') || id.includes('beam')) cat = 'laser';
+            if (id.includes('maser') || id.includes('beam')) cat = 'maser';
             else if (id.includes('railgun') || id.includes('cannon') || id.includes('autocannon')) cat = 'railgun';
             else if (id.includes('missile') || id.includes('torpedo') || id.includes('rocket')) cat = 'missile';
-            else if (id.includes('mining') || id.includes('miner')) cat = 'mining';
+            else if (id.includes('mining') || id.includes('miner') || id.includes('laser')) cat = 'mining';
 
             const key = `${cat}-${w.optimal}-${w.falloff}`;
             if (!rangeMap.has(key)) {
@@ -1704,10 +1772,10 @@ class BattleRenderer {
 
                 let cat = 'default';
                 const id = moduleId.toLowerCase();
-                if (id.includes('laser') || id.includes('beam')) cat = 'laser';
+                if (id.includes('maser') || id.includes('beam')) cat = 'maser';
                 else if (id.includes('railgun') || id.includes('cannon')) cat = 'railgun';
                 else if (id.includes('missile') || id.includes('torpedo') || id.includes('rocket')) cat = 'missile';
-                else if (id.includes('mining') || id.includes('miner')) cat = 'mining';
+                else if (id.includes('mining') || id.includes('miner') || id.includes('laser')) cat = 'mining';
 
                 const key = `${cat}-${optimal}-${falloff}`;
                 if (!rangeMap.has(key)) {
@@ -2676,6 +2744,8 @@ class BattleSimUI {
                 if (c.armorRepair) effects.push(`Armor Rep: ${c.armorRepair}/cycle`);
                 if (c.speedBonus) effects.push(`Speed: +${((c.speedBonus - 1) * 100).toFixed(0)}%`);
                 if (c.signatureBloom) effects.push(`Sig Bloom: ${c.signatureBloom}x`);
+                if (c.pdsBonus) effects.push(`PDS: +${(c.pdsBonus * 100).toFixed(0)}%`);
+                if (c.fleetPdsBonus) effects.push(`Fleet PDS: +${(c.fleetPdsBonus * 100).toFixed(0)}% @${c.fleetPdsRange}m`);
                 if (c.capacitorUse) effects.push(`Cap: ${c.capacitorUse}/s`);
                 html += `<div style="font-size:10px;color:var(--dim);padding:1px 0">[M${i + 1}] ${c.name}${effects.length ? ' - ' + effects.join(', ') : ''}</div>`;
             }
@@ -2685,8 +2755,10 @@ class BattleSimUI {
                 const c = getModuleConfig(id);
                 const effects = [];
                 if (c.damageBonus) effects.push(`Dmg: +${((c.damageBonus - 1) * 100).toFixed(0)}%`);
-                if (c.laserDamageBonus) effects.push(`Laser Dmg: +${((c.laserDamageBonus - 1) * 100).toFixed(0)}%`);
+                if (c.maserDamageBonus) effects.push(`Maser Dmg: +${((c.maserDamageBonus - 1) * 100).toFixed(0)}%`);
                 if (c.missileDamageBonus) effects.push(`Missile Dmg: +${((c.missileDamageBonus - 1) * 100).toFixed(0)}%`);
+                if (c.pdsBonus) effects.push(`PDS: +${(c.pdsBonus * 100).toFixed(0)}%`);
+                if (c.fleetPdsBonus) effects.push(`Fleet PDS: +${(c.fleetPdsBonus * 100).toFixed(0)}% @${c.fleetPdsRange}m`);
                 if (c.shieldResist) effects.push(`Shield Res: +${(c.shieldResist * 100).toFixed(0)}%`);
                 if (c.armorResist) effects.push(`Armor Res: +${(c.armorResist * 100).toFixed(0)}%`);
                 if (c.hullResist) effects.push(`Hull Res: +${(c.hullResist * 100).toFixed(0)}%`);
@@ -2701,6 +2773,8 @@ class BattleSimUI {
         const accuracy = st.totalShots > 0 ? (st.totalHits / st.totalShots * 100).toFixed(1) : '0.0';
         const combatDps = st.timeInCombat > 0.1 ? (ship.damageDone / st.timeInCombat).toFixed(1) : '0.0';
         const resistEff = st.rawDamageReceived > 0 ? (st.damageAbsorbedByResist / st.rawDamageReceived * 100).toFixed(0) : '0';
+        const pdsChance = ship.getPdsChance(this.engine.ships.filter(s => s.team === ship.team && s.alive));
+        const pdsIntPct = st.pdsFired > 0 ? (st.pdsIntercepted / st.pdsFired * 100).toFixed(0) : '0';
 
         html += `<div class="tt-section">
             <div class="tt-section-title">Combat Tally</div>
@@ -2711,6 +2785,8 @@ class BattleSimUI {
                 <div class="tt-row"><span class="lbl">Accuracy</span><span class="val">${accuracy}% (${st.totalHits}/${st.totalShots})</span></div>
                 <div class="tt-row"><span class="lbl">Kills</span><span class="val">${ship.kills}</span></div>
                 <div class="tt-row"><span class="lbl">HP Remaining</span><span class="val">${(ship.getHpPercent() * 100).toFixed(1)}%</span></div>
+                <div class="tt-row"><span class="lbl">PDS Chance</span><span class="val">${(pdsChance * 100).toFixed(0)}%</span></div>
+                <div class="tt-row"><span class="lbl">PDS Intercepts</span><span class="val">${st.pdsIntercepted}/${st.pdsFired} (${pdsIntPct}%)</span></div>
                 <div class="tt-row"><span class="lbl">Resist Efficiency</span><span class="val">${resistEff}% absorbed</span></div>
                 <div class="tt-row"><span class="lbl">Shield Repaired</span><span class="val">${Math.round(st.shieldRepaired)}</span></div>
                 <div class="tt-row"><span class="lbl">Armor Repaired</span><span class="val">${Math.round(st.armorRepaired)}</span></div>
@@ -3013,18 +3089,20 @@ class BattleSimUI {
 
         // Results table (enhanced)
         const tableEl = document.getElementById('results-table');
-        let html = '<table><tr><th>Ship</th><th>Dmg Done</th><th>Dmg Taken</th><th>DPS</th><th>Acc%</th><th>Kills</th><th>Status</th></tr>';
+        let html = '<table><tr><th>Ship</th><th>Dmg Done</th><th>Dmg Taken</th><th>DPS</th><th>Acc%</th><th>PDS</th><th>Kills</th><th>Status</th></tr>';
         for (const ship of this.engine.ships) {
             const teamClass = ship.team === 'a' ? 'team-a' : 'team-b';
             const st = ship.stats;
             const dps = st.timeInCombat > 0.1 ? (ship.damageDone / st.timeInCombat).toFixed(1) : '0';
             const acc = st.totalShots > 0 ? (st.totalHits / st.totalShots * 100).toFixed(0) : '-';
+            const pds = st.pdsFired > 0 ? `${st.pdsIntercepted}/${st.pdsFired}` : '-';
             html += `<tr class="${teamClass}">
                 <td>${ship.name}</td>
                 <td>${Math.round(ship.damageDone)}</td>
                 <td>${Math.round(ship.damageTaken)}</td>
                 <td>${dps}</td>
                 <td>${acc}%</td>
+                <td>${pds}</td>
                 <td>${ship.kills}</td>
                 <td>${ship.alive ? `<span style="color:var(--pass)">${Math.round(ship.getHpPercent() * 100)}%</span>` : '<span style="color:var(--hull)">DESTROYED</span>'}</td>
             </tr>`;
@@ -3058,7 +3136,7 @@ class BattleSimUI {
  * @returns {{ high: string[], mid: string[], low: string[] }}
  *
  * Strategies:
- *   'max-dps-laser', 'max-dps-railgun', 'max-dps-missile',
+ *   'max-dps-maser', 'max-dps-railgun', 'max-dps-missile',
  *   'all-em-resist', 'all-thermal-resist', 'all-kinetic-resist', 'all-explosive-resist',
  *   'omni-tank', 'max-shield-tank', 'max-armor-tank',
  *   'speed-kite', 'brawl-tank', 'custom'
@@ -3095,7 +3173,7 @@ function generateLoadout(strategy, shipConfig, customModules) {
 
     // --- Weapon strategies ---
     const weaponStrats = {
-        'max-dps-laser': 'laser',
+        'max-dps-maser': 'maser',
         'max-dps-railgun': 'railgun',
         'max-dps-missile': 'missile',
     };
@@ -3107,7 +3185,7 @@ function generateLoadout(strategy, shipConfig, customModules) {
         }
         // Matching damage mods in low
         const dmgMods = {
-            laser: ['heat-sink-2', 'heat-sink', 'damage-mod-2', 'damage-mod'],
+            maser: ['heat-sink-2', 'heat-sink', 'damage-mod-2', 'damage-mod'],
             railgun: ['gyrostabilizer-2', 'gyrostabilizer', 'damage-mod-2', 'damage-mod'],
             missile: ['ballistic-control-2', 'ballistic-control', 'damage-mod-2', 'damage-mod'],
         }[cat];
@@ -3129,7 +3207,7 @@ function generateLoadout(strategy, shipConfig, customModules) {
     if (resistStrats[strategy]) {
         const type = resistStrats[strategy];
         // Default weapons (mix)
-        const defaultWeapons = [...findWeapons('laser'), ...findWeapons('railgun')].sort((a, b) =>
+        const defaultWeapons = [...findWeapons('maser'), ...findWeapons('railgun')].sort((a, b) =>
             (b[1].damage / b[1].cycleTime) - (a[1].damage / a[1].cycleTime));
         fillSlots(loadout.high, highCount, defaultWeapons.map(([id]) => id));
         // Mid: type-specific shield hardener + shield booster
@@ -3145,7 +3223,7 @@ function generateLoadout(strategy, shipConfig, customModules) {
 
     // --- Tank strategies ---
     if (strategy === 'omni-tank') {
-        const defaultWeapons = [...findWeapons('laser'), ...findWeapons('railgun')].sort((a, b) =>
+        const defaultWeapons = [...findWeapons('maser'), ...findWeapons('railgun')].sort((a, b) =>
             (b[1].damage / b[1].cycleTime) - (a[1].damage / a[1].cycleTime));
         fillSlots(loadout.high, highCount, defaultWeapons.map(([id]) => id));
         const midList = ['adaptive-invulnerability-field', 'shield-booster', 'afterburner', 'capacitor-booster'].filter(id => EQUIPMENT_DATABASE[id]);
@@ -3156,7 +3234,7 @@ function generateLoadout(strategy, shipConfig, customModules) {
     }
 
     if (strategy === 'max-shield-tank') {
-        const defaultWeapons = [...findWeapons('laser'), ...findWeapons('railgun')].sort((a, b) =>
+        const defaultWeapons = [...findWeapons('maser'), ...findWeapons('railgun')].sort((a, b) =>
             (b[1].damage / b[1].cycleTime) - (a[1].damage / a[1].cycleTime));
         fillSlots(loadout.high, highCount, defaultWeapons.map(([id]) => id));
         const midList = ['shield-booster', 'adaptive-invulnerability-field', 'em-shield-hardener', 'afterburner'].filter(id => EQUIPMENT_DATABASE[id]);
@@ -3167,7 +3245,7 @@ function generateLoadout(strategy, shipConfig, customModules) {
     }
 
     if (strategy === 'max-armor-tank') {
-        const defaultWeapons = [...findWeapons('laser'), ...findWeapons('railgun')].sort((a, b) =>
+        const defaultWeapons = [...findWeapons('maser'), ...findWeapons('railgun')].sort((a, b) =>
             (b[1].damage / b[1].cycleTime) - (a[1].damage / a[1].cycleTime));
         fillSlots(loadout.high, highCount, defaultWeapons.map(([id]) => id));
         const midList = ['armor-repairer', 'afterburner', 'capacitor-booster', 'sensor-booster'].filter(id => EQUIPMENT_DATABASE[id]);
@@ -3194,8 +3272,8 @@ function generateLoadout(strategy, shipConfig, customModules) {
     }
 
     if (strategy === 'brawl-tank') {
-        // Short-range weapons (lasers, highest DPS)
-        const shortRange = findWeapons('laser');
+        // Short-range weapons (masers, highest DPS)
+        const shortRange = findWeapons('maser');
         fillSlots(loadout.high, highCount, shortRange.map(([id]) => id));
         const midList = ['stasis-webifier', 'warp-scrambler', 'afterburner', 'shield-booster'].filter(id => EQUIPMENT_DATABASE[id]);
         fillSlots(loadout.mid, midCount, midList);
@@ -3434,9 +3512,9 @@ function runBalanceReport(options = {}) {
 
             for (const dmgType of dmgTypes) {
                 // Generate attacker loadout: max DPS of one damage type
-                const dmgStrategy = dmgType === 'em' ? 'max-dps-laser' :
+                const dmgStrategy = dmgType === 'em' ? 'max-dps-maser' :
                                      dmgType === 'kinetic' ? 'max-dps-railgun' :
-                                     dmgType === 'explosive' ? 'max-dps-missile' : 'max-dps-laser';
+                                     dmgType === 'explosive' ? 'max-dps-missile' : 'max-dps-maser';
 
                 for (const resType of resistTypes) {
                     const resStrategy = resType === 'omni' ? 'omni-tank' : `all-${resType}-resist`;

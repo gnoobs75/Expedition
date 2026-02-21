@@ -663,10 +663,72 @@ export class Ship extends Entity {
             if (!moduleId) continue;
             const config = getModuleConfig(moduleId);
             if (config?.damageBonus) damageMult *= config.damageBonus;
-            if (config?.laserDamageBonus) damageMult *= config.laserDamageBonus;
+            if (config?.maserDamageBonus) damageMult *= config.maserDamageBonus;
             if (config?.missileDamageBonus) damageMult *= config.missileDamageBonus;
         }
         return totalDps * damageMult;
+    }
+
+    /**
+     * Calculate point defense intercept chance for incoming missiles.
+     * Base chance from ship size + module bonuses (stacking penalized) + engineering skill.
+     * Capped at 0.95.
+     */
+    getPdsChance() {
+        const shipSize = this.shipClass || this.size || 'frigate';
+        const base = CONFIG.PDS_BASE?.[shipSize] || CONFIG.PDS_BASE?.frigate || 0.05;
+
+        // Module bonuses (stacking penalized: 1.0, 0.87, 0.57, 0.28)
+        const stackPenalty = [1.0, 0.87, 0.57, 0.28];
+        const pdsBonuses = [];
+        for (const moduleId of [...(this.modules?.low || []), ...(this.modules?.mid || [])]) {
+            if (!moduleId) continue;
+            const config = getModuleConfig(moduleId);
+            if (config?.pdsBonus) pdsBonuses.push(config.pdsBonus);
+        }
+        pdsBonuses.sort((a, b) => b - a); // Best first
+        let moduleBonus = 0;
+        for (let i = 0; i < pdsBonuses.length; i++) {
+            moduleBonus += pdsBonuses[i] * (stackPenalty[i] || 0.28);
+        }
+
+        // Engineering skill bonus
+        const engLevel = this.game?.skillSystem?.skills?.engineering?.level || 0;
+        const skillBonus = engLevel * (CONFIG.PDS_SKILL_BONUS || 0.02);
+
+        // Fleet PDS bonus from nearby allies
+        const fleetBonus = this.getFleetPdsBonus();
+
+        return Math.min(0.95, base + moduleBonus + skillBonus + fleetBonus);
+    }
+
+    /**
+     * Get PDS bonus from nearby allied ships with fleet-pds-array modules.
+     */
+    getFleetPdsBonus() {
+        if (!this.game?.currentSector) return 0;
+        let bonus = 0;
+        const entities = this.game.currentSector.entities;
+        for (const entity of entities) {
+            if (entity === this || !entity.alive || entity.type !== 'ship' && entity.type !== 'fleet') continue;
+            // Must be friendly (same team: player + fleet ships)
+            const isAlly = (this.isPlayer && (entity.isFleet || entity.type === 'fleet')) ||
+                          (this.isFleet && entity.isPlayer) ||
+                          (this.isFleet && (entity.isFleet || entity.type === 'fleet'));
+            if (!isAlly) continue;
+
+            // Check for fleet PDS modules
+            for (const moduleId of [...(entity.modules?.low || []), ...(entity.modules?.mid || [])]) {
+                if (!moduleId) continue;
+                const config = getModuleConfig(moduleId);
+                if (!config?.fleetPdsBonus || !config?.fleetPdsRange) continue;
+                const dist = this.distanceTo(entity);
+                if (dist <= config.fleetPdsRange) {
+                    bonus += config.fleetPdsBonus;
+                }
+            }
+        }
+        return bonus;
     }
 
     /**
@@ -894,7 +956,7 @@ export class Ship extends Entity {
             if (mod) {
                 const modConfig = getModuleConfig(mod);
                 if (modConfig?.damageBonus) damage *= modConfig.damageBonus;
-                if (modConfig?.laserDamageBonus) damage *= modConfig.laserDamageBonus;
+                if (modConfig?.maserDamageBonus) damage *= modConfig.maserDamageBonus;
                 if (modConfig?.missileDamageBonus && moduleConfig.category === 'missile') damage *= modConfig.missileDamageBonus;
             }
         }
@@ -929,7 +991,7 @@ export class Ship extends Entity {
         if (this.isPlayer) {
             const [st, si] = this.parseSlotId(slotId);
             const eqId = this.modules[st]?.[si];
-            const soundName = moduleConfig.category === 'missile' ? 'missile-launch' : 'laser';
+            const soundName = moduleConfig.category === 'missile' ? 'missile-launch' : 'maser';
             this.game.audio?.playForEquipment(soundName, 1, eqId);
         }
     }
@@ -1615,10 +1677,10 @@ export class Ship extends Entity {
      */
     _getSlotWeaponCategory(slotIndex) {
         const moduleId = this.modules?.high?.[slotIndex];
-        if (!moduleId) return 'laser'; // default visual
+        if (!moduleId) return 'maser'; // default visual
         const config = getModuleConfig(moduleId);
-        if (!config) return 'laser';
-        return config.category || 'laser';
+        if (!config) return 'maser';
+        return config.category || 'maser';
     }
 
     /**
@@ -1682,7 +1744,7 @@ export class Ship extends Entity {
         tip.name = 'emitter_tip';
         group.add(tip);
 
-        group.userData.weaponType = 'laser';
+        group.userData.weaponType = 'maser';
         return group;
     }
 

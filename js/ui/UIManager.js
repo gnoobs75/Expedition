@@ -3010,8 +3010,8 @@ export class UIManager {
      */
     getModuleIcon(moduleId) {
         const icons = {
-            'small-laser': '&#9889;',
-            'medium-laser': '&#9889;',
+            'small-maser': '&#9889;',
+            'medium-maser': '&#9889;',
             'mining-laser': '&#9874;',
             'mining-laser-2': '&#9874;',
             'shield-booster': '&#9211;',
@@ -3031,7 +3031,7 @@ export class UIManager {
             if (config.armorRepair) return '&#10010;';
             if (config.speedBonus) return '&#10148;';
             if (config.warpDisrupt) return '&#10006;';
-            if (config.damageBonus || config.laserDamageBonus || config.missileDamageBonus) return '&#9733;';
+            if (config.damageBonus || config.maserDamageBonus || config.missileDamageBonus) return '&#9733;';
             if (config.missileSpeed) return '&#9737;';
             if (config.salvageChance) return '&#9851;';
         }

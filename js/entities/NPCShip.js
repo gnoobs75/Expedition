@@ -57,7 +57,7 @@ export class NPCShip extends Ship {
 
         // Security-specific
         if (role === 'security') {
-            this.fitModule('high-1', shipClass === 'cruiser' ? 'medium-laser' : 'small-laser');
+            this.fitModule('high-1', shipClass === 'cruiser' ? 'medium-maser' : 'small-maser');
             this.fitModule('mid-1', 'shield-booster');
             this.aggroRange = 3000;
             this.attackRange = shipClass === 'cruiser' ? 800 : 500;

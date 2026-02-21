@@ -578,7 +578,7 @@ export class EncyclopediaManager {
                 remoteRepair: 'Remote Repair', remoteRepairRange: 'Remote Repair Range',
                 salvageChance: 'Salvage Chance', salvageRange: 'Salvage Range',
                 harvestYield: 'Harvest Yield', harvestCycleTime: 'Harvest Cycle Time',
-                laserDamageBonus: 'Laser Damage', capacitorDrain: 'Cap Drain',
+                maserDamageBonus: 'Maser Damage', capacitorDrain: 'Cap Drain',
                 cycleTimeBonus: 'Cycle Time', droneYield: 'Drone Mining Yield',
                 optimalRange: 'Optimal Range',
             };

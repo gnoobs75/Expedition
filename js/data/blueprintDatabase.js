@@ -59,10 +59,10 @@ export const BLUEPRINT_DATABASE = {
     // TIER 1 - Common Station Modules
     // =============================================
 
-    'bp-small-pulse-laser-2': {
-        name: 'Small Pulse Laser II Blueprint',
-        description: 'Manufacturing schematic for the Tech II small pulse laser.',
-        outputId: 'small-pulse-laser-2',
+    'bp-small-pulse-maser-2': {
+        name: 'Small Pulse Maser II Blueprint',
+        description: 'Manufacturing schematic for the Tech II small pulse maser.',
+        outputId: 'small-pulse-maser-2',
         outputType: 'module',
         tier: 1,
         materials: {
@@ -206,10 +206,10 @@ export const BLUEPRINT_DATABASE = {
     // TIER 2 - Medium Modules
     // =============================================
 
-    'bp-medium-pulse-laser': {
-        name: 'Medium Pulse Laser I Blueprint',
-        description: 'Manufacturing schematic for a medium pulse laser turret.',
-        outputId: 'medium-pulse-laser',
+    'bp-medium-pulse-maser': {
+        name: 'Medium Pulse Maser I Blueprint',
+        description: 'Manufacturing schematic for a medium pulse maser turret.',
+        outputId: 'medium-pulse-maser',
         outputType: 'module',
         tier: 2,
         materials: {
@@ -361,10 +361,10 @@ export const BLUEPRINT_DATABASE = {
     // TIER 3 - Rare / Anomaly-Sourced
     // =============================================
 
-    'bp-medium-pulse-laser-2': {
-        name: 'Medium Pulse Laser II Blueprint',
+    'bp-medium-pulse-maser-2': {
+        name: 'Medium Pulse Maser II Blueprint',
         description: 'Rare schematic for a Tech II medium energy turret. Found in combat anomalies.',
-        outputId: 'medium-pulse-laser-2',
+        outputId: 'medium-pulse-maser-2',
         outputType: 'module',
         tier: 3,
         materials: {
@@ -377,10 +377,10 @@ export const BLUEPRINT_DATABASE = {
         price: 35000,
         source: 'anomaly',
     },
-    'bp-large-beam-laser': {
-        name: 'Large Beam Laser I Blueprint',
-        description: 'Rare schematic for a large beam laser turret. Recovered from wrecks.',
-        outputId: 'large-beam-laser',
+    'bp-large-beam-maser': {
+        name: 'Large Beam Maser I Blueprint',
+        description: 'Rare schematic for a large beam maser turret. Recovered from wrecks.',
+        outputId: 'large-beam-maser',
         outputType: 'module',
         tier: 3,
         materials: {

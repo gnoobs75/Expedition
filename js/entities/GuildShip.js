@@ -96,28 +96,28 @@ export class GuildShip extends Ship {
                 this.fitModule('mid-1', 'shield-booster');
                 break;
             case 'hauler':
-                this.fitModule('high-1', 'small-laser');
+                this.fitModule('high-1', 'small-maser');
                 this.fitModule('mid-1', 'shield-booster');
                 if (this.midSlots >= 2) this.fitModule('mid-2', 'afterburner');
                 break;
             case 'ratter':
-                this.fitModule('high-1', 'small-laser');
-                if (this.highSlots >= 2) this.fitModule('high-2', 'small-laser');
-                if (this.highSlots >= 3) this.fitModule('high-3', 'small-laser');
+                this.fitModule('high-1', 'small-maser');
+                if (this.highSlots >= 2) this.fitModule('high-2', 'small-maser');
+                if (this.highSlots >= 3) this.fitModule('high-3', 'small-maser');
                 this.fitModule('mid-1', 'shield-booster');
                 if (this.midSlots >= 2) this.fitModule('mid-2', 'warp-disruptor');
                 break;
             case 'raider':
-                this.fitModule('high-1', 'small-laser');
-                if (this.highSlots >= 2) this.fitModule('high-2', 'small-laser');
+                this.fitModule('high-1', 'small-maser');
+                if (this.highSlots >= 2) this.fitModule('high-2', 'small-maser');
                 this.fitModule('mid-1', 'microwarpdrive');
                 if (this.midSlots >= 2) this.fitModule('mid-2', 'warp-scrambler');
                 if (this.midSlots >= 3) this.fitModule('mid-3', 'stasis-webifier');
                 break;
             case 'bomber':
-                this.fitModule('high-1', 'small-laser');
-                if (this.highSlots >= 2) this.fitModule('high-2', 'small-laser');
-                if (this.highSlots >= 3) this.fitModule('high-3', 'small-laser');
+                this.fitModule('high-1', 'small-maser');
+                if (this.highSlots >= 2) this.fitModule('high-2', 'small-maser');
+                if (this.highSlots >= 3) this.fitModule('high-3', 'small-maser');
                 this.fitModule('mid-1', 'shield-booster');
                 if (this.midSlots >= 2) this.fitModule('mid-2', 'stasis-webifier');
                 this.fitModule('low-1', 'damage-mod');
@@ -125,13 +125,13 @@ export class GuildShip extends Ship {
             case 'surveyor':
                 this.fitModule('mid-1', 'survey-scanner-1');
                 if (this.midSlots >= 2) this.fitModule('mid-2', 'afterburner');
-                if (this.highSlots >= 1) this.fitModule('high-1', 'small-laser');
+                if (this.highSlots >= 1) this.fitModule('high-1', 'small-maser');
                 break;
             case 'logistics':
                 this.fitModule('mid-1', 'remote-shield-repairer');
                 if (this.midSlots >= 2) this.fitModule('mid-2', 'remote-armor-repairer');
                 if (this.midSlots >= 3) this.fitModule('mid-3', 'afterburner');
-                this.fitModule('high-1', 'small-laser');
+                this.fitModule('high-1', 'small-maser');
                 break;
         }
     }
@@ -647,7 +647,7 @@ export class GuildShip extends Ship {
             for (let i = 0; i < this.highSlots; i++) {
                 const slotId = `high-${i + 1}`;
                 const moduleId = this.modules.high[i];
-                if (moduleId && moduleId.includes('laser') && !moduleId.includes('mining')) {
+                if (moduleId && (moduleId.includes('maser') || moduleId.includes('railgun') || moduleId.includes('missile') || moduleId.includes('torpedo') || (moduleId.includes('laser') && !moduleId.includes('mining')))) {
                     if (!this.activeModules.has(slotId)) {
                         this.activateModule(slotId);
                     }
@@ -997,7 +997,7 @@ export class GuildShip extends Ship {
         for (let i = 0; i < this.highSlots; i++) {
             const slotId = `high-${i + 1}`;
             const moduleId = this.modules.high[i];
-            if (moduleId && moduleId.includes('laser') && !moduleId.includes('mining')) {
+            if (moduleId && (moduleId.includes('maser') || moduleId.includes('railgun') || moduleId.includes('missile') || moduleId.includes('torpedo') || (moduleId.includes('laser') && !moduleId.includes('mining')))) {
                 if (!this.activeModules.has(slotId)) {
                     this.activateModule(slotId);
                 }

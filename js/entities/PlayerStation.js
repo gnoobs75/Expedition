@@ -11,7 +11,7 @@ import { POS_MODULES, POS_MAX_SLOTS, isModuleComplete } from '../data/posModuleD
 export const TURRET_TYPES = {
     'basic-turret': { name: 'Basic Turret', damage: 50, range: 800, cycleTime: 3, price: 5000 },
     'advanced-turret': { name: 'Advanced Turret', damage: 120, range: 1200, cycleTime: 2.5, price: 25000 },
-    'pulse-laser': { name: 'Pulse Laser Battery', damage: 200, range: 1500, cycleTime: 2, price: 80000 },
+    'pulse-maser': { name: 'Pulse Maser Battery', damage: 200, range: 1500, cycleTime: 2, price: 80000 },
 };
 
 export const UPGRADE_COSTS = {

@@ -3367,12 +3367,12 @@ class ShipMeshFactory {
             case 'harvester':  return 'harvest';
             case 'surveyor':   return 'utility';
             case 'logistics':  return 'utility';
-            case 'hauler':     return 'laser';
-            case 'mercenary':  return 'laser';
-            case 'pirate':     return 'laser';
-            case 'police':     return 'laser';
+            case 'hauler':     return 'maser';
+            case 'mercenary':  return 'maser';
+            case 'pirate':     return 'maser';
+            case 'police':     return 'maser';
             case 'military':   return 'missile';
-            default:           return 'laser';
+            default:           return 'maser';
         }
     }
 
@@ -3398,9 +3398,9 @@ class ShipMeshFactory {
             // Alternate port/starboard, increasing lateral spread
             const localY = (i % 2 === 0 ? 1 : -1) * s * 0.2 * a * (1 + Math.floor(i / 2) * 0.3);
 
-            // Military ships get mixed turrets (missiles + lasers)
+            // Military ships get mixed turrets (missiles + masers)
             let type = primaryType;
-            if (role === 'military' && i >= Math.ceil(weaponCount / 2)) type = 'laser';
+            if (role === 'military' && i >= Math.ceil(weaponCount / 2)) type = 'maser';
             if (role === 'pirate' && weaponCount > 2 && i === weaponCount - 1) type = 'missile';
 
             const turret = this._buildPreviewTurret(type, turretSize);
@@ -3419,14 +3419,15 @@ class ShipMeshFactory {
             case 'salvage':  return this._buildPreviewSalvageTurret(ts);
             case 'harvest':  return this._buildPreviewHarvestTurret(ts);
             case 'utility':  return this._buildPreviewUtilityTurret(ts);
-            default:         return this._buildPreviewLaserTurret(ts);
+            case 'maser':    return this._buildPreviewMaserTurret(ts);
+            default:         return this._buildPreviewMaserTurret(ts);
         }
     }
 
     /**
-     * Laser turret: rotating base + twin energy emitter barrels + blue-white tip glow
+     * Maser turret: rotating base + twin energy emitter barrels + blue-white tip glow
      */
-    _buildPreviewLaserTurret(ts) {
+    _buildPreviewMaserTurret(ts) {
         const g = new THREE.Group();
 
         // Rotating base
@@ -3464,7 +3465,7 @@ class ShipMeshFactory {
             transparent: true, opacity: 0.8, roughness: 0.1, metalness: 0.2,
         })));
 
-        g.userData.weaponType = 'laser';
+        g.userData.weaponType = 'maser';
         return g;
     }
 

@@ -18,6 +18,7 @@ export class AudioManager {
         // Sound definitions
         this.sounds = {
             'laser': { type: 'laser', duration: 0.15 },
+            'maser': { type: 'laser', duration: 0.15 }, // Alias: masers use same synth as lasers
             'hit': { type: 'hit', duration: 0.1 },
             'explosion': { type: 'explosion', duration: 0.5 },
             'shield-hit': { type: 'shieldHit', duration: 0.2 },
@@ -49,6 +50,7 @@ export class AudioManager {
             'level-up': { type: 'levelUp', duration: 1.0 },
             'dialogue-open': { type: 'dialogueOpen', duration: 0.2 },
             'dialogue-close': { type: 'dialogueClose', duration: 0.15 },
+            'pds-intercept': { type: 'pdsIntercept', duration: 0.15 },
             'missile-launch': { type: 'missileLaunch', duration: 0.3 },
             'missile-hit': { type: 'missileHit', duration: 0.4 },
             'drone-launch': { type: 'droneLaunch', duration: 0.3 },
@@ -298,6 +300,9 @@ export class AudioManager {
             case 'dialogueClose':
                 this.synthDialogueClose(ctx, gain, now, duration);
                 break;
+            case 'pdsIntercept':
+                this.synthPdsIntercept(ctx, gain, now, duration);
+                break;
             case 'missileLaunch':
                 this.synthMissileLaunch(ctx, gain, now, duration);
                 break;
@@ -363,6 +368,23 @@ export class AudioManager {
         osc.connect(gain);
         osc.start(now);
         osc.stop(now + duration);
+    }
+
+    synthPdsIntercept(ctx, gain, now, duration) {
+        // Rapid high-frequency burst (CIWS-like)
+        for (let i = 0; i < 3; i++) {
+            const osc = ctx.createOscillator();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(2400 + i * 400, now + i * 0.03);
+            osc.frequency.exponentialRampToValueAtTime(1200, now + i * 0.03 + 0.04);
+            const burstGain = ctx.createGain();
+            burstGain.gain.setValueAtTime(0.15, now + i * 0.03);
+            burstGain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.03 + 0.04);
+            osc.connect(burstGain);
+            burstGain.connect(gain);
+            osc.start(now + i * 0.03);
+            osc.stop(now + i * 0.03 + 0.05);
+        }
     }
 
     synthHit(ctx, gain, now, duration) {

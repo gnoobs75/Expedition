@@ -46,7 +46,7 @@ export class EnemyShip extends Ship {
         this._pursuitReason = '';
 
         // Default weapon
-        this.fitModule('high-1', 'small-laser');
+        this.fitModule('high-1', 'small-maser');
 
         // Fit tackle modules based on ship class
         const shipClass = enemyConfig?.shipClass || 'frigate';

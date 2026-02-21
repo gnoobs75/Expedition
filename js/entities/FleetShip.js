@@ -97,21 +97,21 @@ export class FleetShip extends Ship {
             case 'mercenary':
             case 'pirate':
             case 'military':
-                this.fitModule('high-1', 'small-laser');
-                if (this.highSlots >= 2) this.fitModule('high-2', 'small-laser');
-                if (this.highSlots >= 3) this.fitModule('high-3', 'small-laser');
+                this.fitModule('high-1', 'small-maser');
+                if (this.highSlots >= 2) this.fitModule('high-2', 'small-maser');
+                if (this.highSlots >= 3) this.fitModule('high-3', 'small-maser');
                 this.fitModule('mid-1', 'shield-booster');
                 if (this.midSlots >= 2) this.fitModule('mid-2', 'afterburner');
                 this.fitModule('low-1', 'damage-mod');
                 break;
             case 'police':
-                this.fitModule('high-1', 'small-laser');
-                if (this.highSlots >= 2) this.fitModule('high-2', 'small-laser');
+                this.fitModule('high-1', 'small-maser');
+                if (this.highSlots >= 2) this.fitModule('high-2', 'small-maser');
                 this.fitModule('mid-1', 'shield-booster');
                 if (this.midSlots >= 2) this.fitModule('mid-2', 'afterburner');
                 break;
             default:
-                this.fitModule('high-1', 'small-laser');
+                this.fitModule('high-1', 'small-maser');
                 this.fitModule('mid-1', 'shield-booster');
                 break;
         }
@@ -574,7 +574,7 @@ export class FleetShip extends Ship {
             if (!moduleId) continue;
 
             // Only activate weapons (not mining lasers) for combat
-            if (moduleId.includes('laser') && !moduleId.includes('mining')) {
+            if ((moduleId.includes('maser') || moduleId.includes('railgun') || moduleId.includes('missile') || moduleId.includes('torpedo') || (moduleId.includes('laser') && !moduleId.includes('mining')))) {
                 if (!this.activeModules.has(slotId) && !this.moduleCooldowns.has(slotId)) {
                     this.activateModule(slotId);
                 }

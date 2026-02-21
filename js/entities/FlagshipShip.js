@@ -108,13 +108,13 @@ export class FlagshipShip extends Ship {
         // Weapon loadout varies by class
         if (shipClass === 'flagship-carrier') {
             // Carrier: fewer weapons, relies on drones and hangared ships
-            this.fitModule('high-1', 'medium-laser');
-            if (this.highSlots >= 2) this.fitModule('high-2', 'medium-laser');
+            this.fitModule('high-1', 'medium-maser');
+            if (this.highSlots >= 2) this.fitModule('high-2', 'medium-maser');
         } else {
             // Battlecruiser: moderate weapons
-            this.fitModule('high-1', 'medium-laser');
-            if (this.highSlots >= 2) this.fitModule('high-2', 'medium-laser');
-            if (this.highSlots >= 3) this.fitModule('high-3', 'small-laser');
+            this.fitModule('high-1', 'medium-maser');
+            if (this.highSlots >= 2) this.fitModule('high-2', 'medium-maser');
+            if (this.highSlots >= 3) this.fitModule('high-3', 'small-maser');
         }
     }
 
@@ -346,7 +346,7 @@ export class FlagshipShip extends Ship {
             const moduleId = this.modules.high[i];
             if (!moduleId) continue;
 
-            if (moduleId.includes('laser') && !moduleId.includes('mining')) {
+            if (moduleId.includes('maser') || moduleId.includes('railgun') || moduleId.includes('missile') || moduleId.includes('torpedo') || (moduleId.includes('laser') && !moduleId.includes('mining'))) {
                 if (!this.activeModules.has(slotId) && !this.moduleCooldowns.has(slotId)) {
                     this.activateModule(slotId);
                 }

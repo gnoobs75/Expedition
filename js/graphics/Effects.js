@@ -88,6 +88,7 @@ export class Effects {
             case 'mining':
                 this.spawnMiningEffect(x, y, options);
                 break;
+            case 'maser': // Masers use same beam visual as lasers
             case 'laser':
                 this.spawnLaserEffect(x, y, options);
                 break;
@@ -96,6 +97,9 @@ export class Effects {
                 break;
             case 'loot':
                 this.spawnLootPickup(x, y, options);
+                break;
+            case 'pds-intercept':
+                this.spawnPdsIntercept(x, y, options);
                 break;
             case 'missile-trail':
                 this.spawnMissileTrail(x, y, options);
@@ -992,6 +996,60 @@ export class Effects {
     }
 
     /**
+     * PDS intercept - yellow tracer lines from ship to missile + spark burst
+     */
+    spawnPdsIntercept(x, y, options = {}) {
+        const targetX = options.targetX || x;
+        const targetY = options.targetY || y;
+
+        // Yellow tracer beam from target ship to missile
+        const dx = x - targetX;
+        const dy = y - targetY;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const angle = Math.atan2(dy, dx);
+
+        const tracerEffect = {
+            type: 'pds-intercept',
+            x: (x + targetX) / 2,
+            y: (y + targetY) / 2,
+            life: 0,
+            maxLife: 0.2,
+            mesh: null,
+        };
+        const tracerGeo = new THREE.PlaneGeometry(dist, 1.5);
+        const tracerMat = new THREE.MeshBasicMaterial({
+            color: 0xffdd44,
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false,
+        });
+        tracerEffect.mesh = new THREE.Mesh(tracerGeo, tracerMat);
+        tracerEffect.mesh.position.set(tracerEffect.x, tracerEffect.y, 10);
+        tracerEffect.mesh.rotation.z = angle;
+        this.group.add(tracerEffect.mesh);
+        this.effects.push(tracerEffect);
+
+        // Spark burst at intercept point
+        for (let i = 0; i < 8; i++) {
+            const p = this.getParticle();
+            if (!p) break;
+            p.position.set(x + (Math.random() - 0.5) * 10, y + (Math.random() - 0.5) * 10, 10);
+            p.scale.setScalar(1.5 + Math.random() * 2);
+            p.material.color.setHex(Math.random() < 0.5 ? 0xffdd44 : 0xffaa00);
+            p.material.opacity = 0.9;
+            p.visible = true;
+            p.userData.active = true;
+            p.userData.vx = (Math.random() - 0.5) * 200;
+            p.userData.vy = (Math.random() - 0.5) * 200;
+            p.userData.life = 0;
+            p.userData.maxLife = 0.15 + Math.random() * 0.1;
+            p.userData.fadeOut = true;
+            p.userData.shrink = true;
+            p.userData.startScale = p.scale.x;
+        }
+    }
+
+    /**
      * Missile trail - fire + smoke plume
      */
     spawnMissileTrail(x, y, options = {}) {
@@ -1767,7 +1825,14 @@ export class Effects {
                     }
                     break;
 
+                case 'maser':
                 case 'laser':
+                    if (effect.mesh) {
+                        effect.mesh.material.opacity = 0.9 * (1 - progress);
+                    }
+                    break;
+
+                case 'pds-intercept':
                     if (effect.mesh) {
                         effect.mesh.material.opacity = 0.9 * (1 - progress);
                     }

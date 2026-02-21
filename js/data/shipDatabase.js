@@ -1712,7 +1712,7 @@ export const SHIP_DATABASE = {
         droneCapacity: 5,
         droneBandwidth: 50,
         price: 700000,
-        bonuses: { laserDamageBonus: 1.50, capacitorUse: 0.65 },
+        bonuses: { maserDamageBonus: 1.50, capacitorUse: 0.65 },
     },
     'bhaalgorn': {
         name: 'Bhaalgorn',
@@ -1737,7 +1737,7 @@ export const SHIP_DATABASE = {
         droneCapacity: 5,
         droneBandwidth: 50,
         price: 750000,
-        bonuses: { laserDamageBonus: 1.40, capacitorDrain: 1.50, armorRepair: 1.35 },
+        bonuses: { maserDamageBonus: 1.40, capacitorDrain: 1.50, armorRepair: 1.35 },
     },
     'revenant': {
         name: 'Revenant',

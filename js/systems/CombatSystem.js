@@ -78,6 +78,33 @@ export class CombatSystem {
             const projectile = this.projectiles[i];
             projectile.update(dt);
 
+            // Point Defense System: intercept incoming missiles
+            if (projectile.alive && projectile._isMissile && !projectile._pdsChecked && projectile.target?.alive) {
+                const pdsRange = this.game.config?.PDS_RANGE || CONFIG?.PDS_RANGE || 150;
+                const dist = projectile.distanceTo(projectile.target);
+                if (dist <= pdsRange) {
+                    projectile._pdsChecked = true;
+                    const pdsChance = projectile.target.getPdsChance?.() || 0;
+                    if (pdsChance > 0 && Math.random() < pdsChance) {
+                        // Intercepted!
+                        this.game.renderer?.effects?.spawn('pds-intercept', projectile.x, projectile.y, {
+                            targetX: projectile.target.x,
+                            targetY: projectile.target.y,
+                        });
+                        this.game.audio?.play('pds-intercept');
+                        if (projectile.target.isPlayer || projectile.source?.isPlayer) {
+                            this.game.events?.emit('combat:action', {
+                                type: 'pds-intercept',
+                                source: projectile.target,
+                                target: projectile.source,
+                                weapon: 'Point Defense',
+                            });
+                        }
+                        projectile.destroy();
+                    }
+                }
+            }
+
             if (!projectile.alive) {
                 // Clean up mesh from scene
                 if (projectile.mesh && this.game.renderer?.scene) {
@@ -161,12 +188,12 @@ export class CombatSystem {
         const hitChance = isMissile ? 1.0 : this.calculateHitChance(source, target, range, moduleConfig);
         const hits = isMissile ? true : Math.random() < hitChance;
 
-        // Determine laser color based on source type
-        let laserColor = 0xff4444; // Default hostile red
+        // Determine beam color based on source type
+        let beamColor = 0xff4444; // Default hostile red
         if (source.isPlayer) {
-            laserColor = 0x00ffff; // Player cyan
+            beamColor = 0x00ffff; // Player cyan
         } else if (source.type === 'npc' && source.role === 'security') {
-            laserColor = 0x4488ff; // Security blue
+            beamColor = 0x4488ff; // Security blue
         }
 
         // Capture sector for stale-timer guards
@@ -288,17 +315,17 @@ export class CombatSystem {
             }
             return; // Skip the rest of the damage pipeline - missile handles it on impact
         } else {
-            // Laser: beam effect
+            // Maser/railgun: beam effect (uses 'laser' effect type for backward compat)
             this.game.renderer.effects.spawn('laser', source.x, source.y, {
                 target: target,
-                color: laserColor,
+                color: beamColor,
             });
         }
 
         // Muzzle flash at source
         this.game.renderer.effects.spawn('hit', source.x, source.y, {
             count: 3,
-            color: laserColor,
+            color: beamColor,
         });
 
         // Apply damage with tick-based delay (for visual sync)
@@ -313,7 +340,7 @@ export class CombatSystem {
                 if (!hits) {
                     this.showMissIndicator(target.x, target.y);
                     // Emit miss event for combat log
-                    const weaponName = moduleConfig?.name || 'Laser';
+                    const weaponName = moduleConfig?.name || 'Maser';
                     this.game.events.emit('combat:action', {
                         type: 'miss',
                         source, target, damage: 0,
@@ -341,7 +368,7 @@ export class CombatSystem {
                 target.takeDamage(finalDamage, source, dmgType);
 
                 // Emit hit event for combat log
-                const weaponName = moduleConfig?.name || 'Laser';
+                const weaponName = moduleConfig?.name || 'Maser';
                 this.game.events.emit('combat:action', {
                     type: 'hit',
                     source, target, damage: finalDamage, damageType, weaponDamageType: dmgType,

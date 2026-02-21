@@ -954,38 +954,25 @@ export class SplashScreen {
     // ==========================================
 
     startSplashMusic() {
-        // Check saved music preference
-        try {
-            const saved = localStorage.getItem('expedition-audio');
-            if (saved) {
-                const settings = JSON.parse(saved);
-                if (settings.musicEnabled === false) return;
-            }
-        } catch (e) {}
-
         try {
             const audio = new Audio('audio/music/splash.ogg');
             audio.loop = true;
             audio.volume = 0;
             this.splashMusic = audio;
 
-            const startPlayback = () => {
-                if (!this.splashMusic) return;
-                this.splashMusic.play().then(() => {
-                    this._fadeSplashMusic(0, this.splashMusicVolume, 2000);
-                }).catch(() => {});
+            const beginFade = () => {
+                console.log('Splash music playing');
+                this._fadeSplashMusic(0, this.splashMusicVolume, 2000);
             };
 
-            // Try immediate play (works if user gesture already occurred)
-            audio.play().then(() => {
-                this._fadeSplashMusic(0, this.splashMusicVolume, 2000);
-            }).catch(() => {
-                // Autoplay blocked - start on first user interaction
+            audio.play().then(beginFade).catch(() => {
+                console.log('Splash music autoplay blocked, waiting for interaction');
                 const startOnClick = () => {
                     document.removeEventListener('click', startOnClick);
                     document.removeEventListener('keydown', startOnClick);
                     this._splashMusicStartOnClick = null;
-                    startPlayback();
+                    if (!this.splashMusic) return;
+                    this.splashMusic.play().then(beginFade).catch(() => {});
                 };
                 document.addEventListener('click', startOnClick);
                 document.addEventListener('keydown', startOnClick);

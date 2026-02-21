@@ -154,11 +154,12 @@ export class CombatSystem {
             return;
         }
 
-        // Calculate hit chance
-        const hitChance = this.calculateHitChance(source, target, range, moduleConfig);
-        const hits = Math.random() < hitChance;
-
         const isMissile = moduleConfig?.category === 'missile';
+
+        // Missiles always hit (guided projectiles) — damage reduced by explosion mechanics
+        // Turrets use tracking-based hit chance
+        const hitChance = isMissile ? 1.0 : this.calculateHitChance(source, target, range, moduleConfig);
+        const hits = isMissile ? true : Math.random() < hitChance;
 
         // Determine laser color based on source type
         let laserColor = 0xff4444; // Default hostile red
@@ -210,40 +211,48 @@ export class CombatSystem {
                 });
                 this.game.audio?.play('missile-explosion');
 
-                if (!missile._hits) {
-                    this.showMissIndicator(target.x, target.y);
-                    const weaponName = moduleConfig?.name || 'Missile';
-                    this.game.events.emit('combat:action', {
-                        type: 'miss', source, target, damage: 0,
-                        weapon: weaponName, hitChance: missile._hitChance,
-                    });
-                    this.game.events.emit('combat:miss', { source, target });
-                } else {
-                    let damageType = 'hull';
-                    if (target.shield > 0) damageType = 'shield';
-                    else if (target.armor > 0) damageType = 'armor';
+                // Missile damage application — explosion radius vs target signature
+                const explosionRadius = moduleConfig?.explosionRadius || 100;
+                const explosionVelocity = moduleConfig?.explosionVelocity || 100;
+                const targetSig = target.signatureRadius || 30;
+                const targetSpeed = target.currentSpeed || 0;
 
-                    const dmgType = moduleConfig?.damageProfile || moduleConfig?.damageType || 'explosive';
-                    target.takeDamage(missile._actualDamage, source, dmgType);
+                // EVE-style: damage = base * min(1, sig/expRadius, (sig/expRadius * expVel/speed))
+                // If target sig >= explosion radius: full damage
+                // If target is smaller: reduced by sig/radius ratio
+                // If target is also fast: further reduced by velocity ratio
+                const sigFactor = Math.min(1.0, targetSig / explosionRadius);
+                const velFactor = targetSpeed > 0
+                    ? Math.min(1.0, (targetSig / explosionRadius) * (explosionVelocity / targetSpeed))
+                    : 1.0;
+                const damageApplication = Math.min(sigFactor, velFactor);
+                const appliedDamage = Math.max(1, Math.round(missile._actualDamage * damageApplication));
 
-                    const weaponName = moduleConfig?.name || 'Missile';
-                    this.game.events.emit('combat:action', {
-                        type: 'hit', source, target, damage: missile._actualDamage,
-                        damageType, weaponDamageType: dmgType,
-                        weapon: weaponName, hitChance: missile._hitChance,
-                    });
+                let damageType = 'hull';
+                if (target.shield > 0) damageType = 'shield';
+                else if (target.armor > 0) damageType = 'armor';
 
-                    // Impact VFX at target
-                    this.game.renderer?.effects?.spawn('hit', target.x, target.y, {
-                        count: 6, color: 0xff8800, damageType: dmgType,
-                    });
-                    if (source.isPlayer || target.isPlayer) {
-                        this.game.audio?.play('weapon-hit');
-                    }
+                const dmgType = moduleConfig?.damageProfile || moduleConfig?.damageType || 'explosive';
+                target.takeDamage(appliedDamage, source, dmgType);
 
-                    // Damage number
-                    this.showDamageNumber(target.x, target.y, missile._actualDamage, damageType);
+                const weaponName = moduleConfig?.name || 'Missile';
+                this.game.events.emit('combat:action', {
+                    type: 'hit', source, target, damage: appliedDamage,
+                    damageType, weaponDamageType: dmgType,
+                    weapon: weaponName, hitChance: 1.0,
+                    damageApplication, // 0-1 factor for UI/analytics
+                });
+
+                // Impact VFX at target
+                this.game.renderer?.effects?.spawn('hit', target.x, target.y, {
+                    count: 6, color: 0xff8800, damageType: dmgType,
+                });
+                if (source.isPlayer || target.isPlayer) {
+                    this.game.audio?.play('weapon-hit');
                 }
+
+                // Damage number
+                this.showDamageNumber(target.x, target.y, appliedDamage, damageType);
                 missile.destroy();
             };
 
@@ -556,7 +565,9 @@ export class CombatSystem {
     }
 
     /**
-     * Calculate hit chance using tracking-based formula (EVE-inspired)
+     * Calculate hit chance using tracking-based formula (EVE-inspired).
+     * Used for turrets only — missiles always hit but use explosion radius
+     * vs target signature for damage application instead.
      *
      * angularVelocity = targetSpeed / max(distance, 50) * targetSignature / 28
      * trackingFactor = weaponTracking / max(angularVelocity, 0.01)

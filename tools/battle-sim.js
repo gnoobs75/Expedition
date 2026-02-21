@@ -801,7 +801,8 @@ class BattleEngine {
                 const cooldownKey = `high-${i}`;
                 const onCooldown = (ship.moduleCooldowns[cooldownKey] || 0) > 0;
                 const weaponRange = config.range || (config.optimalRange || 500) + (config.falloff || 150);
-                const hitChance = (isWeapon && hasTarget) ? this.calculateHitChance(ship, target, dist, config) : 0;
+                const isMissile = config.category === 'missile';
+                const hitChance = (isWeapon && hasTarget) ? (isMissile ? 1.0 : this.calculateHitChance(ship, target, dist, config)) : 0;
                 const inRange = hasTarget && dist <= weaponRange * 1.1;
 
                 // Initialize per-weapon stats entry if needed
@@ -823,6 +824,8 @@ class BattleEngine {
                     optimal: config.optimalRange || config.range || 0,
                     falloff: config.falloff || 0,
                     tracking: config.trackingSpeed || 0,
+                    explosionRadius: config.explosionRadius || 0,
+                    explosionVelocity: config.explosionVelocity || 0,
                     hitChance: hitChance,
                     damage: config.damage || 0,
                     dps: isWeapon ? (config.damage / config.cycleTime) * damageMult * lowDmgMult : 0,
@@ -855,8 +858,23 @@ class BattleEngine {
                 ship.stats.totalShots++;
                 if (ship.stats.weapons[cooldownKey]) ship.stats.weapons[cooldownKey].shots++;
 
-                if (Math.random() < hitChance) {
-                    const dmg = config.damage * damageMult * lowDmgMult;
+                if (isMissile || Math.random() < hitChance) {
+                    let dmg = config.damage * damageMult * lowDmgMult;
+
+                    // Missile explosion radius vs target signature damage application
+                    if (isMissile) {
+                        const expRadius = config.explosionRadius || 100;
+                        const expVelocity = config.explosionVelocity || 100;
+                        const tSig = target.signatureRadius || 30;
+                        const tSpeed = target.currentSpeed || 0;
+                        const sigFactor = Math.min(1.0, tSig / expRadius);
+                        const velFactor = tSpeed > 0
+                            ? Math.min(1.0, (tSig / expRadius) * (expVelocity / tSpeed))
+                            : 1.0;
+                        dmg *= Math.min(sigFactor, velFactor);
+                        dmg = Math.max(1, Math.round(dmg));
+                    }
+
                     const dmgProfile = config.damageProfile || (config.damageType ? { [config.damageType]: 1 } : { em: 1 });
 
                     // Track hit

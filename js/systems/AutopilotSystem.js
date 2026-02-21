@@ -577,6 +577,7 @@ export class AutopilotSystem {
         player.y = landY;
         player.velocity.set(0, 0);
         player.currentSpeed = 0;
+        player.desiredSpeed = 0;
 
         // Brief warp tunnel display then cleanup
         setTimeout(() => {
@@ -749,6 +750,7 @@ export class AutopilotSystem {
 
             player.velocity.set(0, 0);
             player.currentSpeed = 0;
+            player.desiredSpeed = 0;
 
             // Fleet ships follow through wormhole
             this.game.fleetSystem?.followThroughGate();

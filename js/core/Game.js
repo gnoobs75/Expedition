@@ -54,6 +54,7 @@ import { formatCredits } from '../utils/math.js';
 import { FACTIONS, getDefaultStandings, calculateStandingChanges, getStandingInfo, getStandingPriceModifier } from '../data/factionDatabase.js';
 import { setFleetIdCounter } from '../entities/FleetShip.js';
 import { TacticalPauseManager } from '../ui/TacticalPauseManager.js';
+import { ObstacleAvoidance } from '../utils/ObstacleAvoidance.js';
 
 export class Game {
     constructor() {
@@ -286,10 +287,10 @@ export class Game {
             modelId: 'hero-frigate',
         });
 
-        // Default modules: 1 Maser + 1 Railgun + 1 Mining Laser
-        this.player.fitModule('high-1', 'small-pulse-maser');
+        // Default modules: Mining Laser + Railgun + Missiles
+        this.player.fitModule('high-1', 'mining-laser');
         this.player.fitModule('high-2', 'small-railgun');
-        this.player.fitModule('high-3', 'mining-laser');
+        this.player.fitModule('high-3', 'light-missile');
         this.player.fitModule('mid-1', 'shield-booster');
         this.player.fitModule('mid-2', 'afterburner');
         this.player.fitModule('low-1', 'damage-mod');
@@ -339,6 +340,17 @@ export class Game {
             }
             // Encyclopedia discovery: sector
             this.encyclopedia?.discoverItem('sectors', sectorId);
+
+            // Clear all locked targets from the old sector
+            for (const t of this.lockedTargets) {
+                if (t) t.locked = false;
+            }
+            this.lockedTargets = [];
+            this.lockedTarget = null;
+            this.activeLockedTarget = null;
+            this.lockingTarget = null;
+            this.lockProgress = 0;
+            this.selectedTarget = null;
         });
 
         // Combat events
@@ -866,6 +878,20 @@ export class Game {
      * Update lock progress using game-time delta (called from update loop)
      */
     updateLockProgress(dt) {
+        // Prune dead/stale locked targets every frame
+        for (let i = this.lockedTargets.length - 1; i >= 0; i--) {
+            const t = this.lockedTargets[i];
+            if (!t || !t.alive) {
+                if (t) t.locked = false;
+                this.lockedTargets.splice(i, 1);
+            }
+        }
+        // Sync active target if it went stale
+        if (this.activeLockedTarget && (!this.activeLockedTarget.alive || !this.lockedTargets.includes(this.activeLockedTarget))) {
+            this.activeLockedTarget = this.lockedTargets[0] || null;
+        }
+        this.lockedTarget = this.activeLockedTarget || this.lockedTargets[0] || null;
+
         if (!this.lockingTarget) return;
 
         // Cancel if target died or player died
@@ -885,12 +911,11 @@ export class Game {
         if (this.lockProgress >= this.lockDuration) {
             const entity = this.lockingTarget;
             this.lockedTargets.push(entity);
-            this.lockedTarget = this.lockedTargets[0];
             entity.locked = true;
-            // Auto-set as active if no active target
-            if (!this.activeLockedTarget) {
-                this.activeLockedTarget = entity;
-            }
+            // Always set newly locked target as active (most intuitive behavior)
+            this.activeLockedTarget = entity;
+            this.lockedTarget = entity;
+            this.selectTarget(entity);
             this.events.emit('target:locked', entity);
             this.ui?.log(`Target locked: ${entity.name}`, 'system');
             this.audio?.play('lock-complete');
@@ -983,6 +1008,21 @@ export class Game {
             }
             // Keep desiredRotation in sync so Ship.updateRotation doesn't fight us
             this.player.desiredRotation = this.player.rotation;
+        }
+
+        // Collision avoidance: nudge heading when about to ram asteroids/entities
+        if (this.player.currentSpeed > 20) {
+            const entities = this.currentSector?.entities || [];
+            const avoidance = ObstacleAvoidance.getAvoidance(this.player, this.player.rotation, entities);
+            if (avoidance.speedMultiplier < 1) {
+                // Blend avoidance angle — gentle nudge, don't override manual steering
+                const diff = avoidance.angle - this.player.rotation;
+                const normalizedDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
+                this.player.rotation += normalizedDiff * 0.3;
+                this.player.desiredRotation = this.player.rotation;
+                // Slow down slightly near obstacles
+                this.player.desiredSpeed *= avoidance.speedMultiplier;
+            }
         }
     }
 

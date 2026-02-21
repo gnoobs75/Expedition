@@ -1287,9 +1287,41 @@ button:disabled, .buy-btn:disabled, .sell-btn:disabled {
     padding: 8px;
 }
 
-#target-panel .target-scanner {
+/* Scanner + threat list hidden by default, revealed on hover */
+#target-panel .target-scanner,
+#target-panel .threat-list {
     flex-basis: 100%;
     margin-top: 0;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.25s ease, opacity 0.2s ease, margin 0.25s ease;
+    pointer-events: none;
+}
+
+#target-panel:hover .target-scanner,
+#target-panel:hover .threat-list:not(.hidden) {
+    max-height: 600px;
+    opacity: 1;
+    pointer-events: auto;
+    margin-top: 0;
+}
+
+/* Subtle expand hint line at the bottom of compact view */
+#target-panel .panel-content::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 2px;
+    margin: 4px auto 0;
+    background: rgba(0, 255, 255, 0.15);
+    border-radius: 1px;
+    transition: width 0.2s, background 0.2s;
+}
+
+#target-panel:hover .panel-content::after {
+    width: 0;
+    background: transparent;
 }
 
 .target-identity {

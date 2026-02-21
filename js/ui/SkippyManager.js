@@ -5,6 +5,7 @@
 
 import { SkippyAvatar } from './SkippyAvatar.js';
 import { SKIPPY_DIALOGUE, SKIPPY_EXPRESSIONS } from '../data/skippyDialogue.js';
+import { EnemyShip } from '../entities/EnemyShip.js';
 
 export class SkippyManager {
     constructor(game) {
@@ -178,6 +179,7 @@ export class SkippyManager {
                 <span class="panel-title">SKIPPY THE MAGNIFICENT</span>
                 <div class="skippy-controls">
                     <span class="skippy-speaking-dot" id="skippy-speaking-dot"></span>
+                    <button id="skippy-config-btn" class="skippy-ctrl-btn" title="Configuration">&#9881;</button>
                     <button id="skippy-mute-btn" class="skippy-ctrl-btn" title="Mute voice">&#128266;</button>
                     <button id="skippy-compact-btn" class="skippy-ctrl-btn" title="Avatar only">&#9673;</button>
                     <button id="skippy-min-btn" class="skippy-ctrl-btn" title="Minimize">&#8722;</button>
@@ -201,6 +203,7 @@ export class SkippyManager {
         this.speakingDot = this.panel.querySelector('#skippy-speaking-dot');
 
         // Button handlers
+        this.panel.querySelector('#skippy-config-btn').addEventListener('click', () => this.openConfig());
         this.panel.querySelector('#skippy-mute-btn').addEventListener('click', () => this.toggleMute());
         this.panel.querySelector('#skippy-compact-btn').addEventListener('click', () => this.toggleCompact());
         this.panel.querySelector('#skippy-min-btn').addEventListener('click', () => this.toggleMinimize());
@@ -1466,7 +1469,7 @@ export class SkippyManager {
         // =============================================
         {
             id: 'welcome',
-            say: "Oh great, another monkey who thinks they can build an empire. Welcome to the Training Grounds - a safe sector where nothing can kill you. I'm Skippy the Magnificent, your vastly superior AI companion. Let's start with WASD to move your ship around. Try it.",
+            say: "Oh great, another monkey who thinks they can build an empire. Welcome to the Training Grounds - a quiet sector where you can learn the basics. I'm Skippy the Magnificent, your vastly superior AI companion. Let's start with WASD to move your ship around. Try it.",
             expression: 'smug',
             check: (g) => g.player && (Math.abs(g.player.velocity.x) > 5 || Math.abs(g.player.velocity.y) > 5),
             complete: "Look at you, moving through space like a particularly ambitious bacterium. I'm almost impressed. Almost.",
@@ -1487,7 +1490,7 @@ export class SkippyManager {
         },
         {
             id: 'mine_asteroid',
-            say: "Now lock it with R and activate your mining laser with F1. Watch the pretty beam and try not to drool on the controls. This is the foundation of everything we're going to build.",
+            say: "Now lock it with R and press 1 to activate your mining laser. Watch the pretty beam and try not to drool on the controls. This is the foundation of everything we're going to build.",
             expression: 'bored',
             check: (g) => g.player?.cargoUsed > 0,
             complete: "Ore in the hold! Every empire starts somewhere, and yours starts with space rocks. How poetic.",
@@ -1559,17 +1562,21 @@ export class SkippyManager {
         // =============================================
         {
             id: 'combat_awareness',
-            say: "Important survival lesson, monkey. Training Grounds is safe - no pirates here. But once you jump to the Central Hub and beyond, red dots on the overview mean pirates. When hostiles appear: fight or run. For now, keep building your fleet here.",
+            say: "Heads up, monkey. My sensors are picking up a Kristang scouting party jumping into the sector. Those lizards are aggressive but stupid - perfect practice targets for you. Red dots on the overview mean hostiles. Get ready.",
             expression: 'concerned',
-            check: (g) => g.stats?.playTime > 120 || g.stats?.kills >= 1,
-            complete: "Good. You're still alive. That's the minimum acceptable standard.",
+            onActivate: (g) => {
+                // Spawn 2 weak Kristang frigates near the player for tutorial combat
+                g.skippy?.spawnTutorialKristang();
+            },
+            check: (g) => g.sector?.entities?.some(e => e.type === 'enemy' && e.faction === 'kristang' && e.alive),
+            complete: "There they are - two Kristang scouts on the overview. Time for your first real fight, monkey.",
         },
         {
             id: 'combat_basics',
-            say: "Okay, combat basics for when running isn't an option. Select a hostile, press R to lock, then F1 to fire your weapons. You have shields, armor, and hull - three layers of not-dying. If shields drop below half, seriously consider warping out.",
+            say: "Combat 101: Click one of those Kristang, press R to lock, then press 2 and 3 to fire your railgun and missiles. You have shields, armor, and hull - three layers of not-dying. These scouts are weak - you can handle them. Probably.",
             expression: 'lecturing',
             check: (g) => g.stats?.kills >= 1,
-            complete: "First kill! Pirates pay bounties when they die. Defending yourself IS profitable, monkey.",
+            complete: "First kill! Kristang pay bounties when they die. Defending yourself IS profitable, monkey.",
         },
         {
             id: 'repair_after_combat',
@@ -1823,6 +1830,11 @@ export class SkippyManager {
             return;
         }
 
+        // Fire onActivate callback if present (e.g. spawn tutorial enemies)
+        if (step.onActivate) {
+            try { step.onActivate(this.game); } catch (e) { /* safe */ }
+        }
+
         // Deliver the step's dialogue
         this.say(step.say, 8, step.expression || 'lecturing', `guided_${step.id}`);
         this.guidedWaiting = true;
@@ -1866,6 +1878,345 @@ export class SkippyManager {
         } catch {
             // Check function might reference entities that don't exist yet - skip safely
         }
+    }
+
+    /**
+     * Spawn tutorial Kristang scouts in the tutorial sector
+     * Creates 2 weak frigates near the player for first combat experience
+     */
+    spawnTutorialKristang() {
+        const game = this.game;
+        if (!game.sector || game.sector.id !== 'tutorial') return;
+        if (!game.player?.alive) return;
+
+        // Don't double-spawn if Kristang already exist in sector
+        if (game.sector.entities.some(e => e.type === 'enemy' && e.faction === 'kristang' && e.alive)) return;
+
+        const px = game.player.x;
+        const py = game.player.y;
+        const names = ['Kristang Scout', 'Kristang Raider'];
+
+        for (let i = 0; i < 2; i++) {
+            // Spawn 3000-4000 units away at spread angles
+            const baseAngle = Math.atan2(py, px) + Math.PI; // Opposite side from station
+            const angle = baseAngle + (i === 0 ? -0.4 : 0.4);
+            const dist = 3000 + Math.random() * 1000;
+
+            const enemy = new EnemyShip(game, {
+                x: px + Math.cos(angle) * dist,
+                y: py + Math.sin(angle) * dist,
+                enemyType: 'pirate-frigate',
+                name: names[i],
+                faction: 'kristang',
+            });
+
+            // Weaken for tutorial — roughly 60% of normal stats
+            enemy.maxShield = Math.round(enemy.maxShield * 0.6);
+            enemy.shield = enemy.maxShield;
+            enemy.maxArmor = Math.round(enemy.maxArmor * 0.6);
+            enemy.armor = enemy.maxArmor;
+            enemy.maxHull = Math.round(enemy.maxHull * 0.6);
+            enemy.hull = enemy.maxHull;
+            enemy.damageMultiplier = 0.5; // Hit softer
+            enemy.bounty = 250; // Decent reward for a first kill
+            enemy.aggroRange = 2500; // Wide aggro so they come to player
+            enemy.lootValue = { min: 100, max: 300 };
+
+            // Patrol toward the player so they approach
+            enemy.patrolPoint = { x: px + (Math.random() - 0.5) * 1000, y: py + (Math.random() - 0.5) * 1000 };
+            enemy.aiState = 'patrol';
+
+            game.sector.addEntity(enemy);
+        }
+    }
+
+    // =============================================
+    // SKIPPY CONFIGURATION SCREEN
+    // =============================================
+
+    openConfig() {
+        const modal = document.getElementById('skippy-config-modal');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+
+        // Wire close button
+        const closeBtn = document.getElementById('skippy-config-close');
+        if (closeBtn) {
+            closeBtn.onclick = () => this.closeConfig();
+        }
+
+        // Click outside to close
+        modal.onclick = (e) => {
+            if (e.target === modal) this.closeConfig();
+        };
+
+        this._configFilter = 'all';
+        this.renderConfigSidebar();
+        this.renderConfigContent('all');
+    }
+
+    closeConfig() {
+        const modal = document.getElementById('skippy-config-modal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    /**
+     * Count lines in a dialogue category (including nested subcategories)
+     */
+    _countCategoryLines(category) {
+        const data = SKIPPY_DIALOGUE[category];
+        if (!data) return 0;
+        if (Array.isArray(data)) return data.length;
+        // Object with subcategories
+        let count = 0;
+        for (const sub of Object.values(data)) {
+            if (Array.isArray(sub)) count += sub.length;
+        }
+        return count;
+    }
+
+    renderConfigSidebar() {
+        const sidebar = document.getElementById('skippy-config-sidebar');
+        if (!sidebar) return;
+
+        // Count totals
+        let totalLines = 0;
+        const categories = Object.keys(SKIPPY_DIALOGUE);
+        const categoryCounts = {};
+        for (const cat of categories) {
+            const count = this._countCategoryLines(cat);
+            categoryCounts[cat] = count;
+            totalLines += count;
+        }
+
+        // Count guided steps (say + complete = up to 2 lines per step)
+        const steps = SkippyManager.GUIDED_STEPS;
+        let guidedCount = 0;
+        for (const step of steps) {
+            guidedCount++; // say
+            if (step.complete) guidedCount++; // complete
+        }
+        totalLines += guidedCount;
+
+        let html = '';
+
+        // ALL button
+        html += `<button class="skippy-config-filter active" data-filter="all">
+            <span>ALL</span>
+            <span class="count-badge">${totalLines}</span>
+        </button>`;
+
+        // Per-category buttons
+        for (const cat of categories) {
+            html += `<button class="skippy-config-filter" data-filter="${cat}">
+                <span>${cat}</span>
+                <span class="count-badge">${categoryCounts[cat]}</span>
+            </button>`;
+        }
+
+        // Guided tutorial button
+        html += `<button class="skippy-config-filter" data-filter="guided">
+            <span>guided</span>
+            <span class="count-badge">${guidedCount}</span>
+        </button>`;
+
+        sidebar.innerHTML = html;
+
+        // Attach click handlers
+        sidebar.querySelectorAll('.skippy-config-filter').forEach(btn => {
+            btn.addEventListener('click', () => {
+                sidebar.querySelectorAll('.skippy-config-filter').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const filter = btn.dataset.filter;
+                this._configFilter = filter;
+                this.renderConfigContent(filter);
+            });
+        });
+    }
+
+    renderConfigContent(filter) {
+        const body = document.getElementById('skippy-config-body');
+        if (!body) return;
+
+        let html = '';
+        const rows = [];
+
+        if (filter === 'all' || filter === 'guided') {
+            // nothing - we'll add guided below
+        }
+
+        // Collect dialogue rows
+        const categories = filter === 'all' ? Object.keys(SKIPPY_DIALOGUE) : (filter === 'guided' ? [] : [filter]);
+
+        for (const cat of categories) {
+            const data = SKIPPY_DIALOGUE[cat];
+            if (!data) continue;
+
+            if (Array.isArray(data)) {
+                // Flat array (idle, sectorEvent, etc.)
+                data.forEach((line, idx) => {
+                    rows.push({
+                        category: cat,
+                        subcategory: null,
+                        text: line.text,
+                        expression: SKIPPY_EXPRESSIONS[cat] || 'idle',
+                        priority: line.priority || 5,
+                        audioId: `${cat}_${idx}`,
+                        milestone: line.milestone || null,
+                    });
+                });
+            } else {
+                // Object with subcategories
+                for (const [sub, lines] of Object.entries(data)) {
+                    if (!Array.isArray(lines)) continue;
+                    lines.forEach((line, idx) => {
+                        const catKey = `${cat}:${sub}`;
+                        rows.push({
+                            category: cat,
+                            subcategory: sub,
+                            text: line.text,
+                            expression: SKIPPY_EXPRESSIONS[catKey] || SKIPPY_EXPRESSIONS[cat] || 'idle',
+                            priority: line.priority || 5,
+                            audioId: `${cat}_${sub}_${idx}`,
+                            milestone: line.milestone || null,
+                        });
+                    });
+                }
+            }
+        }
+
+        // Add guided steps
+        if (filter === 'all' || filter === 'guided') {
+            const steps = SkippyManager.GUIDED_STEPS;
+            steps.forEach((step) => {
+                rows.push({
+                    category: 'guided',
+                    subcategory: step.id,
+                    text: step.say,
+                    expression: step.expression || 'lecturing',
+                    priority: 8,
+                    audioId: `guided_${step.id}`,
+                    milestone: null,
+                    isGuided: true,
+                });
+                if (step.complete) {
+                    rows.push({
+                        category: 'guided',
+                        subcategory: step.id + '\u2713',
+                        text: step.complete,
+                        expression: 'impressed',
+                        priority: 7,
+                        audioId: `guided_${step.id}_complete`,
+                        milestone: null,
+                        isGuided: true,
+                    });
+                }
+            });
+        }
+
+        // Stats bar
+        html += `<div class="skippy-config-stats">
+            <div>Total phrases: <span>${rows.length}</span></div>
+            <div>Audio files: <span>${rows.length}</span></div>
+            <div>Categories: <span>${Object.keys(SKIPPY_DIALOGUE).length + 1}</span></div>
+        </div>`;
+
+        // Render rows
+        for (let i = 0; i < rows.length; i++) {
+            const r = rows[i];
+            const truncated = r.text.length > 80 ? r.text.slice(0, 80) + '...' : r.text;
+            const audioFile = `${r.audioId}.ogg`;
+            const catClass = `cat-${r.category}`;
+
+            html += `<div class="skippy-phrase-row" data-idx="${i}">
+                <span class="skippy-category-badge ${catClass}">${r.category.toUpperCase()}</span>
+                <span class="skippy-sub-label">${r.subcategory || '\u2014'}</span>
+                <span class="skippy-phrase-text" title="${this._escapeHtml(r.text)}">${this._escapeHtml(truncated)}</span>
+                <span class="skippy-expr-badge">${r.expression}</span>
+                <span class="skippy-priority-badge">P:${r.priority}</span>
+                <span class="skippy-audio-path" title="${audioFile}">${audioFile}</span>
+                <button class="skippy-play-btn" data-audio="${r.audioId}" data-text="${this._escapeAttr(r.text)}">&#9654;</button>
+            </div>`;
+        }
+
+        if (rows.length === 0) {
+            html += `<div style="padding: 20px; color: rgba(200,220,255,0.4); text-align: center;">No phrases found for this category.</div>`;
+        }
+
+        body.innerHTML = html;
+
+        // Wire row click to expand/collapse
+        body.querySelectorAll('.skippy-phrase-row').forEach(row => {
+            const idx = parseInt(row.dataset.idx);
+            const r = rows[idx];
+            const textEl = row.querySelector('.skippy-phrase-text');
+
+            row.addEventListener('click', (e) => {
+                if (e.target.closest('.skippy-play-btn')) return;
+                const expanded = row.classList.toggle('expanded');
+                if (expanded) {
+                    textEl.textContent = r.text;
+                } else {
+                    textEl.textContent = r.text.length > 80 ? r.text.slice(0, 80) + '...' : r.text;
+                }
+            });
+        });
+
+        // Wire play buttons
+        body.querySelectorAll('.skippy-play-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const audioId = btn.dataset.audio;
+                const text = btn.dataset.text;
+                this.playConfigPreview(audioId, text);
+            });
+        });
+    }
+
+    playConfigPreview(audioId, text) {
+        // Stop any current playback
+        this.stopCurrentSpeech();
+
+        const src = `${this.audioBasePath}${audioId}.${this.audioFormat}`;
+        const audio = new Audio(src);
+        audio.volume = 0.85;
+        this.currentAudio = audio;
+
+        this.speaking = true;
+        this.avatar?.startTalking();
+        if (this.speakingDot) this.speakingDot.classList.add('active');
+
+        audio.onended = () => {
+            this.currentAudio = null;
+            this.speaking = false;
+            this.avatar?.stopTalking();
+            if (this.speakingDot) this.speakingDot.classList.remove('active');
+        };
+
+        audio.onerror = () => {
+            // Fall back to TTS
+            this.currentAudio = null;
+            this.speaking = false;
+            this.avatar?.stopTalking();
+            if (this.speakingDot) this.speakingDot.classList.remove('active');
+            this.speakTTS(text);
+        };
+
+        audio.play().catch(() => {
+            this.currentAudio = null;
+            this.speaking = false;
+            this.avatar?.stopTalking();
+            if (this.speakingDot) this.speakingDot.classList.remove('active');
+            this.speakTTS(text);
+        });
+    }
+
+    _escapeHtml(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    _escapeAttr(str) {
+        return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     dispose() {

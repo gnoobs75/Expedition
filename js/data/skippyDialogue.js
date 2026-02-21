@@ -299,13 +299,13 @@ export const SKIPPY_DIALOGUE = {
     tutorial: {
         // -- Controls & Navigation Basics --
         controls: [
-            { text: "Alright monkey, crash course. Click anything in space to select it. R to lock targets, F1-F8 to fire weapons. Tab cycles through targets. You're welcome for the education.", priority: 6, milestone: 'tut_controls' },
+            { text: "Alright monkey, crash course. Click anything in space to select it. R to lock targets, 1-3 to fire weapon groups. Tab cycles through targets. You're welcome for the education.", priority: 6, milestone: 'tut_controls' },
         ],
         movementBasics: [
             { text: "Navigation 101: Q approaches a target, W orbits it, E keeps at range. S warps to it if it's far enough. Space stops your ship. Even a monkey can remember five keys. Probably.", priority: 6, milestone: 'tut_movement' },
         ],
         combatBasics: [
-            { text: "Combat for dummies: Select a hostile, press R to lock, then F1-F8 to fire your fitted weapons. D auto-targets the nearest enemy. Your shields absorb damage first, then armor, then hull. Hull hits zero? Boom. That's you.", priority: 7, milestone: 'tut_combat' },
+            { text: "Combat for dummies: Select a hostile, press R to lock, then 1-3 to fire your weapon groups. D auto-targets the nearest enemy. Your shields absorb damage first, then armor, then hull. Hull hits zero? Boom. That's you.", priority: 7, milestone: 'tut_combat' },
         ],
         weaponModules: [
             { text: "Your high slots hold weapons. Lasers need capacitor energy. Missiles use ammo. Each weapon has optimal range and tracking speed - fast small ships are hard to hit with big slow turrets. Fit smart, monkey.", priority: 5, milestone: 'tut_weapons' },
@@ -325,7 +325,7 @@ export const SKIPPY_DIALOGUE = {
 
         // -- Mining & Industry --
         miningGuide: [
-            { text: "Mining 101: Fit a mining laser in your high slots. Select an asteroid, lock it with R, activate the laser with F1. Ore goes into cargo. When full, dock at a station and hit REFINERY to sell. Simple enough even for you.", priority: 6, milestone: 'tut_mining' },
+            { text: "Mining 101: Fit a mining laser in your high slots. Select an asteroid, lock it with R, press 1 to activate the laser. Ore goes into cargo. When full, dock at a station and hit REFINERY to sell. Simple enough even for you.", priority: 6, milestone: 'tut_mining' },
         ],
         oreTypes: [
             { text: "Not all rocks are equal, monkey. Rarer ore in dangerous sectors is worth more ISK. Check the asteroids - some glow differently. Risk versus reward. The galaxy's oldest lesson.", priority: 5, milestone: 'tut_ore_types' },

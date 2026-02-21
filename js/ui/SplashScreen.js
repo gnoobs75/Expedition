@@ -32,6 +32,10 @@ export class SplashScreen {
         // Save manager (standalone, no game ref needed for listing)
         this.saveManager = new SaveManager(null);
 
+        // Splash music
+        this.splashMusic = null;
+        this.splashMusicVolume = 0.35;
+
         // Resolve callback
         this._resolve = null;
     }
@@ -47,6 +51,7 @@ export class SplashScreen {
         this.initBackground();
         this.initSkippy();
         this.initMenu();
+        this.startSplashMusic();
 
         return new Promise((resolve) => {
             this._resolve = resolve;
@@ -57,6 +62,7 @@ export class SplashScreen {
      * Hide splash with fade-out transition
      */
     hide() {
+        this.fadeOutSplashMusic(700);
         return new Promise((resolve) => {
             this.container.classList.add('fade-out');
             setTimeout(() => {
@@ -394,12 +400,16 @@ export class SplashScreen {
             setTimeout(() => this.avatar?.setExpression('smug'), 3000);
         }
 
+        // Duck splash music while speaking
+        this.duckSplashMusic();
+
         // Try pre-recorded audio first
         if (audioId) {
             const audio = new Audio(`audio/skippy/${audioId}.ogg`);
             audio.volume = 0.85;
             audio.onended = () => {
                 if (this.avatar) this.avatar.setExpression('smug');
+                this.unduckSplashMusic();
             };
             audio.onerror = () => {
                 // Fall back to browser TTS
@@ -421,10 +431,16 @@ export class SplashScreen {
                 const voices = this.synth.getVoices();
                 const preferred = voices.find(v => /david|daniel|james|mark/i.test(v.name));
                 if (preferred) utter.voice = preferred;
+                utter.onend = () => this.unduckSplashMusic();
+                utter.onerror = () => this.unduckSplashMusic();
                 this.synth.speak(utter);
             } catch {
                 // TTS not available
+                this.unduckSplashMusic();
             }
+        } else {
+            // No TTS, restore music
+            this.unduckSplashMusic();
         }
     }
 
@@ -933,7 +949,107 @@ export class SplashScreen {
     // Cleanup
     // ==========================================
 
+    // ==========================================
+    // Splash Music
+    // ==========================================
+
+    startSplashMusic() {
+        try {
+            const audio = new Audio('audio/music/splash.ogg');
+            audio.loop = true;
+            audio.volume = 0;
+            this.splashMusic = audio;
+            audio.play().then(() => {
+                // Fade in over 2 seconds
+                this._fadeSplashMusic(0, this.splashMusicVolume, 2000);
+            }).catch(() => {
+                // Autoplay blocked - start on first user click
+                const startOnClick = () => {
+                    document.removeEventListener('click', startOnClick);
+                    document.removeEventListener('keydown', startOnClick);
+                    if (this.splashMusic) {
+                        this.splashMusic.play().then(() => {
+                            this._fadeSplashMusic(0, this.splashMusicVolume, 2000);
+                        }).catch(() => {});
+                    }
+                };
+                document.addEventListener('click', startOnClick, { once: false });
+                document.addEventListener('keydown', startOnClick, { once: false });
+                this._splashMusicStartOnClick = startOnClick;
+            });
+        } catch (e) {
+            // Audio not available
+        }
+    }
+
+    fadeOutSplashMusic(duration = 700) {
+        if (!this.splashMusic) return;
+        this._fadeSplashMusic(this.splashMusic.volume, 0, duration, () => {
+            this.stopSplashMusic();
+        });
+    }
+
+    stopSplashMusic() {
+        if (this.splashMusic) {
+            this.splashMusic.pause();
+            this.splashMusic.src = '';
+            this.splashMusic = null;
+        }
+        // Clean up click listener if still registered
+        if (this._splashMusicStartOnClick) {
+            document.removeEventListener('click', this._splashMusicStartOnClick);
+            document.removeEventListener('keydown', this._splashMusicStartOnClick);
+            this._splashMusicStartOnClick = null;
+        }
+    }
+
+    /**
+     * Duck splash music when Skippy speaks (75% of current target volume)
+     */
+    duckSplashMusic() {
+        if (!this.splashMusic) return;
+        this._fadeSplashMusic(this.splashMusic.volume, this.splashMusicVolume * 0.75, 400);
+    }
+
+    /**
+     * Restore splash music volume after Skippy finishes speaking
+     */
+    unduckSplashMusic() {
+        if (!this.splashMusic) return;
+        this._fadeSplashMusic(this.splashMusic.volume, this.splashMusicVolume, 800);
+    }
+
+    _fadeSplashMusic(from, to, duration, onComplete = null) {
+        if (!this.splashMusic) return;
+        if (this._splashFadeInterval) clearInterval(this._splashFadeInterval);
+        const steps = 25;
+        const stepTime = duration / steps;
+        const volStep = (to - from) / steps;
+        let step = 0;
+        this.splashMusic.volume = Math.max(0, Math.min(1, from));
+        this._splashFadeInterval = setInterval(() => {
+            step++;
+            if (step >= steps) {
+                clearInterval(this._splashFadeInterval);
+                this._splashFadeInterval = null;
+                if (this.splashMusic) this.splashMusic.volume = Math.max(0, Math.min(1, to));
+                if (onComplete) onComplete();
+                return;
+            }
+            if (this.splashMusic) {
+                this.splashMusic.volume = Math.max(0, Math.min(1, from + volStep * step));
+            }
+        }, stepTime);
+    }
+
     destroy() {
+        // Stop splash music
+        this.stopSplashMusic();
+        if (this._splashFadeInterval) {
+            clearInterval(this._splashFadeInterval);
+            this._splashFadeInterval = null;
+        }
+
         // Stop animation
         if (this.bgAnimId) {
             cancelAnimationFrame(this.bgAnimId);

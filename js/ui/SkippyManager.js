@@ -283,6 +283,7 @@ export class SkippyManager {
         this.textEl?.classList.add('speaking');
         if (this.speakingDot) this.speakingDot.classList.add('active');
         this.displayText(text);
+        this._duckGameMusic();
 
         audio.onended = () => {
             this.currentAudio = null;
@@ -329,6 +330,7 @@ export class SkippyManager {
         this.avatar?.startTalking();
         this.textEl?.classList.add('speaking');
         if (this.speakingDot) this.speakingDot.classList.add('active');
+        this._duckGameMusic();
 
         utterance.onend = () => {
             this.utterance = null;
@@ -353,7 +355,50 @@ export class SkippyManager {
         this.textEl?.classList.remove('speaking');
         if (this.speakingDot) this.speakingDot.classList.remove('active');
         this.currentMessage = null;
+        this._unduckGameMusic();
         this.processQueue();
+    }
+
+    /**
+     * Duck game music to 75% while Skippy speaks
+     */
+    _duckGameMusic() {
+        const audio = this.game?.audio;
+        if (!audio) return;
+        // Duck OGG space music tracks
+        if (audio.currentTrack && audio.trackPlaying) {
+            audio.duckSpaceMusic(audio.getEffectiveTrackVolume() * 0.75, 400);
+        }
+        // Duck synth music layers
+        if (audio.musicMasterGain && audio.context) {
+            this._preDuckMusicVol = audio.musicMasterGain.gain.value;
+            audio.musicMasterGain.gain.setTargetAtTime(
+                this._preDuckMusicVol * 0.75,
+                audio.context.currentTime,
+                0.15
+            );
+        }
+    }
+
+    /**
+     * Restore game music after Skippy finishes speaking
+     */
+    _unduckGameMusic() {
+        const audio = this.game?.audio;
+        if (!audio) return;
+        // Restore OGG space music
+        if (audio.currentTrack && audio.trackPlaying) {
+            audio.unduckSpaceMusic(800);
+        }
+        // Restore synth music layers
+        if (audio.musicMasterGain && audio.context && this._preDuckMusicVol != null) {
+            audio.musicMasterGain.gain.setTargetAtTime(
+                this._preDuckMusicVol,
+                audio.context.currentTime,
+                0.3
+            );
+            this._preDuckMusicVol = null;
+        }
     }
 
     stopCurrentSpeech() {
@@ -368,6 +413,7 @@ export class SkippyManager {
             this.synth.cancel();
         }
         this.stopTTSKeepAlive();
+        this._unduckGameMusic();
     }
 
     displayText(text) {

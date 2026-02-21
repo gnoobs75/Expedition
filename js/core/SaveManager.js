@@ -223,6 +223,8 @@ export class SaveManager {
             modelId: player?.modelId || 'hero-frigate',
             weaponGroups: player?.weaponGroups ? { ...player.weaponGroups } : { 1: [], 2: [], 3: [] },
             componentLevels: player?.componentLevels ? { ...player.componentLevels } : { reactor: 0, engines: 0, sensors: 0, plating: 0 },
+            paintScheme: player?.paintScheme || null,
+            decals: player?.decals ? [...player.decals] : [],
             cargo: player ? { ...player.cargo } : {},
             tradeGoods: player ? { ...player.tradeGoods } : {},
             materials: player ? { ...player.materials } : {},

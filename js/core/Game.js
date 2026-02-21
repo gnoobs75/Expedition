@@ -1191,6 +1191,9 @@ export class Game {
             this.player.x = station.x + 300;
             this.player.y = station.y;
 
+            // Rebuild player mesh to apply any customization changes (paint, decals)
+            this.player.rebuildMesh();
+
             this.events.emit('station:undocked');
             this.ui.log(`Undocked from ${station.name}`, 'system');
             this.audio.play('undock');
@@ -1735,6 +1738,14 @@ export class Game {
             if (data.componentLevels) {
                 this.player.componentLevels = { ...data.componentLevels };
                 this.player.applyComponentUpgrades();
+            }
+
+            // Restore paint scheme and decals
+            if (data.paintScheme !== undefined) {
+                this.player.paintScheme = data.paintScheme;
+            }
+            if (data.decals) {
+                this.player.decals = [...data.decals];
             }
         }
 

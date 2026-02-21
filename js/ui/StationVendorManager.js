@@ -7,7 +7,7 @@ import { CONFIG, UNIVERSE_LAYOUT_MAP } from '../config.js';
 import { SHIP_DATABASE, SHIP_ROLES, SHIP_SIZES, getShipsByRole, getShipsByRoleAndSize } from '../data/shipDatabase.js';
 import { EQUIPMENT_DATABASE, SLOT_DISPLAY_MAP, getEquipmentBySlot } from '../data/equipmentDatabase.js';
 import { FACTIONS, FACTION_SHIP_VARIANTS, getFactionShipCatalog, applyFactionOverlay } from '../data/factionDatabase.js';
-import { shipMeshFactory } from '../graphics/ShipMeshFactory.js';
+import { shipMeshFactory, PAINT_SCHEMES, DECAL_PRESETS } from '../graphics/ShipMeshFactory.js';
 import { formatCredits } from '../utils/math.js';
 
 export class StationVendorManager {
@@ -29,6 +29,17 @@ export class StationVendorManager {
         this.vendorRenderer = null;
         this.vendorShipMesh = null;
         this.vendorAnimationId = null;
+
+        // 3D viewer state (hangar)
+        this.hangarScene = null;
+        this.hangarCamera = null;
+        this.hangarRenderer = null;
+        this.hangarShipMesh = null;
+        this.hangarAnimationId = null;
+        this.hangarDragState = null;
+        this.hangarRotationY = 0;
+        this.hangarRotationX = -0.3;
+        this.hangarZoom = 1.0;
 
         // 3D viewer state (fitting)
         this.fittingScene = null;
@@ -59,6 +70,14 @@ export class StationVendorManager {
             cancelAnimationFrame(this.fittingAnimationId);
             this.fittingAnimationId = null;
         }
+        if (this.hangarAnimationId) {
+            cancelAnimationFrame(this.hangarAnimationId);
+            this.hangarAnimationId = null;
+        }
+        if (this.hangarRenderer) {
+            this.hangarRenderer.dispose();
+            this.hangarRenderer = null;
+        }
     }
 
     /**
@@ -66,6 +85,12 @@ export class StationVendorManager {
      */
     updateTab(tab) {
         this.activeTab = tab;
+
+        // Clean up hangar viewer when leaving hangar tab
+        if (tab !== 'hangar' && this.hangarAnimationId) {
+            cancelAnimationFrame(this.hangarAnimationId);
+            this.hangarAnimationId = null;
+        }
 
         switch (tab) {
             case 'hangar':
@@ -103,6 +128,9 @@ export class StationVendorManager {
                     document.getElementById('missions-content')
                 );
                 break;
+            case 'factions':
+                this.renderFactions();
+                break;
         }
     }
 
@@ -114,15 +142,19 @@ export class StationVendorManager {
         const player = this.game.player;
         if (!player) return;
 
-        const hangarShips = document.getElementById('hangar-ships');
-        const cargoContents = document.getElementById('cargo-contents');
-        if (!hangarShips || !cargoContents) return;
+        const container = document.getElementById('hangar-content');
+        if (!container) return;
 
-        // Current ship info
+        // Stop existing animation
+        if (this.hangarAnimationId) {
+            cancelAnimationFrame(this.hangarAnimationId);
+            this.hangarAnimationId = null;
+        }
+
         const shipConfig = SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
         const shipName = shipConfig?.name || player.shipClass;
 
-        // Build hull upgrade section
+        // Hull upgrade
         const hullTiers = CONFIG.HULL_TIERS || {};
         const currentSize = player.shipSize || 'frigate';
         const currentTier = hullTiers[currentSize];
@@ -132,68 +164,127 @@ export class StationVendorManager {
         let hullUpgradeHtml = '';
         if (nextTier) {
             const canAfford = this.game.credits >= nextTier.cost;
-            hullUpgradeHtml = `
-                <div class="shop-item hull-upgrade ${canAfford ? '' : 'disabled'}">
-                    <div class="item-info">
-                        <div class="item-name">HULL UPGRADE: ${nextTier.name}</div>
-                        <div class="item-desc">Upgrade your ship to ${nextTierKey} class. More slots, HP, and firepower.</div>
-                    </div>
-                    <button class="buy-btn ${canAfford ? '' : 'disabled'}" id="hull-upgrade-btn"
-                        ${canAfford ? '' : 'disabled'}>${formatCredits(nextTier.cost)} ISK</button>
-                </div>`;
+            hullUpgradeHtml = `<div class="hangar-upgrade-item ${canAfford ? '' : 'disabled'}">
+                <span class="upgrade-label">HULL: ${nextTier.name}</span>
+                <button class="buy-btn" id="hull-upgrade-btn" ${canAfford ? '' : 'disabled'}>${formatCredits(nextTier.cost)}</button>
+            </div>`;
         } else {
-            hullUpgradeHtml = `<div class="shop-item" style="opacity:0.5"><div class="item-info"><div class="item-name">MAX HULL TIER</div><div class="item-desc">Your ship has reached maximum hull class.</div></div></div>`;
+            hullUpgradeHtml = `<div class="hangar-upgrade-item maxed"><span class="upgrade-label">HULL: MAX TIER</span></div>`;
         }
 
-        // Build component upgrades section
+        // Component upgrades
         const compUpgrades = CONFIG.COMPONENT_UPGRADES || {};
         let compHtml = '';
         for (const [compId, def] of Object.entries(compUpgrades)) {
             const currentLevel = player.componentLevels?.[compId] || 0;
             const maxLevel = def.levels.length - 1;
-            const nextLevel = currentLevel + 1;
             const isMaxed = currentLevel >= maxLevel;
-            const cost = isMaxed ? 0 : def.costs[nextLevel];
+            const cost = isMaxed ? 0 : def.costs[currentLevel + 1];
             const canAfford = !isMaxed && this.game.credits >= cost;
-            const currentBonus = def.levels[currentLevel];
-            const nextBonus = isMaxed ? currentBonus : def.levels[nextLevel];
-
-            const formatBonus = (v) => {
-                if (def.stat === 'lockTimeBonus') return `${Math.round(v * 100)}%`; // lower is better
-                return `${Math.round((v - 1) * 100)}%`;
-            };
-
-            compHtml += `
-                <div class="shop-item component-upgrade ${isMaxed ? 'maxed' : ''}">
-                    <div class="item-info">
-                        <div class="item-name">${def.name} Mk.${currentLevel + 1}${isMaxed ? ' (MAX)' : ''}</div>
-                        <div class="item-desc">${def.label}: +${formatBonus(currentBonus)}${isMaxed ? '' : ` -> +${formatBonus(nextBonus)}`}</div>
-                    </div>
-                    ${isMaxed ? '<div class="item-price" style="color:var(--text-dim)">MAXED</div>' :
-                    `<button class="buy-btn ${canAfford ? '' : 'disabled'}" data-comp="${compId}"
-                        ${canAfford ? '' : 'disabled'}>${formatCredits(cost)} ISK</button>`}
-                </div>`;
+            compHtml += `<div class="hangar-upgrade-item ${isMaxed ? 'maxed' : ''} ${canAfford ? '' : 'disabled'}">
+                <span class="upgrade-label">${def.name} Mk.${currentLevel + 1}${isMaxed ? ' MAX' : ''}</span>
+                ${isMaxed ? '' : `<button class="buy-btn" data-comp="${compId}" ${canAfford ? '' : 'disabled'}>${formatCredits(cost)}</button>`}
+            </div>`;
         }
 
-        hangarShips.innerHTML = `
-            <div class="shop-item current-ship">
-                <div class="item-info">
-                    <div class="item-name">${player.heroName || shipName}</div>
-                    <div class="item-desc">
-                        ${shipConfig?.role ? shipConfig.role.toUpperCase() + ' - ' : ''}${shipConfig?.size ? shipConfig.size.toUpperCase() : ''}
-                        | Shield: ${Math.floor(player.shield)}/${player.maxShield}
-                        | Armor: ${Math.floor(player.armor)}/${player.maxArmor}
+        // Paint scheme selector
+        const activePaint = player.paintScheme || '';
+        let paintHtml = `<div class="hangar-paint-item ${!activePaint ? 'active' : ''}" data-paint="">
+            <div class="paint-swatch" style="background: linear-gradient(135deg, #4a5566, #607080)"></div>
+            <span>Default</span>
+        </div>`;
+        for (const [id, scheme] of Object.entries(PAINT_SCHEMES)) {
+            const p = scheme;
+            const c1 = '#' + p.primary.toString(16).padStart(6, '0');
+            const c2 = '#' + p.secondary.toString(16).padStart(6, '0');
+            const c3 = '#' + p.accent.toString(16).padStart(6, '0');
+            paintHtml += `<div class="hangar-paint-item ${activePaint === id ? 'active' : ''}" data-paint="${id}">
+                <div class="paint-swatch" style="background: linear-gradient(135deg, ${c1}, ${c2}, ${c3})"></div>
+                <span>${scheme.name}</span>
+            </div>`;
+        }
+
+        // Decal selector
+        const activeDecals = player.decals || [];
+        const positions = ['port', 'starboard', 'dorsal-fore', 'dorsal-aft'];
+        let decalHtml = '';
+        for (const pos of positions) {
+            const existing = activeDecals.find(d => d.position === pos);
+            const existingPreset = existing ? DECAL_PRESETS[existing.id] : null;
+            decalHtml += `<div class="hangar-decal-slot" data-pos="${pos}">
+                <div class="decal-slot-label">${pos.toUpperCase()}</div>
+                <div class="decal-slot-current">${existingPreset ? existingPreset.symbol : '---'}</div>
+                <select class="decal-select" data-pos="${pos}">
+                    <option value="">None</option>
+                    ${Object.entries(DECAL_PRESETS).map(([id, d]) =>
+                        `<option value="${id}" ${existing?.id === id ? 'selected' : ''}>${d.symbol} ${d.name}</option>`
+                    ).join('')}
+                </select>
+            </div>`;
+        }
+
+        // Cargo summary
+        const cargo = player.getCargoContents();
+        const cargoUsed = cargo.reduce((sum, c) => sum + c.volume, 0);
+        const cargoMax = player.cargoCapacity || shipConfig?.cargoCapacity || 0;
+
+        container.innerHTML = `
+            <div class="hangar-layout">
+                <div class="hangar-viewer-section">
+                    <canvas id="hangar-3d-canvas"></canvas>
+                    <div class="hangar-ship-overlay">
+                        <div class="hangar-ship-name">${player.heroName || shipName}</div>
+                        <div class="hangar-ship-class">${shipConfig?.role ? shipConfig.role.toUpperCase() : ''} ${shipConfig?.size ? shipConfig.size.toUpperCase() : ''}</div>
+                    </div>
+                    <div class="hangar-ship-stats">
+                        <span>SHD ${Math.floor(player.shield)}/${player.maxShield}</span>
+                        <span>ARM ${Math.floor(player.armor)}/${player.maxArmor}</span>
+                        <span>CAP ${Math.floor(player.capacitor)}/${player.maxCapacitor}</span>
+                        <span>SPD ${player.maxSpeed} m/s</span>
+                        <span>CARGO ${cargoUsed.toFixed(0)}/${cargoMax} m\u00B3</span>
+                    </div>
+                    <div class="hangar-viewer-hint">DRAG TO ROTATE | SCROLL TO ZOOM</div>
+                </div>
+                <div class="hangar-controls-section">
+                    <div class="hangar-panel">
+                        <div class="hangar-panel-title">UPGRADES</div>
+                        ${hullUpgradeHtml}
+                        ${compHtml}
+                    </div>
+                    <div class="hangar-panel">
+                        <div class="hangar-panel-title">PAINT SCHEME</div>
+                        <div class="hangar-paint-grid">${paintHtml}</div>
+                    </div>
+                    <div class="hangar-panel">
+                        <div class="hangar-panel-title">DECALS</div>
+                        <div class="hangar-decal-grid">${decalHtml}</div>
+                    </div>
+                    <div class="hangar-panel">
+                        <div class="hangar-panel-title">CARGO HOLD (${cargo.length} items)</div>
+                        <div class="hangar-cargo-list">
+                            ${cargo.length === 0 ? '<div class="empty-message">Empty</div>' :
+                            cargo.map(item => `<div class="hangar-cargo-item">
+                                <span>${item.name} x${item.units}</span>
+                                <span>${formatCredits(item.value)}</span>
+                            </div>`).join('')}
+                        </div>
                     </div>
                 </div>
-                <div class="item-price" style="color: var(--text-secondary)">ACTIVE</div>
             </div>
-            <h3 style="margin-top:12px">Hull Upgrade</h3>
-            ${hullUpgradeHtml}
-            <h3 style="margin-top:12px">Component Upgrades</h3>
-            ${compHtml}
         `;
 
-        // Hull upgrade button handler
+        // Initialize 3D viewer
+        requestAnimationFrame(() => {
+            const canvas = document.getElementById('hangar-3d-canvas');
+            if (canvas) {
+                this.initHangar3DViewer(canvas);
+                this.loadHangarShipMesh();
+                this.animateHangarViewer();
+                this.setupHangarControls(canvas);
+            }
+        });
+
+        // Hull upgrade button
         const hullBtn = document.getElementById('hull-upgrade-btn');
         if (hullBtn && nextTierKey) {
             hullBtn.addEventListener('click', () => {
@@ -201,29 +292,254 @@ export class StationVendorManager {
             });
         }
 
-        // Component upgrade button handlers
-        hangarShips.querySelectorAll('.component-upgrade .buy-btn[data-comp]').forEach(btn => {
+        // Component upgrade buttons
+        container.querySelectorAll('.hangar-upgrade-item .buy-btn[data-comp]').forEach(btn => {
             btn.addEventListener('click', () => {
-                const compId = btn.dataset.comp;
-                this.upgradeComponent(compId);
+                this.upgradeComponent(btn.dataset.comp);
             });
         });
 
-        // Cargo
-        const cargo = player.getCargoContents();
-        if (cargo.length === 0) {
-            cargoContents.innerHTML = '<div class="empty-message">Cargo hold is empty</div>';
-        } else {
-            cargoContents.innerHTML = cargo.map(item => `
-                <div class="shop-item">
-                    <div class="item-info">
-                        <div class="item-name">${item.name}</div>
-                        <div class="item-desc">${item.units} units (${item.volume.toFixed(1)} m³)</div>
-                    </div>
-                    <div class="item-price">${formatCredits(item.value)} ISK</div>
-                </div>
-            `).join('');
+        // Paint scheme buttons
+        container.querySelectorAll('.hangar-paint-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const paintId = item.dataset.paint || null; // '' -> null for default
+                player.paintScheme = paintId;
+                // Update active state visually
+                container.querySelectorAll('.hangar-paint-item').forEach(p => p.classList.remove('active'));
+                item.classList.add('active');
+                // Reload ship mesh with new paint
+                this.loadHangarShipMesh();
+                this.game.audio?.play('click');
+            });
+        });
+
+        // Decal selectors
+        container.querySelectorAll('.decal-select').forEach(sel => {
+            sel.addEventListener('change', () => {
+                const pos = sel.dataset.pos;
+                const decalId = sel.value;
+                // Update player decals array
+                player.decals = (player.decals || []).filter(d => d.position !== pos);
+                if (decalId) {
+                    player.decals.push({ id: decalId, position: pos });
+                }
+                // Update visual
+                const slot = sel.closest('.hangar-decal-slot');
+                const currentEl = slot?.querySelector('.decal-slot-current');
+                if (currentEl) {
+                    const preset = DECAL_PRESETS[decalId];
+                    currentEl.textContent = preset ? preset.symbol : '---';
+                }
+                // Reload mesh
+                this.loadHangarShipMesh();
+                this.game.audio?.play('click');
+            });
+        });
+    }
+
+    /**
+     * Initialize the hangar 3D viewer
+     */
+    initHangar3DViewer(canvas) {
+        if (this.hangarRenderer) {
+            this.hangarRenderer.dispose();
+            this.hangarRenderer = null;
         }
+
+        const rect = canvas.parentElement.getBoundingClientRect();
+        const width = Math.floor(rect.width) || 500;
+        const height = 280;
+        canvas.width = width;
+        canvas.height = height;
+
+        this.hangarScene = new THREE.Scene();
+        this.hangarScene.background = new THREE.Color(0x020810);
+
+        this.hangarCamera = new THREE.PerspectiveCamera(40, width / height, 0.1, 2000);
+        this.hangarCamera.position.set(0, 60, 150);
+        this.hangarCamera.lookAt(0, 0, 0);
+
+        this.hangarRenderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        this.hangarRenderer.setSize(width, height);
+        this.hangarRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.hangarRenderer.outputEncoding = THREE.sRGBEncoding;
+        this.hangarRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.hangarRenderer.toneMappingExposure = 2.5;
+
+        // Hangar lighting - dramatic station lighting
+        const ambient = new THREE.AmbientLight(0x223344, 1.0);
+        this.hangarScene.add(ambient);
+
+        const keyLight = new THREE.DirectionalLight(0xffffff, 2.5);
+        keyLight.position.set(4, 10, 6);
+        this.hangarScene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0x4488cc, 1.2);
+        fillLight.position.set(-6, 4, -3);
+        this.hangarScene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0x00ccff, 0.8);
+        rimLight.position.set(0, -3, -8);
+        this.hangarScene.add(rimLight);
+
+        const topLight = new THREE.PointLight(0x88aaff, 0.6, 300);
+        topLight.position.set(0, 80, 0);
+        this.hangarScene.add(topLight);
+
+        // Hangar floor grid
+        const grid = new THREE.GridHelper(300, 30, 0x0a2233, 0x061522);
+        grid.rotation.x = Math.PI / 2;
+        grid.position.z = -40;
+        this.hangarScene.add(grid);
+
+        // Hangar environment - docking clamps
+        for (const side of [-1, 1]) {
+            const clampGeo = new THREE.BoxGeometry(4, 60, 8);
+            const clampMat = new THREE.MeshStandardMaterial({
+                color: 0x1a2a3a, metalness: 0.8, roughness: 0.3,
+            });
+            const clamp = new THREE.Mesh(clampGeo, clampMat);
+            clamp.position.set(0, side * 55, -20);
+            this.hangarScene.add(clamp);
+
+            // Docking light
+            const lightGeo = new THREE.SphereGeometry(1.5, 8, 8);
+            const lightMat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
+            const dockLight = new THREE.Mesh(lightGeo, lightMat);
+            dockLight.position.set(0, side * 55, -12);
+            this.hangarScene.add(dockLight);
+        }
+    }
+
+    /**
+     * Load the player's ship mesh into hangar viewer
+     */
+    loadHangarShipMesh() {
+        if (!this.hangarScene) return;
+
+        // Remove old mesh
+        if (this.hangarShipMesh && this.hangarScene) {
+            this.hangarScene.remove(this.hangarShipMesh);
+            this.hangarShipMesh.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
+            this.hangarShipMesh = null;
+        }
+
+        const player = this.game.player;
+        if (!player) return;
+        const shipConfig = SHIP_DATABASE[player.shipClass] || CONFIG.SHIPS[player.shipClass];
+        if (!shipConfig) return;
+
+        shipMeshFactory.generateShipMeshAsync({
+            shipId: player.modelId || player.shipClass,
+            role: shipConfig.role || 'mercenary',
+            size: shipConfig.size || 'frigate',
+            detailLevel: 'high',
+            paintScheme: player.paintScheme || null,
+            decals: player.decals || [],
+        }).then(mesh => {
+            if (!mesh || !this.hangarScene) return;
+
+            const wrapper = new THREE.Group();
+
+            // Normalize size
+            const box = new THREE.Box3().setFromObject(mesh);
+            const dims = new THREE.Vector3();
+            box.getSize(dims);
+            const maxDim = Math.max(dims.x, dims.y, dims.z);
+            if (maxDim > 0) {
+                const targetSize = 80;
+                mesh.scale.multiplyScalar(targetSize / maxDim);
+            }
+
+            // Center
+            const scaledBox = new THREE.Box3().setFromObject(mesh);
+            const center = new THREE.Vector3();
+            scaledBox.getCenter(center);
+            mesh.position.sub(center);
+
+            // Detect flat procedural mesh and tilt
+            const isProcedural = dims.z < dims.x * 0.3;
+            if (isProcedural) {
+                wrapper.rotation.x = -Math.PI / 3;
+            }
+            this._hangarIsProcedural = isProcedural;
+
+            wrapper.add(mesh);
+            this.hangarShipMesh = wrapper;
+            this.hangarScene.add(this.hangarShipMesh);
+        });
+    }
+
+    /**
+     * Animate the hangar 3D viewer
+     */
+    animateHangarViewer() {
+        if (!this.hangarRenderer || !this.hangarScene) {
+            this.hangarAnimationId = null;
+            return;
+        }
+
+        if (this.hangarShipMesh) {
+            const inner = this.hangarShipMesh.children[0];
+            if (inner) {
+                // Auto-rotate slowly when not dragging
+                if (!this.hangarDragState) {
+                    this.hangarRotationY += 0.003;
+                }
+                inner.rotation.y = this.hangarRotationY;
+                if (!this._hangarIsProcedural) {
+                    inner.rotation.x = this.hangarRotationX;
+                }
+            }
+
+            // Apply zoom
+            const baseZ = 150;
+            this.hangarCamera.position.z = baseZ / this.hangarZoom;
+            this.hangarCamera.position.y = 60 / this.hangarZoom;
+        }
+
+        this.hangarRenderer.render(this.hangarScene, this.hangarCamera);
+        this.hangarAnimationId = requestAnimationFrame(() => this.animateHangarViewer());
+    }
+
+    /**
+     * Setup mouse controls for hangar 3D viewer
+     */
+    setupHangarControls(canvas) {
+        // Drag to rotate
+        canvas.addEventListener('mousedown', (e) => {
+            this.hangarDragState = { x: e.clientX, y: e.clientY };
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!this.hangarDragState) return;
+            const dx = e.clientX - this.hangarDragState.x;
+            const dy = e.clientY - this.hangarDragState.y;
+            this.hangarRotationY += dx * 0.008;
+            if (!this._hangarIsProcedural) {
+                this.hangarRotationX = Math.max(-1.2, Math.min(1.2, this.hangarRotationX + dy * 0.005));
+            }
+            this.hangarDragState = { x: e.clientX, y: e.clientY };
+        });
+
+        canvas.addEventListener('mouseup', () => { this.hangarDragState = null; });
+        canvas.addEventListener('mouseleave', () => { this.hangarDragState = null; });
+
+        // Scroll to zoom
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+            this.hangarZoom = Math.max(0.3, Math.min(3.0, this.hangarZoom * zoomDelta));
+        }, { passive: false });
     }
 
     /**
@@ -310,6 +626,168 @@ export class StationVendorManager {
         this.game.ui?.showToast(`${def.name} upgraded to Mk.${nextLevel + 1}!`, 'success');
         this.game.audio?.play('click');
         this.renderHangar();
+    }
+
+    // =============================================
+    // FACTIONS TAB
+    // =============================================
+
+    renderFactions() {
+        const container = document.getElementById('factions-content');
+        if (!container) return;
+
+        // Get player standings
+        const standings = this.game.factionStandings || {};
+
+        // Group factions by tier
+        const tiers = {
+            1: { label: 'TIER 1 - ELDER RACES', factions: [] },
+            2: { label: 'TIER 2 - PATRON RACES', factions: [] },
+            3: { label: 'TIER 3 - CLIENT RACES', factions: [] },
+        };
+
+        // Separate human factions
+        const humanFactions = [];
+
+        for (const [id, fac] of Object.entries(FACTIONS)) {
+            if (fac.coalition === 'humanity') {
+                humanFactions.push({ id, ...fac });
+            } else if (tiers[fac.tier]) {
+                tiers[fac.tier].factions.push({ id, ...fac });
+            }
+        }
+
+        let html = '<div class="factions-container">';
+
+        // Render alien species by tier
+        for (const [tier, group] of Object.entries(tiers)) {
+            if (group.factions.length === 0) continue;
+            html += `<div class="faction-tier-group">
+                <div class="faction-tier-header">${group.label}</div>`;
+
+            for (const fac of group.factions) {
+                const standing = standings[fac.id] || fac.baseStanding;
+                const standingInfo = this._getStandingLabel(standing);
+                html += this._buildFactionCard(fac, standing, standingInfo);
+            }
+            html += '</div>';
+        }
+
+        // Human factions
+        if (humanFactions.length > 0) {
+            html += `<div class="faction-tier-group">
+                <div class="faction-tier-header">HUMANITY</div>`;
+            for (const fac of humanFactions) {
+                const standing = standings[fac.id] || fac.baseStanding;
+                const standingInfo = this._getStandingLabel(standing);
+                html += this._buildFactionCard(fac, standing, standingInfo);
+            }
+            html += '</div>';
+        }
+
+        html += '</div>';
+        container.innerHTML = html;
+
+        // Wire up expand/collapse
+        container.querySelectorAll('.faction-card-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const card = header.closest('.faction-card');
+                card.classList.toggle('expanded');
+            });
+        });
+    }
+
+    _getStandingLabel(standing) {
+        if (standing >= 5) return { label: 'ALLIED', color: '#44ff44' };
+        if (standing >= 2) return { label: 'FRIENDLY', color: '#44aaff' };
+        if (standing >= -2) return { label: 'NEUTRAL', color: '#888888' };
+        if (standing >= -5) return { label: 'UNFRIENDLY', color: '#ff8844' };
+        return { label: 'HOSTILE', color: '#ff2222' };
+    }
+
+    _buildFactionCard(fac, standing, standingInfo) {
+        const standingBar = Math.max(0, Math.min(100, (standing + 10) * 5));
+        const traits = (fac.notableTraits || []).map(t => `<span class="faction-trait">${t}</span>`).join('');
+
+        return `
+            <div class="faction-card" style="--faction-color: ${fac.color}">
+                <div class="faction-card-header">
+                    <div class="faction-icon">${fac.icon || ''}</div>
+                    <div class="faction-header-info">
+                        <div class="faction-name" style="color: ${fac.color}">${fac.name}</div>
+                        <div class="faction-subtitle">"${fac.nickname}" | ${fac.coalition ? fac.coalition.charAt(0).toUpperCase() + fac.coalition.slice(1) + ' Coalition' : ''} | Tech Level ${fac.techLevel}</div>
+                    </div>
+                    <div class="faction-standing-badge" style="color: ${standingInfo.color}">${standingInfo.label}</div>
+                    <div class="faction-expand-icon">&#9660;</div>
+                </div>
+                <div class="faction-card-body">
+                    <div class="faction-description">${fac.description}</div>
+
+                    <div class="faction-standing-bar-wrap">
+                        <span class="faction-standing-label">Standing: ${standing.toFixed(1)}</span>
+                        <div class="faction-standing-bar">
+                            <div class="faction-standing-fill" style="width: ${standingBar}%; background: ${standingInfo.color}"></div>
+                            <div class="faction-standing-marker" style="left: 50%"></div>
+                        </div>
+                        <div class="faction-standing-range"><span>HOSTILE</span><span>NEUTRAL</span><span>ALLIED</span></div>
+                    </div>
+
+                    ${fac.physicalDescription ? `
+                    <div class="faction-lore-section">
+                        <div class="faction-lore-title">SPECIES PROFILE</div>
+                        <div class="faction-lore-text">${fac.physicalDescription}</div>
+                    </div>` : ''}
+
+                    ${fac.homeworld ? `
+                    <div class="faction-lore-section">
+                        <div class="faction-lore-title">HOMEWORLD</div>
+                        <div class="faction-lore-text">${fac.homeworld}</div>
+                    </div>` : ''}
+
+                    ${fac.government ? `
+                    <div class="faction-lore-section">
+                        <div class="faction-lore-title">GOVERNMENT</div>
+                        <div class="faction-lore-text">${fac.government}</div>
+                    </div>` : ''}
+
+                    ${fac.society ? `
+                    <div class="faction-lore-section">
+                        <div class="faction-lore-title">SOCIETY & CULTURE</div>
+                        <div class="faction-lore-text">${fac.society}</div>
+                    </div>` : ''}
+
+                    ${fac.technology ? `
+                    <div class="faction-lore-section">
+                        <div class="faction-lore-title">TECHNOLOGY</div>
+                        <div class="faction-lore-text">${fac.technology}</div>
+                    </div>` : ''}
+
+                    ${fac.militaryDoctrine ? `
+                    <div class="faction-lore-section">
+                        <div class="faction-lore-title">MILITARY DOCTRINE</div>
+                        <div class="faction-lore-text">${fac.militaryDoctrine}</div>
+                    </div>` : ''}
+
+                    ${fac.humanRelations ? `
+                    <div class="faction-lore-section">
+                        <div class="faction-lore-title">RELATIONS WITH HUMANITY</div>
+                        <div class="faction-lore-text">${fac.humanRelations}</div>
+                    </div>` : ''}
+
+                    ${traits ? `
+                    <div class="faction-lore-section">
+                        <div class="faction-lore-title">NOTABLE TRAITS</div>
+                        <div class="faction-traits">${traits}</div>
+                    </div>` : ''}
+
+                    <div class="faction-stats-row">
+                        <div class="faction-stat"><span class="stat-label">AGGRESSION</span><span class="stat-value">${Math.round(fac.aggressionLevel * 100)}%</span></div>
+                        <div class="faction-stat"><span class="stat-label">TECH</span><span class="stat-value">Lv.${fac.techLevel}</span></div>
+                        <div class="faction-stat"><span class="stat-label">TRADE</span><span class="stat-value">${(fac.tradeGoods || []).length} goods</span></div>
+                        <div class="faction-stat"><span class="stat-label">PREFIX</span><span class="stat-value">${fac.shipPrefix}</span></div>
+                    </div>
+                </div>
+            </div>`;
     }
 
     // =============================================

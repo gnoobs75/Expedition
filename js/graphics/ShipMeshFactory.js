@@ -36,6 +36,38 @@ const ROLE_PALETTES = {
     logistics:  { primary: 0x335577, secondary: 0x4488bb, accent: 0x66ddff, glow: 0x44ccff, trim: 0x55aadd, dark: 0x1a2a44 },
 };
 
+// Player paint scheme presets
+export const PAINT_SCHEMES = {
+    'stealth-black':   { name: 'Stealth Black',     primary: 0x1a1a22, secondary: 0x2a2a33, accent: 0x445566, glow: 0x4488cc, trim: 0x334455, dark: 0x0a0a11 },
+    'arctic-white':    { name: 'Arctic White',       primary: 0xccddee, secondary: 0xaabbcc, accent: 0x88ccff, glow: 0x66bbff, trim: 0xddeeff, dark: 0x556677 },
+    'crimson-fury':    { name: 'Crimson Fury',       primary: 0x881122, secondary: 0xbb2233, accent: 0xff4455, glow: 0xff2244, trim: 0xcc3344, dark: 0x440811 },
+    'solar-gold':      { name: 'Solar Gold',         primary: 0x886622, secondary: 0xbbaa44, accent: 0xffdd44, glow: 0xffcc00, trim: 0xccaa33, dark: 0x443311 },
+    'void-purple':     { name: 'Void Purple',        primary: 0x442266, secondary: 0x6633aa, accent: 0x9955ff, glow: 0x8844ff, trim: 0x7744cc, dark: 0x221133 },
+    'emerald-wing':    { name: 'Emerald Wing',       primary: 0x225533, secondary: 0x338855, accent: 0x44dd77, glow: 0x33ff66, trim: 0x44aa66, dark: 0x112a1a },
+    'rust-desert':     { name: 'Rust Desert',        primary: 0x774422, secondary: 0xaa6633, accent: 0xdd8844, glow: 0xff9944, trim: 0xbb7733, dark: 0x3a2211 },
+    'neon-cyan':       { name: 'Neon Cyan',          primary: 0x113344, secondary: 0x225566, accent: 0x00ffff, glow: 0x00eeff, trim: 0x44ddee, dark: 0x0a1a22 },
+    'blood-orange':    { name: 'Blood Orange',       primary: 0x883311, secondary: 0xbb5522, accent: 0xff7733, glow: 0xff6622, trim: 0xcc6633, dark: 0x441a08 },
+    'ghost-gray':      { name: 'Ghost Gray',         primary: 0x555566, secondary: 0x777788, accent: 0x99aabb, glow: 0x8899aa, trim: 0x888899, dark: 0x333344 },
+    'cobalt-blue':     { name: 'Cobalt Blue',        primary: 0x1a3366, secondary: 0x2244aa, accent: 0x4488ff, glow: 0x3377ff, trim: 0x3366cc, dark: 0x0d1a33 },
+    'toxic-green':     { name: 'Toxic Green',        primary: 0x224411, secondary: 0x336622, accent: 0x66ff22, glow: 0x44ff00, trim: 0x55aa22, dark: 0x112208 },
+};
+
+// Player decal presets (rendered as colored shapes on hull)
+export const DECAL_PRESETS = {
+    'skull':           { name: 'Skull & Crossbones', symbol: '\u2620', color: 0xffffff },
+    'star':            { name: 'Star',               symbol: '\u2605', color: 0xffdd44 },
+    'lightning':       { name: 'Lightning Bolt',     symbol: '\u26A1', color: 0x44ddff },
+    'crosshairs':      { name: 'Crosshairs',         symbol: '\u2316', color: 0xff4444 },
+    'diamond':         { name: 'Diamond',            symbol: '\u25C6', color: 0x44ffcc },
+    'arrows':          { name: 'Arrows',             symbol: '\u2191\u2191', color: 0xff8844 },
+    'shield':          { name: 'Shield',             symbol: '\u{1F6E1}', color: 0x4488ff },
+    'crown':           { name: 'Crown',              symbol: '\u{1F451}', color: 0xffaa00 },
+    'anchor':          { name: 'Anchor',             symbol: '\u2693', color: 0x88aacc },
+    'radiation':       { name: 'Radiation',          symbol: '\u2622', color: 0x44ff44 },
+    'biohazard':       { name: 'Biohazard',          symbol: '\u2623', color: 0xff4488 },
+    'peace':           { name: 'Peace',              symbol: '\u262E', color: 0xffffff },
+};
+
 // Faction logo colors for guild ship hull decals
 const FACTION_LOGOS = {
     'ore-extraction-syndicate': { color: 0xffaa44, glow: 0xffcc66 },
@@ -63,9 +95,11 @@ class ShipMeshFactory {
      * Generate a ship mesh from ship database config
      */
     generateShipMesh(config) {
-        const { shipId, role, size, detailLevel = 'low', factionId } = config;
+        const { shipId, role, size, detailLevel = 'low', factionId, paintScheme, decals } = config;
         const sizeConfig = SIZE_CONFIGS[size] || SIZE_CONFIGS.frigate;
-        const palette = ROLE_PALETTES[role] || ROLE_PALETTES.mercenary;
+        const basePalette = ROLE_PALETTES[role] || ROLE_PALETTES.mercenary;
+        // Apply custom paint scheme if provided
+        const palette = (paintScheme && PAINT_SCHEMES[paintScheme]) ? PAINT_SCHEMES[paintScheme] : basePalette;
         const rng = this.createSeededRNG(this.hashString(shipId || 'default'));
 
         // Calculate engine speed factor: fast ships (frigates) have big engines, slow ships (capitals) small
@@ -92,6 +126,11 @@ class ShipMeshFactory {
             this.addFactionDecal(group, sizeConfig, factionId);
         }
 
+        // Add player decals
+        if (decals && decals.length > 0) {
+            this.addPlayerDecals(group, sizeConfig, decals);
+        }
+
         // Add universal details (running lights, panel greebles)
         this.addRunningLights(group, sizeConfig, rng, palette);
         this.addLightHalos(group, sizeConfig, palette);
@@ -101,6 +140,7 @@ class ShipMeshFactory {
         this.addArmorPlates(group, sizeConfig, rng, palette);
         this.addHullTrim(group, sizeConfig, palette, role);
         this.addHullRibbing(group, sizeConfig, rng, palette);
+        this.addHullPanelLines(group, sizeConfig, rng, palette);
         this.addWindowRows(group, sizeConfig, rng, palette);
         this.addAntennaArrays(group, sizeConfig, rng, palette);
         this.addPowerConduits(group, sizeConfig, rng, palette);
@@ -1472,6 +1512,7 @@ class ShipMeshFactory {
             glow.position.set(pos.x, pos.y, 0.03);
             glow.renderOrder = 3;
             group.add(glow);
+            glow.userData.enginePulse = true;
 
             // Hot core center - white hot
             const coreGeo = new THREE.CircleGeometry(nacSize * 0.18, 8);
@@ -1482,6 +1523,7 @@ class ShipMeshFactory {
             core.position.set(pos.x, pos.y, 0.035);
             core.renderOrder = 4;
             group.add(core);
+            core.userData.enginePulse = true;
 
             // Exhaust trail - vivid blue glow
             const trailLen = nacSize * (1.2 + speedFactor * 0.6);
@@ -2626,6 +2668,53 @@ class ShipMeshFactory {
     }
 
     /**
+     * Add hull panel lines for mechanical detail on larger ships.
+     * Creates recessed panel seam lines across the hull surface.
+     */
+    addHullPanelLines(group, sizeConfig, rng, palette) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const complexity = sizeConfig.complexity || 1;
+        // Only cruiser+ ships get panel lines
+        if (complexity < 2.0) return;
+
+        const lineCount = Math.floor(complexity * 3);
+        const lineMat = new THREE.LineBasicMaterial({
+            color: 0x334455, transparent: true, opacity: 0.18,
+        });
+
+        // Longitudinal panel seams
+        for (let i = 0; i < lineCount; i++) {
+            const yOffset = (rng() - 0.5) * s * 0.7 * a;
+            const xStart = s * (-0.4 + rng() * 0.2);
+            const xEnd = s * (0.1 + rng() * 0.3);
+            const pts = [
+                new THREE.Vector3(xStart, yOffset, 0.045),
+                new THREE.Vector3(xEnd, yOffset + (rng() - 0.5) * s * 0.05 * a, 0.045),
+            ];
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            const line = new THREE.Line(geo, lineMat);
+            line.renderOrder = 3;
+            group.add(line);
+        }
+
+        // Transverse panel seams
+        const transCount = Math.floor(complexity * 2);
+        for (let i = 0; i < transCount; i++) {
+            const xPos = s * (-0.3 + (i / transCount) * 0.6);
+            const halfHeight = s * (0.25 + rng() * 0.15) * a;
+            const pts = [
+                new THREE.Vector3(xPos, -halfHeight, 0.045),
+                new THREE.Vector3(xPos + (rng() - 0.5) * s * 0.03, halfHeight, 0.045),
+            ];
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            const line = new THREE.Line(geo, lineMat);
+            line.renderOrder = 3;
+            group.add(line);
+        }
+    }
+
+    /**
      * Add power conduit network lines along the hull.
      * Visual energy distribution lines with junction nodes.
      */
@@ -2994,15 +3083,20 @@ class ShipMeshFactory {
      * Generate mesh with GLB if available (async), falls back to procedural.
      */
     async generateShipMeshAsync(config) {
-        const { shipId, role, size, detailLevel = 'low' } = config;
+        const { shipId, role, size, detailLevel = 'low', paintScheme, decals } = config;
         const sizeConfig = SIZE_CONFIGS[size] || SIZE_CONFIGS.frigate;
         const targetSize = detailLevel === 'high' ? 50 : 30;
 
-        // Try GLB first
-        const glbMesh = await this.loadModel(shipId, targetSize);
-        if (glbMesh) return glbMesh;
+        // If player has paint customization, skip GLB and use procedural (paintable)
+        const hasCustomization = paintScheme || (decals && decals.length > 0);
 
-        // Fallback to procedural + add preview turret hardpoints
+        if (!hasCustomization) {
+            // Try GLB first (no customizations to apply)
+            const glbMesh = await this.loadModel(shipId, targetSize);
+            if (glbMesh) return glbMesh;
+        }
+
+        // Procedural mesh with full customization support
         const mesh = this.generateShipMesh(config);
         this.addPreviewTurrets(mesh, sizeConfig, shipId, role);
         return mesh;
@@ -3179,6 +3273,69 @@ class ShipMeshFactory {
             const glow = new THREE.Mesh(glowGeo, glowMat);
             glow.position.set(xPos, yPos, 0.047);
             glow.renderOrder = 4;
+            group.add(glow);
+        }
+    }
+
+    /**
+     * Add player-chosen decals to hull
+     */
+    addPlayerDecals(group, sizeConfig, decals) {
+        const s = sizeConfig.radius;
+        const a = sizeConfig.aspect || 0.5;
+        const decalSize = s * 0.1;
+
+        // Position slots for decals (port, starboard, dorsal-fore, dorsal-aft)
+        const positions = {
+            port:          { x: -s * 0.1,  y:  s * 0.28 * a, z: 0.055 },
+            starboard:     { x: -s * 0.1,  y: -s * 0.28 * a, z: 0.055 },
+            'dorsal-fore': { x:  s * 0.25,  y: 0,             z: 0.055 },
+            'dorsal-aft':  { x: -s * 0.3,  y: 0,             z: 0.055 },
+        };
+
+        for (const decal of decals) {
+            const preset = DECAL_PRESETS[decal.id];
+            if (!preset) continue;
+            const pos = positions[decal.position] || positions.port;
+
+            // Backing circle
+            const backGeo = new THREE.CircleGeometry(decalSize * 1.15, 16);
+            const backMat = new THREE.MeshBasicMaterial({
+                color: 0x111122, transparent: true, opacity: 0.45,
+            });
+            const back = new THREE.Mesh(backGeo, backMat);
+            back.position.set(pos.x, pos.y, pos.z - 0.002);
+            back.renderOrder = 5;
+            group.add(back);
+
+            // Colored ring border
+            const ringGeo = new THREE.RingGeometry(decalSize * 0.95, decalSize * 1.15, 24);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: preset.color, transparent: true, opacity: 0.6, side: THREE.DoubleSide,
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.position.set(pos.x, pos.y, pos.z - 0.001);
+            ring.renderOrder = 5;
+            group.add(ring);
+
+            // Inner filled symbol disc (colored dot for now since we can't render text in Three.js easily)
+            const symGeo = new THREE.CircleGeometry(decalSize * 0.7, 16);
+            const symMat = new THREE.MeshBasicMaterial({
+                color: preset.color, transparent: true, opacity: 0.75,
+            });
+            const sym = new THREE.Mesh(symGeo, symMat);
+            sym.position.set(pos.x, pos.y, pos.z);
+            sym.renderOrder = 5;
+            group.add(sym);
+
+            // Glow halo
+            const glowGeo = new THREE.CircleGeometry(decalSize * 1.5, 16);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: preset.color, transparent: true, opacity: 0.06,
+            });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            glow.position.set(pos.x, pos.y, pos.z - 0.003);
+            glow.renderOrder = 5;
             group.add(glow);
         }
     }

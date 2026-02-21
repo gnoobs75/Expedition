@@ -216,35 +216,39 @@
                 <button class="panel-close">&times;</button>
             </div>
             <div class="panel-content">
-                <div id="target-name" class="target-name">No Target</div>
-                <div id="target-type" class="target-type"></div>
-                <div id="target-distance" class="target-distance"></div>
-                <div id="target-health-bars">
-                    <div class="mini-bar-group">
-                        <div id="target-shield-bar" class="mini-bar shield"></div>
+                <div class="target-identity">
+                    <div id="target-name" class="target-name">No Target</div>
+                    <div id="target-type" class="target-type"></div>
+                    <div id="target-distance" class="target-distance"></div>
+                </div>
+                <div class="target-stats">
+                    <div id="target-health-bars">
+                        <div class="mini-bar-group">
+                            <div id="target-shield-bar" class="mini-bar shield"></div>
+                        </div>
+                        <div class="mini-bar-group">
+                            <div id="target-armor-bar" class="mini-bar armor"></div>
+                        </div>
+                        <div class="mini-bar-group">
+                            <div id="target-hull-bar" class="mini-bar hull"></div>
+                        </div>
                     </div>
-                    <div class="mini-bar-group">
-                        <div id="target-armor-bar" class="mini-bar armor"></div>
-                    </div>
-                    <div class="mini-bar-group">
-                        <div id="target-hull-bar" class="mini-bar hull"></div>
+                    <div id="target-combat-info" class="target-combat-info">
+                        <div class="combat-info-row">
+                            <span class="combat-info-label">DPS</span>
+                            <span class="combat-info-value" id="target-dps-out">0</span>
+                        </div>
+                        <div class="combat-info-row">
+                            <span class="combat-info-label">SPD</span>
+                            <span class="combat-info-value" id="target-speed-val">0 m/s</span>
+                        </div>
+                        <div class="combat-info-row">
+                            <span class="combat-info-label">ANG</span>
+                            <span class="combat-info-value" id="target-angular-val">0</span>
+                        </div>
                     </div>
                 </div>
-                <div id="target-combat-info" class="target-combat-info">
-                    <div class="combat-info-row">
-                        <span class="combat-info-label">DPS OUT</span>
-                        <span class="combat-info-value" id="target-dps-out">0</span>
-                    </div>
-                    <div class="combat-info-row">
-                        <span class="combat-info-label">SPEED</span>
-                        <span class="combat-info-value" id="target-speed-val">0 m/s</span>
-                    </div>
-                    <div class="combat-info-row">
-                        <span class="combat-info-label">ANGULAR</span>
-                        <span class="combat-info-value" id="target-angular-val">0</span>
-                    </div>
-                </div>
-                <!-- Scanner Readout (expanded ship data) -->
+                <!-- Scanner Readout (expanded ship data, spans full width) -->
                 <div id="target-scanner" class="target-scanner">
                     <div class="scanner-divider"></div>
                     <div class="scanner-grid">
@@ -457,38 +461,40 @@
             </div>
             <div class="ship-indicator-content">
                 <canvas id="ship-indicator-canvas"></canvas>
-                <div class="ship-indicator-info">
-                    <div id="ship-indicator-name" class="ship-indicator-name">Your Ship</div>
-                    <div id="ship-indicator-class" class="ship-indicator-class"></div>
-                </div>
-                <div id="ship-indicator-health">
-                    <div class="mini-bar-group">
-                        <div id="ship-shield-bar" class="mini-bar shield"></div>
-                        <span class="bar-pct" id="ship-shield-pct"></span>
+                <div class="ship-indicator-right">
+                    <div class="ship-indicator-info">
+                        <div id="ship-indicator-name" class="ship-indicator-name">Your Ship</div>
+                        <div id="ship-indicator-class" class="ship-indicator-class"></div>
                     </div>
-                    <div class="mini-bar-group">
-                        <div id="ship-armor-bar" class="mini-bar armor"></div>
-                        <span class="bar-pct" id="ship-armor-pct"></span>
+                    <div id="ship-indicator-health">
+                        <div class="mini-bar-group">
+                            <div id="ship-shield-bar" class="mini-bar shield"></div>
+                            <span class="bar-pct" id="ship-shield-pct"></span>
+                        </div>
+                        <div class="mini-bar-group">
+                            <div id="ship-armor-bar" class="mini-bar armor"></div>
+                            <span class="bar-pct" id="ship-armor-pct"></span>
+                        </div>
+                        <div class="mini-bar-group">
+                            <div id="ship-hull-bar" class="mini-bar hull"></div>
+                            <span class="bar-pct" id="ship-hull-pct"></span>
+                        </div>
+                        <div class="mini-bar-group">
+                            <div id="ship-cap-bar" class="mini-bar capacitor"></div>
+                            <span class="bar-pct" id="ship-cap-pct"></span>
+                        </div>
                     </div>
-                    <div class="mini-bar-group">
-                        <div id="ship-hull-bar" class="mini-bar hull"></div>
-                        <span class="bar-pct" id="ship-hull-pct"></span>
+                    <div id="ship-cargo-bar-container" class="mini-bar-group cargo-bar-group">
+                        <div id="ship-cargo-bar" class="mini-bar cargo"></div>
+                        <span class="cargo-label" id="ship-cargo-label"></span>
                     </div>
-                    <div class="mini-bar-group">
-                        <div id="ship-cap-bar" class="mini-bar capacitor"></div>
-                        <span class="bar-pct" id="ship-cap-pct"></span>
+                    <div id="velocity-compass" class="velocity-compass">
+                        <canvas id="velocity-compass-canvas" width="40" height="40"></canvas>
+                        <span id="velocity-speed-label" class="velocity-speed-label">0 m/s</span>
                     </div>
+                    <div id="hull-warning-text" class="hull-warning-text hidden">HULL CRITICAL</div>
+                    <div id="ewar-status" class="ewar-status-bar"></div>
                 </div>
-                <div id="ship-cargo-bar-container" class="mini-bar-group cargo-bar-group">
-                    <div id="ship-cargo-bar" class="mini-bar cargo"></div>
-                    <span class="cargo-label" id="ship-cargo-label"></span>
-                </div>
-                <div id="velocity-compass" class="velocity-compass">
-                    <canvas id="velocity-compass-canvas" width="50" height="50"></canvas>
-                    <span id="velocity-speed-label" class="velocity-speed-label">0 m/s</span>
-                </div>
-                <div id="hull-warning-text" class="hull-warning-text hidden">HULL CRITICAL</div>
-                <div id="ewar-status" class="ewar-status-bar"></div>
             </div>
         </div>
 
@@ -654,7 +660,8 @@
                 <div id="price-ticker" class="price-ticker">
                     <div class="price-ticker-track" id="price-ticker-track"></div>
                 </div>
-                <div class="modal-tabs">
+                <div class="station-layout">
+                    <div class="modal-tabs station-nav">
                     <button class="tab-btn active" data-tab="hangar">HANGAR</button>
                     <button class="tab-btn" data-tab="ships">SHIPS</button>
                     <button class="tab-btn" data-tab="equipment">EQUIPMENT</button>
@@ -670,13 +677,11 @@
                     <button class="tab-btn" data-tab="drones">DRONES</button>
                     <button class="tab-btn" data-tab="manufacturing">CRAFT</button>
                     <button class="tab-btn" data-tab="skills">SKILLS</button>
-                </div>
-                <div class="modal-body">
+                    <button class="tab-btn" data-tab="factions">FACTIONS</button>
+                    </div>
+                    <div class="modal-body">
                     <div id="tab-hangar" class="tab-content active">
-                        <h3>Your Ships</h3>
-                        <div id="hangar-ships"></div>
-                        <h3>Cargo Hold</h3>
-                        <div id="cargo-contents"></div>
+                        <div id="hangar-content"></div>
                     </div>
                     <div id="tab-ships" class="tab-content">
                         <div id="ships-market" class="market-section"></div>
@@ -727,6 +732,10 @@
                     <div id="tab-skills" class="tab-content">
                         <div id="skills-content"></div>
                     </div>
+                    <div id="tab-factions" class="tab-content">
+                        <div id="factions-content"></div>
+                    </div>
+                </div>
                 </div>
             </div>
         </div>

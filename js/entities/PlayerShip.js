@@ -48,6 +48,12 @@ export class PlayerShip extends Ship {
             plating: 0,
         };
 
+        // Paint scheme customization
+        this.paintScheme = options.paintScheme || null; // null = default role palette
+
+        // Decals on ship hull
+        this.decals = options.decals || []; // [{id, position}]
+
         // Orbit visual effect state
         this.orbitPhase = 0;      // Current angle in orbit (radians, 0-2π)
         this.orbitTilt = 0.7;     // Tilt factor for ellipse perspective (0.7 = ~35° visual tilt)
@@ -59,8 +65,8 @@ export class PlayerShip extends Ship {
     update(dt) {
         super.update(dt);
 
-        // Update target from game state (primary locked target)
-        this.target = this.game.lockedTargets?.[0] || this.game.lockedTarget;
+        // Update target from game state (active locked target)
+        this.target = this.game.activeLockedTarget || this.game.lockedTargets?.[0] || this.game.lockedTarget;
 
         // Sync EWAR state for AutopilotSystem compatibility
         this.warpDisrupted = this.isPointed;
@@ -161,6 +167,58 @@ export class PlayerShip extends Ship {
     }
 
     /**
+     * Rebuild the ship mesh in-place (for customization changes like paint/decals)
+     */
+    rebuildMesh() {
+        if (!this.mesh) return;
+
+        // Save position/rotation
+        const pos = this.mesh.position.clone();
+        const rot = this.mesh.rotation.z;
+
+        // Dispose all children
+        while (this.mesh.children.length > 0) {
+            const child = this.mesh.children[0];
+            this.mesh.remove(child);
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(m => m.dispose());
+                } else {
+                    child.material.dispose();
+                }
+            }
+        }
+
+        // Rebuild procedural mesh contents
+        const newMesh = this.createProceduralMesh();
+        // Transfer children from new mesh into existing mesh group
+        while (newMesh.children.length > 0) {
+            this.mesh.add(newMesh.children[0]);
+        }
+
+        // Re-add shield overlay
+        const shieldGeo = new THREE.CircleGeometry(this.radius * 1.5, 32);
+        const shieldMat = new THREE.MeshBasicMaterial({
+            color: 0x4488ff, transparent: true, opacity: 0.0, side: THREE.DoubleSide,
+        });
+        this.shieldOverlay = new THREE.Mesh(shieldGeo, shieldMat);
+        this.shieldOverlay.position.z = 2;
+        this.mesh.add(this.shieldOverlay);
+
+        // Re-add turrets
+        this.addTurretHardpoints();
+
+        // Restore position/rotation
+        this.mesh.position.copy(pos);
+        this.mesh.rotation.z = rot;
+
+        // Try GLB async
+        this.glbLoaded = false;
+        this.loadGLBMesh();
+    }
+
+    /**
      * Create the procedural fallback mesh using ShipMeshFactory
      */
     createProceduralMesh() {
@@ -174,6 +232,8 @@ export class PlayerShip extends Ship {
                     role: dbConfig.role || 'mercenary',
                     size: dbConfig.size || 'frigate',
                     detailLevel: 'low',
+                    paintScheme: this.paintScheme || null,
+                    decals: this.decals || [],
                 });
                 this.engineMeshes = null;
                 return mesh;

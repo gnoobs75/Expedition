@@ -539,7 +539,7 @@ export class UIManager {
                 if (tabEl) tabEl.classList.add('active');
 
                 // Notify vendor manager of tab change
-                if (['hangar', 'ships', 'equipment', 'fitting'].includes(btn.dataset.tab)) {
+                if (['hangar', 'ships', 'equipment', 'fitting', 'factions'].includes(btn.dataset.tab)) {
                     this.vendorManager?.updateTab(btn.dataset.tab);
                 }
                 // Update refinery when switching to it

@@ -18,6 +18,7 @@ export class SkippyManager {
         this.speakingDot = null;
         this.visible = true;
         this.minimized = false;
+        this.compact = false;
         this.muted = false;
 
         // Message queue
@@ -135,6 +136,15 @@ export class SkippyManager {
         this.initTTS();
         this.setupEvents();
 
+        // Apply persisted compact state
+        if (this.compact) {
+            this.panel.querySelector('#skippy-text').style.display = 'none';
+            this.panel.querySelector('#skippy-history').style.display = 'none';
+            this.panel.classList.add('skippy-compact');
+            this.panel.querySelector('#skippy-compact-btn').textContent = '\u25A3';
+            this.panel.querySelector('#skippy-compact-btn').title = 'Show text';
+        }
+
         // Show panel after a brief delay (defer for DOM readiness)
         requestAnimationFrame(() => {
             this.panel.classList.remove('hidden');
@@ -169,6 +179,7 @@ export class SkippyManager {
                 <div class="skippy-controls">
                     <span class="skippy-speaking-dot" id="skippy-speaking-dot"></span>
                     <button id="skippy-mute-btn" class="skippy-ctrl-btn" title="Mute voice">&#128266;</button>
+                    <button id="skippy-compact-btn" class="skippy-ctrl-btn" title="Avatar only">&#9673;</button>
                     <button id="skippy-min-btn" class="skippy-ctrl-btn" title="Minimize">&#8722;</button>
                 </div>
             </div>
@@ -191,6 +202,7 @@ export class SkippyManager {
 
         // Button handlers
         this.panel.querySelector('#skippy-mute-btn').addEventListener('click', () => this.toggleMute());
+        this.panel.querySelector('#skippy-compact-btn').addEventListener('click', () => this.toggleCompact());
         this.panel.querySelector('#skippy-min-btn').addEventListener('click', () => this.toggleMinimize());
     }
 
@@ -1368,6 +1380,29 @@ export class SkippyManager {
         this.visible = !this.panel.classList.contains('hidden');
     }
 
+    toggleCompact() {
+        this.compact = !this.compact;
+        const textEl = this.panel.querySelector('#skippy-text');
+        const historyEl = this.panel.querySelector('#skippy-history');
+        const btn = this.panel.querySelector('#skippy-compact-btn');
+
+        if (this.compact) {
+            textEl.style.display = 'none';
+            historyEl.style.display = 'none';
+            this.panel.classList.add('skippy-compact');
+            btn.textContent = '\u25A3'; // filled square with inner square
+            btn.title = 'Show text';
+        } else {
+            textEl.style.display = '';
+            historyEl.style.display = '';
+            this.panel.classList.remove('skippy-compact');
+            btn.textContent = '\u25C9'; // circle
+            btn.title = 'Avatar only';
+        }
+
+        this.saveState();
+    }
+
     toggleMinimize() {
         this.minimized = !this.minimized;
         const body = this.panel.querySelector('#skippy-body');
@@ -1396,6 +1431,7 @@ export class SkippyManager {
             }
             if (data.muted !== undefined) this.muted = data.muted;
             if (data.minimized !== undefined) this.minimized = data.minimized;
+            if (data.compact !== undefined) this.compact = data.compact;
             if (data.guidedTutorial !== undefined) this.guidedTutorial = data.guidedTutorial;
             if (data.guidedStep !== undefined) this.guidedStep = data.guidedStep;
         } catch {
@@ -1409,6 +1445,7 @@ export class SkippyManager {
                 milestones: [...this.milestones],
                 muted: this.muted,
                 minimized: this.minimized,
+                compact: this.compact,
                 guidedTutorial: this.guidedTutorial,
                 guidedStep: this.guidedStep,
             }));

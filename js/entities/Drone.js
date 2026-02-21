@@ -557,117 +557,288 @@ export class Drone extends Entity {
     // ---- Mesh Creation ----
 
     createMesh() {
-        const shape = new THREE.Shape();
         const size = this.radius;
+        const group = new THREE.Group();
 
-        if (this.droneCategory === 'ewar') {
-            // Hexagonal shape for EWAR drones
-            const sides = 6;
-            for (let i = 0; i <= sides; i++) {
-                const a = (i / sides) * Math.PI * 2 - Math.PI / 2;
-                const px = Math.cos(a) * size;
-                const py = Math.sin(a) * size * 0.7;
-                if (i === 0) shape.moveTo(px, py);
-                else shape.lineTo(px, py);
-            }
-        } else if (this.droneSize === 'heavy') {
-            // Wider, more angular shape for heavy drones
-            shape.moveTo(size * 1.2, 0);
-            shape.lineTo(size * 0.3, size * 0.8);
-            shape.lineTo(-size * 0.8, size * 0.5);
-            shape.lineTo(-size, 0);
-            shape.lineTo(-size * 0.8, -size * 0.5);
-            shape.lineTo(size * 0.3, -size * 0.8);
-            shape.closePath();
-        } else if (this.droneSize === 'light') {
-            // Sleek narrow shape for light drones
-            shape.moveTo(size * 1.1, 0);
-            shape.lineTo(0, size * 0.4);
-            shape.lineTo(-size * 0.8, size * 0.2);
-            shape.lineTo(-size * 0.6, 0);
-            shape.lineTo(-size * 0.8, -size * 0.2);
-            shape.lineTo(0, -size * 0.4);
-            shape.closePath();
+        // --- Category-specific hull ---
+        if (this.droneCategory === 'combat') {
+            this._buildCombatMesh(group, size);
+        } else if (this.droneCategory === 'mining') {
+            this._buildMiningMesh(group, size);
+        } else if (this.droneCategory === 'ewar') {
+            this._buildEwarMesh(group, size);
         } else {
-            // Standard diamond for medium drones
-            shape.moveTo(size, 0);
-            shape.lineTo(0, size * 0.6);
-            shape.lineTo(-size, 0);
-            shape.lineTo(0, -size * 0.6);
-            shape.closePath();
+            this._buildScoutMesh(group, size);
         }
 
-        const geometry = new THREE.ExtrudeGeometry(shape, {
-            depth: size * 0.08,
-            bevelEnabled: true,
-            bevelThickness: size * 0.02,
-            bevelSize: size * 0.01,
-            bevelSegments: 1,
+        // --- Shared: Engine glow (rear thruster) ---
+        const engineCore = new THREE.CircleGeometry(size * 0.18, 8);
+        const engineCoreMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff, transparent: true, opacity: 0.7,
         });
-        geometry.center();
+        const engineMesh = new THREE.Mesh(engineCore, engineCoreMat);
+        engineMesh.position.set(-size * 0.65, 0, 0.06);
+        group.add(engineMesh);
 
-        const material = new THREE.MeshStandardMaterial({
-            color: this.color,
-            emissive: this.color,
-            emissiveIntensity: 0.15,
-            transparent: true,
-            opacity: 0.9,
-            roughness: 0.4,
-            metalness: 0.4,
+        // Engine bloom
+        const bloomGeo = new THREE.CircleGeometry(size * 0.35, 10);
+        const bloomMat = new THREE.MeshBasicMaterial({
+            color: 0x44ccff, transparent: true, opacity: 0.2,
         });
+        const bloom = new THREE.Mesh(bloomGeo, bloomMat);
+        bloom.position.set(-size * 0.65, 0, 0.04);
+        group.add(bloom);
 
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.set(this.x, this.y, 1);
+        // --- Shared: Running lights (2 per side, color-coded) ---
+        const lightColor = this.droneCategory === 'combat' ? 0xff4422
+            : this.droneCategory === 'mining' ? 0xffaa22
+            : this.droneCategory === 'ewar' ? 0xaa44ff
+            : 0x22ff88;
 
-        // Glow ring
-        const glowGeometry = new THREE.CircleGeometry(size * 1.5, 16);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-            color: this.color,
-            transparent: true,
-            opacity: 0.2,
-        });
-        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-        glow.position.z = -0.1;
-        this.mesh.add(glow);
+        const lightPositions = [
+            { x: size * 0.2, y: size * 0.35 },
+            { x: -size * 0.3, y: size * 0.25 },
+            { x: size * 0.2, y: -size * 0.35 },
+            { x: -size * 0.3, y: -size * 0.25 },
+        ];
 
-        // Heavy drones get an extra hull plate ring
-        if (this.droneSize === 'heavy') {
-            const armorRing = new THREE.RingGeometry(size * 1.1, size * 1.3, 8);
-            const armorMat = new THREE.MeshBasicMaterial({
-                color: this.color,
-                transparent: true,
-                opacity: 0.15,
+        const lightGeo = new THREE.CircleGeometry(size * 0.04, 6);
+        const lightHaloGeo = new THREE.CircleGeometry(size * 0.1, 8);
+        for (const lp of lightPositions) {
+            const lightMat = new THREE.MeshBasicMaterial({
+                color: lightColor, transparent: true, opacity: 0.9,
             });
-            const armor = new THREE.Mesh(armorRing, armorMat);
-            armor.position.z = -0.05;
-            this.mesh.add(armor);
-        }
+            const light = new THREE.Mesh(lightGeo, lightMat);
+            light.position.set(lp.x, lp.y, 0.08);
+            group.add(light);
 
-        // EWAR drones get a pulsing indicator
-        if (this.droneCategory === 'ewar') {
-            const pulseGeo = new THREE.RingGeometry(size * 0.4, size * 0.6, 12);
-            const pulseMat = new THREE.MeshBasicMaterial({
-                color: this.color,
-                transparent: true,
-                opacity: 0.4,
+            const haloMat = new THREE.MeshBasicMaterial({
+                color: lightColor, transparent: true, opacity: 0.15,
             });
-            const pulse = new THREE.Mesh(pulseGeo, pulseMat);
-            pulse.position.z = 0.1;
-            this.mesh.add(pulse);
-            this._ewarPulse = pulse;
+            const halo = new THREE.Mesh(lightHaloGeo, haloMat);
+            halo.position.set(lp.x, lp.y, 0.07);
+            group.add(halo);
         }
 
-        // Engine glow dot at rear
-        const engineGeo = new THREE.CircleGeometry(size * 0.2, 8);
-        const engineMat = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.6,
-        });
-        const engine = new THREE.Mesh(engineGeo, engineMat);
-        engine.position.set(-size * 0.6, 0, 0.05);
-        this.mesh.add(engine);
-
+        group.position.set(this.x, this.y, 1);
+        this.mesh = group;
         return this.mesh;
+    }
+
+    // --- Combat drone: aggressive angular hull with forward-swept wings ---
+    _buildCombatMesh(group, size) {
+        // Main hull - angular wedge
+        const hullShape = new THREE.Shape();
+        hullShape.moveTo(size * 1.1, 0);
+        hullShape.lineTo(size * 0.3, size * 0.15);
+        hullShape.lineTo(-size * 0.2, size * 0.5);
+        hullShape.lineTo(-size * 0.5, size * 0.35);
+        hullShape.lineTo(-size * 0.7, size * 0.12);
+        hullShape.lineTo(-size * 0.7, -size * 0.12);
+        hullShape.lineTo(-size * 0.5, -size * 0.35);
+        hullShape.lineTo(-size * 0.2, -size * 0.5);
+        hullShape.lineTo(size * 0.3, -size * 0.15);
+        hullShape.closePath();
+
+        const hullGeo = new THREE.ExtrudeGeometry(hullShape, {
+            depth: size * 0.08, bevelEnabled: true, bevelThickness: size * 0.02,
+            bevelSize: size * 0.01, bevelSegments: 1,
+        });
+        hullGeo.center();
+
+        const hullMat = new THREE.MeshStandardMaterial({
+            color: this.color, emissive: this.color, emissiveIntensity: 0.15,
+            transparent: true, opacity: 0.9, roughness: 0.35, metalness: 0.5,
+        });
+        const hull = new THREE.Mesh(hullGeo, hullMat);
+        group.add(hull);
+
+        // Wing weapon mount nubs
+        const nubGeo = new THREE.CylinderGeometry(size * 0.06, size * 0.04, size * 0.15, 6);
+        const nubMat = new THREE.MeshBasicMaterial({ color: 0x554433, transparent: true, opacity: 0.7 });
+        for (const side of [1, -1]) {
+            const nub = new THREE.Mesh(nubGeo, nubMat);
+            nub.rotation.x = Math.PI / 2;
+            nub.position.set(-size * 0.15, side * size * 0.45, 0.05);
+            group.add(nub);
+        }
+
+        // Armor plate overlay (center dorsal)
+        const armorGeo = new THREE.PlaneGeometry(size * 0.6, size * 0.25);
+        const armorMat = new THREE.MeshBasicMaterial({
+            color: 0x553322, transparent: true, opacity: 0.2,
+        });
+        const armor = new THREE.Mesh(armorGeo, armorMat);
+        armor.position.set(0, 0, 0.05);
+        group.add(armor);
+    }
+
+    // --- Mining drone: compact boxy industrial hull ---
+    _buildMiningMesh(group, size) {
+        const hullShape = new THREE.Shape();
+        hullShape.moveTo(size * 0.7, 0);
+        hullShape.lineTo(size * 0.5, size * 0.45);
+        hullShape.lineTo(-size * 0.5, size * 0.5);
+        hullShape.lineTo(-size * 0.7, size * 0.3);
+        hullShape.lineTo(-size * 0.7, -size * 0.3);
+        hullShape.lineTo(-size * 0.5, -size * 0.5);
+        hullShape.lineTo(size * 0.5, -size * 0.45);
+        hullShape.closePath();
+
+        const hullGeo = new THREE.ExtrudeGeometry(hullShape, {
+            depth: size * 0.1, bevelEnabled: true, bevelThickness: size * 0.02,
+            bevelSize: size * 0.01, bevelSegments: 1,
+        });
+        hullGeo.center();
+
+        const hullMat = new THREE.MeshStandardMaterial({
+            color: this.color, emissive: this.color, emissiveIntensity: 0.12,
+            transparent: true, opacity: 0.9, roughness: 0.5, metalness: 0.3,
+        });
+        const hull = new THREE.Mesh(hullGeo, hullMat);
+        group.add(hull);
+
+        // Mining laser emitter arm (forward-extending)
+        const armGeo = new THREE.PlaneGeometry(size * 0.5, size * 0.06);
+        const armMat = new THREE.MeshBasicMaterial({ color: 0x667788, transparent: true, opacity: 0.6 });
+        const arm = new THREE.Mesh(armGeo, armMat);
+        arm.position.set(size * 0.7, 0, 0.05);
+        group.add(arm);
+
+        // Emitter tip glow
+        const tipGeo = new THREE.CircleGeometry(size * 0.08, 8);
+        const tipMat = new THREE.MeshBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.7 });
+        const tip = new THREE.Mesh(tipGeo, tipMat);
+        tip.position.set(size * 0.95, 0, 0.06);
+        group.add(tip);
+
+        // Cargo scoop (wide front opening indicator)
+        const scoopGeo = new THREE.PlaneGeometry(size * 0.08, size * 0.35);
+        const scoopMat = new THREE.MeshBasicMaterial({ color: 0xffaa22, transparent: true, opacity: 0.25 });
+        const scoop = new THREE.Mesh(scoopGeo, scoopMat);
+        scoop.position.set(size * 0.45, 0, 0.04);
+        group.add(scoop);
+
+        // Utility conduit lines on hull
+        const conduitMat = new THREE.LineBasicMaterial({ color: 0x556677, transparent: true, opacity: 0.3 });
+        for (const side of [1, -1]) {
+            const pts = [
+                new THREE.Vector3(-size * 0.4, side * size * 0.2, 0.06),
+                new THREE.Vector3(size * 0.3, side * size * 0.15, 0.06),
+            ];
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            const line = new THREE.Line(geo, conduitMat);
+            group.add(line);
+        }
+    }
+
+    // --- EWAR drone: hexagonal hull with sensor fins ---
+    _buildEwarMesh(group, size) {
+        const hullShape = new THREE.Shape();
+        const sides = 6;
+        for (let i = 0; i <= sides; i++) {
+            const a = (i / sides) * Math.PI * 2 - Math.PI / 2;
+            const px = Math.cos(a) * size * 0.8;
+            const py = Math.sin(a) * size * 0.6;
+            if (i === 0) hullShape.moveTo(px, py);
+            else hullShape.lineTo(px, py);
+        }
+
+        const hullGeo = new THREE.ExtrudeGeometry(hullShape, {
+            depth: size * 0.07, bevelEnabled: true, bevelThickness: size * 0.015,
+            bevelSize: size * 0.01, bevelSegments: 1,
+        });
+        hullGeo.center();
+
+        const hullMat = new THREE.MeshStandardMaterial({
+            color: this.color, emissive: this.color, emissiveIntensity: 0.18,
+            transparent: true, opacity: 0.9, roughness: 0.3, metalness: 0.45,
+        });
+        const hull = new THREE.Mesh(hullGeo, hullMat);
+        group.add(hull);
+
+        // 4 sensor fin extensions (cross pattern)
+        const finGeo = new THREE.PlaneGeometry(size * 0.5, size * 0.04);
+        const finMat = new THREE.MeshBasicMaterial({ color: 0x6644aa, transparent: true, opacity: 0.5 });
+        for (let i = 0; i < 4; i++) {
+            const angle = (i / 4) * Math.PI * 2;
+            const fin = new THREE.Mesh(finGeo, finMat);
+            fin.rotation.z = angle;
+            fin.position.set(
+                Math.cos(angle) * size * 0.3,
+                Math.sin(angle) * size * 0.3,
+                0.05
+            );
+            group.add(fin);
+        }
+
+        // EW emitter ring (pulsing)
+        const ringGeo = new THREE.RingGeometry(size * 0.35, size * 0.45, 16);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: this.color, transparent: true, opacity: 0.3,
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.z = 0.08;
+        group.add(ring);
+        this._ewarPulse = ring;
+
+        // Rotating scan antenna on top
+        const antennaGeo = new THREE.PlaneGeometry(size * 0.6, size * 0.025);
+        const antennaMat = new THREE.MeshBasicMaterial({ color: 0xaa88ff, transparent: true, opacity: 0.4 });
+        const antenna = new THREE.Mesh(antennaGeo, antennaMat);
+        antenna.position.z = 0.09;
+        group.add(antenna);
+    }
+
+    // --- Scout drone: sleek narrow dart hull ---
+    _buildScoutMesh(group, size) {
+        const hullShape = new THREE.Shape();
+        hullShape.moveTo(size * 1.2, 0);
+        hullShape.lineTo(size * 0.2, size * 0.18);
+        hullShape.lineTo(-size * 0.3, size * 0.4);
+        hullShape.lineTo(-size * 0.6, size * 0.25);
+        hullShape.lineTo(-size * 0.7, size * 0.08);
+        hullShape.lineTo(-size * 0.7, -size * 0.08);
+        hullShape.lineTo(-size * 0.6, -size * 0.25);
+        hullShape.lineTo(-size * 0.3, -size * 0.4);
+        hullShape.lineTo(size * 0.2, -size * 0.18);
+        hullShape.closePath();
+
+        const hullGeo = new THREE.ExtrudeGeometry(hullShape, {
+            depth: size * 0.06, bevelEnabled: true, bevelThickness: size * 0.015,
+            bevelSize: size * 0.008, bevelSegments: 1,
+        });
+        hullGeo.center();
+
+        const hullMat = new THREE.MeshStandardMaterial({
+            color: this.color, emissive: this.color, emissiveIntensity: 0.2,
+            transparent: true, opacity: 0.9, roughness: 0.25, metalness: 0.55,
+        });
+        const hull = new THREE.Mesh(hullGeo, hullMat);
+        group.add(hull);
+
+        // Swept-back sensor wings (thin, wide)
+        const wingGeo = new THREE.PlaneGeometry(size * 0.35, size * 0.02);
+        const wingMat = new THREE.MeshBasicMaterial({ color: 0x338866, transparent: true, opacity: 0.5 });
+        for (const side of [1, -1]) {
+            const wing = new THREE.Mesh(wingGeo, wingMat);
+            wing.rotation.z = side * 0.4;
+            wing.position.set(-size * 0.25, side * size * 0.3, 0.05);
+            group.add(wing);
+        }
+
+        // Forward sensor eye
+        const eyeGeo = new THREE.CircleGeometry(size * 0.08, 10);
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.8 });
+        const eye = new THREE.Mesh(eyeGeo, eyeMat);
+        eye.position.set(size * 0.7, 0, 0.07);
+        group.add(eye);
+
+        // Eye glow halo
+        const eyeHaloGeo = new THREE.CircleGeometry(size * 0.18, 10);
+        const eyeHaloMat = new THREE.MeshBasicMaterial({ color: 0x22ff88, transparent: true, opacity: 0.15 });
+        const eyeHalo = new THREE.Mesh(eyeHaloGeo, eyeHaloMat);
+        eyeHalo.position.set(size * 0.7, 0, 0.06);
+        group.add(eyeHalo);
     }
 }

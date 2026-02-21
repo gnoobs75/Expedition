@@ -826,8 +826,13 @@ export class Ship extends Entity {
             }
         }
 
+        // Resolve current target (player reads from game state to avoid stale cache)
+        const currentTarget = this.isPlayer
+            ? (this.game.activeLockedTarget || this.game.lockedTargets?.[0] || this.game.lockedTarget || this.target)
+            : this.target;
+
         // Weapons need a locked target
-        if (moduleConfig.damage && !this.target) {
+        if (moduleConfig.damage && !currentTarget) {
             if (this.isPlayer) {
                 this.game.ui?.log('No target locked', 'system');
                 this.game.ui?.toast('No target locked (R to lock)', 'warning');
@@ -836,12 +841,17 @@ export class Ship extends Entity {
         }
 
         // Mining laser needs target
-        if (moduleConfig.miningYield && !this.target) {
+        if (moduleConfig.miningYield && !currentTarget) {
             if (this.isPlayer) {
                 this.game.ui?.log('No target locked', 'system');
                 this.game.ui?.toast('Lock an asteroid first (R)', 'warning');
             }
             return false;
+        }
+
+        // Sync target for player so triggerModuleEffect uses the right one
+        if (this.isPlayer && currentTarget) {
+            this.target = currentTarget;
         }
 
         this.activeModules.add(slotId);

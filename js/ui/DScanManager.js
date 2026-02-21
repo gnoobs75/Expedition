@@ -19,6 +19,7 @@ export class DScanManager {
      */
     toggle() {
         this.ui.elements.dscanPanel.classList.toggle('hidden');
+        this.ui.panelDragManager?.savePanelVisibility();
     }
 
     /**

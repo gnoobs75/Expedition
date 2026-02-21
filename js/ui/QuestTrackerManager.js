@@ -49,6 +49,7 @@ export class QuestTrackerManager {
 
     toggle() {
         this.panel.classList.toggle('hidden');
+        this.game.ui?.panelDragManager?.savePanelVisibility();
     }
 
     update(dt) {

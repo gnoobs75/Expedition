@@ -967,6 +967,9 @@ export class UIManager {
         // Load saved tab groups (must be after all panels are registered)
         requestAnimationFrame(() => this.panelDragManager.loadTabGroups());
 
+        // Restore saved panel visibility (after tab groups so grouped panels aren't overridden)
+        requestAnimationFrame(() => this.panelDragManager.loadPanelVisibility());
+
         // Panels toggle menu
         this.initPanelsToggle();
     }
@@ -1034,6 +1037,7 @@ export class UIManager {
                             this.panelDragManager?.onPanelShown(panelId);
                         }
                     }
+                    this.panelDragManager?.savePanelVisibility();
                     renderPopup();
                 });
             });
@@ -3753,6 +3757,7 @@ export class UIManager {
             this.renderShipLog();
             this.game.panelDragManager?.onPanelShown('ship-log-panel');
         }
+        this.panelDragManager?.savePanelVisibility();
     }
 
     /**
@@ -3825,6 +3830,7 @@ export class UIManager {
             this.updateAchievementsPanel();
             this.game.panelDragManager?.onPanelShown('achievements-panel');
         }
+        this.panelDragManager?.savePanelVisibility();
     }
 
     /**
@@ -3877,6 +3883,7 @@ export class UIManager {
         if (!panel.classList.contains('hidden')) {
             this.updateStatsPanel();
         }
+        this.panelDragManager?.savePanelVisibility();
     }
 
     /**
@@ -4093,6 +4100,7 @@ export class UIManager {
      */
     toggleFleet() {
         this.fleetPanelManager?.toggle();
+        this.panelDragManager?.savePanelVisibility();
     }
 
     /**
@@ -5189,6 +5197,7 @@ export class UIManager {
      */
     toggleSkippy() {
         this.game.skippy?.togglePanel();
+        this.panelDragManager?.savePanelVisibility();
     }
 
     /**

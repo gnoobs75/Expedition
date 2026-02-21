@@ -59,6 +59,7 @@ export class PanelDragManager {
         this.layoutVersion = 9;
         this.versionKey = 'expedition-panel-layout-version';
         this.tabGroupStorageKey = 'expedition-tab-groups';
+        this.visibilityStorageKey = 'expedition-panel-visibility';
 
         // Force reset if layout version changed
         const savedVersion = parseInt(localStorage.getItem(this.versionKey) || '0');
@@ -899,7 +900,8 @@ export class PanelDragManager {
     }
 
     saveLayout() {
-        const layout = {};
+        // Start with previously saved layout to preserve positions of hidden panels
+        const layout = this.getSavedLayout();
         const zoom = this.getZoom();
 
         for (const [panelId, panelData] of this.panels) {
@@ -907,6 +909,7 @@ export class PanelDragManager {
             if (this.panelToGroup.has(panelId)) continue;
 
             const panel = panelData.element;
+            // Skip hidden panels - keep their previously saved position
             if (panel.classList.contains('hidden')) continue;
             const panelCS = getComputedStyle(panel);
             if (panelCS.display === 'none') continue;
@@ -988,6 +991,50 @@ export class PanelDragManager {
     }
 
     // =============================================
+    // Panel Visibility Persistence
+    // =============================================
+
+    /**
+     * Save visibility state of all registered panels to localStorage
+     */
+    savePanelVisibility() {
+        const visibility = {};
+        for (const [panelId, panelData] of this.panels) {
+            const el = panelData.element;
+            visibility[panelId] = !el.classList.contains('hidden');
+        }
+        // Also track skippy-panel (may not be registered as draggable)
+        const skippy = document.getElementById('skippy-panel');
+        if (skippy) visibility['skippy-panel'] = !skippy.classList.contains('hidden');
+        try {
+            localStorage.setItem(this.visibilityStorageKey, JSON.stringify(visibility));
+        } catch { /* storage full */ }
+    }
+
+    /**
+     * Load and restore panel visibility from localStorage
+     */
+    loadPanelVisibility() {
+        try {
+            const raw = localStorage.getItem(this.visibilityStorageKey);
+            if (!raw) return;
+            const visibility = JSON.parse(raw);
+
+            for (const [panelId, visible] of Object.entries(visibility)) {
+                const el = document.getElementById(panelId);
+                if (!el) continue;
+                // Skip panels that are in tab groups (handled by loadTabGroups)
+                if (this.panelToGroup.has(panelId)) continue;
+                if (visible) {
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
+                }
+            }
+        } catch { /* corrupt data */ }
+    }
+
+    // =============================================
     // Reset
     // =============================================
 
@@ -1000,6 +1047,7 @@ export class PanelDragManager {
         try {
             localStorage.removeItem(this.storageKey);
             localStorage.removeItem(this.tabGroupStorageKey);
+            localStorage.removeItem(this.visibilityStorageKey);
         } catch {
             // Ignore
         }

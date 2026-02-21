@@ -590,6 +590,14 @@ export class UIManager {
             });
         });
 
+        // Target panel Ctrl+Click = lock selected target
+        this.elements.targetPanel?.addEventListener('click', (e) => {
+            if (e.ctrlKey && this.game.selectedTarget) {
+                e.stopPropagation();
+                this.game.lockTarget(this.game.selectedTarget);
+            }
+        });
+
         // Overview row click handling (delegated)
         this.elements.overviewBody?.addEventListener('click', (e) => {
             const row = e.target.closest('tr');
@@ -597,6 +605,10 @@ export class UIManager {
                 const entity = this.findEntityById(parseInt(row.dataset.entityId));
                 if (entity) {
                     this.game.selectTarget(entity);
+                    // Ctrl+Click = lock target
+                    if (e.ctrlKey) {
+                        this.game.lockTarget(entity);
+                    }
                 }
             }
         });
@@ -1508,12 +1520,14 @@ export class UIManager {
             return;
         }
 
+        const activeTarget = this.game.activeLockedTarget;
+
         let html = '';
         for (const locked of aliveTargets) {
             const dist = player ? formatDistance(player.distanceTo(locked)) : '-';
             const icon = this.getEntityIcon(locked);
             const isSelected = locked === selected;
-            const isPrimary = locked === aliveTargets[0];
+            const isPrimary = locked === activeTarget;
 
             if (locked.type === 'asteroid') {
                 const oreInfo = locked.getOreInfo?.() || { current: 0, max: 1 };
@@ -1560,13 +1574,19 @@ export class UIManager {
             const entityId = el.dataset.entityId;
             const target = aliveTargets.find(t => String(t.id) === entityId);
             if (target) {
-                el.addEventListener('click', () => {
-                    this.game.selectTarget(target);
+                el.addEventListener('click', (e) => {
+                    if (e.ctrlKey) {
+                        // Ctrl+Click = unlock this target
+                        this.game.unlockTarget(target);
+                    } else {
+                        // Click = make active target
+                        this.game.setActiveLockedTarget(target);
+                    }
                 });
                 el.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    this.game.selectTarget(target);
+                    this.game.setActiveLockedTarget(target);
                     this.showContextMenu(e.clientX, e.clientY, target);
                 });
             }

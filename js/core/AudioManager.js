@@ -83,20 +83,31 @@ export class AudioManager {
         this.musicVolume = 0.12;
         this.musicMode = 'ambient'; // 'ambient' | 'combat' | 'danger' | 'station'
         this.musicTargetMode = 'ambient';
-        this.musicTransitionTimer = 0;
-        this.musicTransitionDuration = 2.0;
-        this.musicLayers = null; // { ambient: {nodes, gain}, combat: {nodes, gain}, danger: {nodes, gain} }
-        this.musicMasterGain = null;
         this.musicStarted = false;
-        this.musicBeatTimer = 0;
 
-        // OGG music track player
-        this.spaceTracks = [
-            'audio/music/Space.ogg',
-            'audio/music/space2.ogg',
-            'audio/music/Space3.ogg',
-            'audio/music/Space4.ogg',
-        ];
+        // OGG music track playlists per mode
+        this.tracksByMode = {
+            ambient: [
+                'audio/music/space.ogg',
+                'audio/music/space2.ogg',
+                'audio/music/space3.ogg',
+                'audio/music/space4.ogg',
+                'audio/music/space5.ogg',
+                'audio/music/space6.ogg',
+            ],
+            combat: [
+                'audio/music/combat1.ogg',
+            ],
+            danger: [
+                'audio/music/space3.ogg',
+                'audio/music/space4.ogg',
+            ],
+            station: [
+                'audio/music/mining1.ogg',
+                'audio/music/hacking.ogg',
+            ],
+        };
+        this.currentModePlaylist = 'ambient';
         this.trackIndex = 0;
         this.trackShuffleOrder = null;
         this.currentTrack = null;  // Audio element
@@ -1572,349 +1583,21 @@ export class AudioManager {
     // ==========================================
 
     /**
-     * Start the layered music system
-     * Creates all layers at once, crossfades between them
+     * Start the OGG-based music system
      */
     startMusic() {
-        if (!this.initialized || !this.context || this.musicStarted || !this.musicEnabled) return;
-
-        const ctx = this.context;
-        this.musicMasterGain = ctx.createGain();
-        this.musicMasterGain.gain.value = this.musicVolume;
-        this.musicMasterGain.connect(this.masterGain);
-
-        this.musicLayers = {
-            ambient: this.createAmbientLayer(ctx),
-            combat: this.createCombatLayer(ctx),
-            danger: this.createDangerLayer(ctx),
-            station: this.createStationMusicLayer(ctx),
-        };
-
-        // Synth ambient starts quiet (OGG tracks are the main music)
-        this.musicLayers.ambient.gain.gain.value = 0.3;
-        this.musicLayers.combat.gain.gain.value = 0.0;
-        this.musicLayers.danger.gain.gain.value = 0.0;
-        this.musicLayers.station.gain.gain.value = 0.0;
+        if (!this.initialized || this.musicStarted || !this.musicEnabled) {
+            console.log('startMusic blocked:', { initialized: this.initialized, musicStarted: this.musicStarted, musicEnabled: this.musicEnabled });
+            return;
+        }
 
         this.musicMode = 'ambient';
         this.musicTargetMode = 'ambient';
         this.musicStarted = true;
+        this.currentModePlaylist = 'ambient';
 
-        // Start OGG space music tracks
+        console.log('Starting OGG music system');
         this.startSpaceMusic();
-    }
-
-    /**
-     * Ambient layer: deep space drone with slowly evolving harmonics
-     * Inspired by EVE Online's ambient space music
-     */
-    createAmbientLayer(ctx) {
-        const layerGain = ctx.createGain();
-        layerGain.gain.value = 0;
-        layerGain.connect(this.musicMasterGain);
-
-        const nodes = [];
-
-        // Sub bass drone - very low sine, the foundation
-        const sub = ctx.createOscillator();
-        sub.type = 'sine';
-        sub.frequency.value = 38;
-        const subGain = ctx.createGain();
-        subGain.gain.value = 0.35;
-        sub.connect(subGain);
-        subGain.connect(layerGain);
-        sub.start();
-        nodes.push(sub);
-
-        // Low pad - filtered triangle for warmth
-        const pad = ctx.createOscillator();
-        pad.type = 'triangle';
-        pad.frequency.value = 65;
-        const padFilter = ctx.createBiquadFilter();
-        padFilter.type = 'lowpass';
-        padFilter.frequency.value = 200;
-        padFilter.Q.value = 1;
-        const padGain = ctx.createGain();
-        padGain.gain.value = 0.2;
-        pad.connect(padFilter);
-        padFilter.connect(padGain);
-        padGain.connect(layerGain);
-        pad.start();
-        nodes.push(pad);
-
-        // Slow LFO on pad filter for gentle movement
-        const padLfo = ctx.createOscillator();
-        padLfo.frequency.value = 0.07; // ~14 second cycle
-        const padLfoGain = ctx.createGain();
-        padLfoGain.gain.value = 60;
-        padLfo.connect(padLfoGain);
-        padLfoGain.connect(padFilter.frequency);
-        padLfo.start();
-        nodes.push(padLfo);
-
-        // Chord tones: perfect 5th + octave (ethereal space harmony)
-        const chord1 = ctx.createOscillator();
-        chord1.type = 'sine';
-        chord1.frequency.value = 98; // G2 - perfect 5th above sub
-        const chord1Gain = ctx.createGain();
-        chord1Gain.gain.value = 0.08;
-        chord1.connect(chord1Gain);
-        chord1Gain.connect(layerGain);
-        chord1.start();
-        nodes.push(chord1);
-
-        const chord2 = ctx.createOscillator();
-        chord2.type = 'sine';
-        chord2.frequency.value = 131; // C3 - octave above sub
-        const chord2Gain = ctx.createGain();
-        chord2Gain.gain.value = 0.05;
-        chord2.connect(chord2Gain);
-        chord2Gain.connect(layerGain);
-        chord2.start();
-        nodes.push(chord2);
-
-        // Very subtle high shimmer with slow vibrato
-        const shimmer = ctx.createOscillator();
-        shimmer.type = 'sine';
-        shimmer.frequency.value = 523; // C5
-        const shimmerGain = ctx.createGain();
-        shimmerGain.gain.value = 0.015;
-        const shimmerLfo = ctx.createOscillator();
-        shimmerLfo.frequency.value = 0.15;
-        const shimmerLfoGain = ctx.createGain();
-        shimmerLfoGain.gain.value = 0.008;
-        shimmerLfo.connect(shimmerLfoGain);
-        shimmerLfoGain.connect(shimmerGain.gain);
-        shimmer.connect(shimmerGain);
-        shimmerGain.connect(layerGain);
-        shimmer.start();
-        shimmerLfo.start();
-        nodes.push(shimmer, shimmerLfo);
-
-        return { nodes, gain: layerGain };
-    }
-
-    /**
-     * Combat layer: tense, pulsing, aggressive
-     * Minor key dissonance + rhythmic low pulse
-     */
-    createCombatLayer(ctx) {
-        const layerGain = ctx.createGain();
-        layerGain.gain.value = 0;
-        layerGain.connect(this.musicMasterGain);
-
-        const nodes = [];
-
-        // Aggressive sub pulse - pulsing bass
-        const sub = ctx.createOscillator();
-        sub.type = 'sawtooth';
-        sub.frequency.value = 45;
-        const subFilter = ctx.createBiquadFilter();
-        subFilter.type = 'lowpass';
-        subFilter.frequency.value = 120;
-        subFilter.Q.value = 3;
-        const subGain = ctx.createGain();
-        subGain.gain.value = 0.25;
-        // Rhythmic pulse LFO
-        const pulseLfo = ctx.createOscillator();
-        pulseLfo.frequency.value = 1.2; // ~72 BPM feel
-        const pulseLfoGain = ctx.createGain();
-        pulseLfoGain.gain.value = 0.15;
-        pulseLfo.connect(pulseLfoGain);
-        pulseLfoGain.connect(subGain.gain);
-        sub.connect(subFilter);
-        subFilter.connect(subGain);
-        subGain.connect(layerGain);
-        sub.start();
-        pulseLfo.start();
-        nodes.push(sub, pulseLfo);
-
-        // Minor chord - Cm (C-Eb-G) in low register for tension
-        const chordFreqs = [65.4, 77.8, 98]; // C2, Eb2, G2
-        chordFreqs.forEach((freq, i) => {
-            const osc = ctx.createOscillator();
-            osc.type = i === 1 ? 'triangle' : 'sine'; // Eb gets triangle for edge
-            osc.frequency.value = freq;
-            const oscGain = ctx.createGain();
-            oscGain.gain.value = 0.12 - i * 0.02;
-            osc.connect(oscGain);
-            oscGain.connect(layerGain);
-            osc.start();
-            nodes.push(osc);
-        });
-
-        // Tension drone - tritone interval (devil's interval)
-        const tension = ctx.createOscillator();
-        tension.type = 'sine';
-        tension.frequency.value = 92.5; // F#2 (tritone from C)
-        const tensionGain = ctx.createGain();
-        tensionGain.gain.value = 0.04;
-        // Slow vibrato for unease
-        const tensionLfo = ctx.createOscillator();
-        tensionLfo.frequency.value = 3;
-        const tensionLfoGain = ctx.createGain();
-        tensionLfoGain.gain.value = 2;
-        tensionLfo.connect(tensionLfoGain);
-        tensionLfoGain.connect(tension.frequency);
-        tension.connect(tensionGain);
-        tensionGain.connect(layerGain);
-        tension.start();
-        tensionLfo.start();
-        nodes.push(tension, tensionLfo);
-
-        // High staccato ping - repeating metallic hit
-        const ping = ctx.createOscillator();
-        ping.type = 'sine';
-        ping.frequency.value = 880;
-        const pingGain = ctx.createGain();
-        pingGain.gain.value = 0.0;
-        // Fast LFO creates staccato pulsing
-        const pingLfo = ctx.createOscillator();
-        pingLfo.frequency.value = 2.4; // Double the base pulse
-        const pingLfoGain = ctx.createGain();
-        pingLfoGain.gain.value = 0.025;
-        pingLfo.connect(pingLfoGain);
-        pingLfoGain.connect(pingGain.gain);
-        ping.connect(pingGain);
-        pingGain.connect(layerGain);
-        ping.start();
-        pingLfo.start();
-        nodes.push(ping, pingLfo);
-
-        return { nodes, gain: layerGain };
-    }
-
-    /**
-     * Danger layer: used when in dangerous sectors without active combat
-     * Suspenseful, lurking menace
-     */
-    createDangerLayer(ctx) {
-        const layerGain = ctx.createGain();
-        layerGain.gain.value = 0;
-        layerGain.connect(this.musicMasterGain);
-
-        const nodes = [];
-
-        // Deep rumble
-        const rumble = ctx.createOscillator();
-        rumble.type = 'sine';
-        rumble.frequency.value = 30;
-        const rumbleGain = ctx.createGain();
-        rumbleGain.gain.value = 0.3;
-        // Very slow swell
-        const rumbleLfo = ctx.createOscillator();
-        rumbleLfo.frequency.value = 0.04; // 25s cycle
-        const rumbleLfoGain = ctx.createGain();
-        rumbleLfoGain.gain.value = 0.12;
-        rumbleLfo.connect(rumbleLfoGain);
-        rumbleLfoGain.connect(rumbleGain.gain);
-        rumble.connect(rumbleGain);
-        rumbleGain.connect(layerGain);
-        rumble.start();
-        rumbleLfo.start();
-        nodes.push(rumble, rumbleLfo);
-
-        // Dissonant minor 2nd cluster
-        const dis1 = ctx.createOscillator();
-        dis1.type = 'sine';
-        dis1.frequency.value = 55; // A1
-        const dis2 = ctx.createOscillator();
-        dis2.type = 'sine';
-        dis2.frequency.value = 58.3; // Bb1 (minor 2nd)
-        const dis1Gain = ctx.createGain();
-        dis1Gain.gain.value = 0.07;
-        const dis2Gain = ctx.createGain();
-        dis2Gain.gain.value = 0.06;
-        dis1.connect(dis1Gain);
-        dis2.connect(dis2Gain);
-        dis1Gain.connect(layerGain);
-        dis2Gain.connect(layerGain);
-        dis1.start();
-        dis2.start();
-        nodes.push(dis1, dis2);
-
-        // Eerie high tone with slow sweep
-        const eerie = ctx.createOscillator();
-        eerie.type = 'sine';
-        eerie.frequency.value = 660;
-        const eerieFilter = ctx.createBiquadFilter();
-        eerieFilter.type = 'bandpass';
-        eerieFilter.frequency.value = 800;
-        eerieFilter.Q.value = 8;
-        const eerieGain = ctx.createGain();
-        eerieGain.gain.value = 0.02;
-        const eerieLfo = ctx.createOscillator();
-        eerieLfo.frequency.value = 0.05;
-        const eerieLfoGain = ctx.createGain();
-        eerieLfoGain.gain.value = 100;
-        eerieLfo.connect(eerieLfoGain);
-        eerieLfoGain.connect(eerie.frequency);
-        eerie.connect(eerieFilter);
-        eerieFilter.connect(eerieGain);
-        eerieGain.connect(layerGain);
-        eerie.start();
-        eerieLfo.start();
-        nodes.push(eerie, eerieLfo);
-
-        return { nodes, gain: layerGain };
-    }
-
-    /**
-     * Station layer: calm, mechanical, safe harbor
-     */
-    createStationMusicLayer(ctx) {
-        const layerGain = ctx.createGain();
-        layerGain.gain.value = 0;
-        layerGain.connect(this.musicMasterGain);
-
-        const nodes = [];
-
-        // Warm pad in major key (C major 7th)
-        const padFreqs = [130.8, 164.8, 196, 247]; // C3, E3, G3, B3
-        padFreqs.forEach((freq, i) => {
-            const osc = ctx.createOscillator();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            const oscGain = ctx.createGain();
-            oscGain.gain.value = 0.06 - i * 0.01;
-            osc.connect(oscGain);
-            oscGain.connect(layerGain);
-            osc.start();
-            nodes.push(osc);
-        });
-
-        // Gentle chime LFO (very slow amplitude modulation on top note)
-        const chimeLfo = ctx.createOscillator();
-        chimeLfo.frequency.value = 0.12;
-        const chimeLfoGain = ctx.createGain();
-        chimeLfoGain.gain.value = 0.015;
-        chimeLfo.connect(chimeLfoGain);
-        // Modulate the B3 tone's gain
-        const bOsc = ctx.createOscillator();
-        bOsc.type = 'sine';
-        bOsc.frequency.value = 494; // B4 - octave shimmer
-        const bGain = ctx.createGain();
-        bGain.gain.value = 0.0;
-        chimeLfo.connect(chimeLfoGain);
-        chimeLfoGain.connect(bGain.gain);
-        bOsc.connect(bGain);
-        bGain.connect(layerGain);
-        bOsc.start();
-        chimeLfo.start();
-        nodes.push(bOsc, chimeLfo);
-
-        // Sub warmth
-        const sub = ctx.createOscillator();
-        sub.type = 'sine';
-        sub.frequency.value = 65.4; // C2
-        const subGain = ctx.createGain();
-        subGain.gain.value = 0.15;
-        sub.connect(subGain);
-        subGain.connect(layerGain);
-        sub.start();
-        nodes.push(sub);
-
-        return { nodes, gain: layerGain };
     }
 
     // ==========================================
@@ -1922,10 +1605,18 @@ export class AudioManager {
     // ==========================================
 
     /**
+     * Get the track list for the current mode
+     */
+    getCurrentPlaylist() {
+        return this.tracksByMode[this.currentModePlaylist] || this.tracksByMode.ambient;
+    }
+
+    /**
      * Shuffle the track order for variety
      */
     shuffleTracks() {
-        this.trackShuffleOrder = [...this.spaceTracks.keys()];
+        const playlist = this.getCurrentPlaylist();
+        this.trackShuffleOrder = [...playlist.keys()];
         // Fisher-Yates shuffle
         for (let i = this.trackShuffleOrder.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -1939,20 +1630,22 @@ export class AudioManager {
      * Get the next track path from shuffled order
      */
     getNextTrackPath() {
+        const playlist = this.getCurrentPlaylist();
         if (!this.trackShuffleOrder || this.trackIndex >= this.trackShuffleOrder.length) {
             this.shuffleTracks();
         }
         const idx = this.trackShuffleOrder[this.trackIndex];
         this.trackIndex++;
-        return this.spaceTracks[idx];
+        return playlist[idx];
     }
 
     /**
-     * Start playing space music tracks
+     * Start playing music tracks for current mode
      */
     startSpaceMusic() {
         if (!this.musicEnabled || this.trackPlaying) return;
-        if (this.spaceTracks.length === 0) return;
+        const playlist = this.getCurrentPlaylist();
+        if (playlist.length === 0) return;
 
         this.shuffleTracks();
         this.trackPlaying = true;
@@ -1963,18 +1656,18 @@ export class AudioManager {
      * Play a specific track with fade-in
      */
     playTrack(src) {
+        console.log('Playing track:', src);
         const audio = new Audio(src);
         audio.volume = 0;
         this.currentTrack = audio;
 
         audio.onended = () => {
             if (!this.trackPlaying) return;
-            // Crossfade to next track
             this.crossfadeToNext();
         };
 
-        audio.onerror = () => {
-            // Skip broken track, try next
+        audio.onerror = (e) => {
+            console.warn('Track error:', src, e);
             if (!this.trackPlaying) return;
             setTimeout(() => this.crossfadeToNext(), 500);
         };
@@ -2095,81 +1788,61 @@ export class AudioManager {
     }
 
     /**
-     * Set the target music mode (crossfades smoothly)
+     * Set the target music mode (crossfades to new mode's OGG playlist)
      */
     setMusicMode(mode) {
         if (mode === this.musicTargetMode) return;
 
         this.musicTargetMode = mode;
-
-        // Handle OGG space music: play in ambient, duck in others
-        if (mode === 'ambient') {
-            if (!this.trackPlaying && this.musicEnabled) {
-                this.startSpaceMusic();
-            } else {
-                this.unduckSpaceMusic();
-            }
-        } else if (mode === 'combat' || mode === 'danger') {
-            // Duck space music during combat/danger (don't stop - resume on return)
-            this.duckSpaceMusic(this.getEffectiveTrackVolume() * 0.15, 2000);
-        } else if (mode === 'station') {
-            this.duckSpaceMusic(this.getEffectiveTrackVolume() * 0.25, 2000);
-        }
-
-        // Handle synth layers
-        if (this.musicStarted && this.musicLayers) {
-            this.musicTransitionTimer = this.musicTransitionDuration;
-
-            const ctx = this.context;
-            const now = ctx.currentTime;
-            const fadeDur = this.musicTransitionDuration;
-
-            // In ambient mode, silence synth layers (OGG tracks take over)
-            for (const [layerName, layer] of Object.entries(this.musicLayers)) {
-                let target;
-                if (mode === 'ambient') {
-                    // OGG tracks play, synth ambient as subtle underlayer
-                    target = layerName === 'ambient' ? 0.3 : 0.0;
-                } else {
-                    target = layerName === mode ? 1.0 : 0.0;
-                }
-                layer.gain.gain.cancelScheduledValues(now);
-                layer.gain.gain.setValueAtTime(layer.gain.gain.value, now);
-                layer.gain.gain.linearRampToValueAtTime(target, now + fadeDur);
-            }
-        }
-
         this.musicMode = mode;
+
+        // Switch to the new mode's playlist
+        if (this.currentModePlaylist !== mode) {
+            this.currentModePlaylist = mode;
+
+            // Crossfade: fade out current track, start new one from mode playlist
+            if (this.trackPlaying && this.currentTrack) {
+                const oldTrack = this.currentTrack;
+                this.shuffleTracks();
+                const nextSrc = this.getNextTrackPath();
+                const newTrack = new Audio(nextSrc);
+                newTrack.volume = 0;
+                this.currentTrack = newTrack;
+
+                newTrack.onended = () => {
+                    if (!this.trackPlaying) return;
+                    this.crossfadeToNext();
+                };
+                newTrack.onerror = () => {
+                    if (!this.trackPlaying) return;
+                    setTimeout(() => this.crossfadeToNext(), 500);
+                };
+
+                newTrack.play().then(() => {
+                    this.fadeTrack(newTrack, 0, this.getEffectiveTrackVolume(), 3000);
+                    this.fadeTrack(oldTrack, oldTrack.volume, 0, 3000, () => {
+                        oldTrack.pause();
+                        oldTrack.src = '';
+                    });
+                }).catch(() => {
+                    this.currentTrack = oldTrack;
+                });
+            } else if (this.musicEnabled) {
+                this.startSpaceMusic();
+            }
+        }
     }
 
     /**
      * Stop all music
      */
     stopMusic() {
-        // Stop OGG tracks
         this.trackPlaying = false;
         if (this.currentTrack) {
             this.currentTrack.pause();
             this.currentTrack.src = '';
             this.currentTrack = null;
         }
-
-        // Stop synth layers
-        if (!this.musicStarted || !this.musicLayers) return;
-
-        for (const layer of Object.values(this.musicLayers)) {
-            for (const node of layer.nodes) {
-                try { node.stop(); } catch (e) {}
-            }
-            try { layer.gain.disconnect(); } catch (e) {}
-        }
-
-        if (this.musicMasterGain) {
-            try { this.musicMasterGain.disconnect(); } catch (e) {}
-        }
-
-        this.musicLayers = null;
-        this.musicMasterGain = null;
         this.musicStarted = false;
     }
 
@@ -2178,10 +1851,6 @@ export class AudioManager {
      */
     setMusicVolume(volume) {
         this.musicVolume = volume;
-        if (this.musicMasterGain) {
-            this.musicMasterGain.gain.setTargetAtTime(volume, this.context.currentTime, 0.1);
-        }
-        // Update OGG track volume too
         if (this.currentTrack && this.trackPlaying) {
             try {
                 this.currentTrack.volume = Math.max(0, Math.min(1, this.getEffectiveTrackVolume()));

@@ -61,19 +61,30 @@ export class ObstacleAvoidance {
         obstacles.sort((a, b) => a.dist - b.dist);
         const nearest = obstacles[0];
 
-        // Calculate avoidance angle - steer to whichever side has more room
-        // Check clearance on both sides
-        const avoidAngle = nearest.angleDiff > 0 ? -0.5 : 0.5; // Steer away from obstacle
-        const urgency = 1.0 - Math.min(1.0, nearest.dist / lookAhead);
-        const steerStrength = urgency * Math.PI * 0.4; // Max 72 degrees of avoidance
+        // Calculate weighted avoidance considering ALL nearby obstacles
+        let leftWeight = 0;   // obstacles on the left (positive angleDiff)
+        let rightWeight = 0;  // obstacles on the right (negative angleDiff)
+        for (const obs of obstacles) {
+            const weight = 1.0 / Math.max(50, obs.dist);
+            if (obs.angleDiff > 0) {
+                leftWeight += weight;
+            } else {
+                rightWeight += weight;
+            }
+        }
 
-        const adjustedAngle = targetAngle + avoidAngle * steerStrength * 2;
+        // Steer toward the side with fewer/farther obstacles
+        const avoidSign = leftWeight > rightWeight ? -1 : 1;
+        const urgency = 1.0 - Math.min(1.0, nearest.dist / lookAhead);
+        const steerStrength = urgency * Math.PI * 0.5; // Max 90 degrees of avoidance
+
+        const adjustedAngle = targetAngle + avoidSign * steerStrength;
 
         // Slow down based on proximity
-        const brakeDist = nearest.clearance * 3;
+        const brakeDist = nearest.clearance * 4;
         let speedMultiplier = 1.0;
         if (nearest.dist < brakeDist) {
-            speedMultiplier = Math.max(0.2, nearest.dist / brakeDist);
+            speedMultiplier = Math.max(0.15, nearest.dist / brakeDist);
         }
 
         return { angle: adjustedAngle, speedMultiplier };

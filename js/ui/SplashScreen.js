@@ -954,31 +954,45 @@ export class SplashScreen {
     // ==========================================
 
     startSplashMusic() {
+        // Check saved music preference
+        try {
+            const saved = localStorage.getItem('expedition-audio');
+            if (saved) {
+                const settings = JSON.parse(saved);
+                if (settings.musicEnabled === false) return;
+            }
+        } catch (e) {}
+
         try {
             const audio = new Audio('audio/music/splash.ogg');
             audio.loop = true;
             audio.volume = 0;
             this.splashMusic = audio;
+
+            const startPlayback = () => {
+                if (!this.splashMusic) return;
+                this.splashMusic.play().then(() => {
+                    this._fadeSplashMusic(0, this.splashMusicVolume, 2000);
+                }).catch(() => {});
+            };
+
+            // Try immediate play (works if user gesture already occurred)
             audio.play().then(() => {
-                // Fade in over 2 seconds
                 this._fadeSplashMusic(0, this.splashMusicVolume, 2000);
             }).catch(() => {
-                // Autoplay blocked - start on first user click
+                // Autoplay blocked - start on first user interaction
                 const startOnClick = () => {
                     document.removeEventListener('click', startOnClick);
                     document.removeEventListener('keydown', startOnClick);
-                    if (this.splashMusic) {
-                        this.splashMusic.play().then(() => {
-                            this._fadeSplashMusic(0, this.splashMusicVolume, 2000);
-                        }).catch(() => {});
-                    }
+                    this._splashMusicStartOnClick = null;
+                    startPlayback();
                 };
-                document.addEventListener('click', startOnClick, { once: false });
-                document.addEventListener('keydown', startOnClick, { once: false });
+                document.addEventListener('click', startOnClick);
+                document.addEventListener('keydown', startOnClick);
                 this._splashMusicStartOnClick = startOnClick;
             });
         } catch (e) {
-            // Audio not available
+            console.warn('Splash music failed:', e);
         }
     }
 

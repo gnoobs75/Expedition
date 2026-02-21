@@ -175,6 +175,24 @@ export class AutopilotSystem {
 
         const orbitRadius = this.distance;
 
+        // Safety: break orbit if player drifts near planet
+        const sector = this.game.currentSector;
+        if (sector?.centralPlanet) {
+            const pDist = wrappedDistance(player.x, player.y,
+                sector.centralPlanet.x, sector.centralPlanet.y, CONFIG.SECTOR_SIZE);
+            if (pDist < CONFIG.CENTRAL_PLANET.minOrbitDistance + 200) {
+                this.denyOrder('Breaking orbit - too close to planet');
+                this.stop();
+                // Steer away from planet
+                player.desiredRotation = wrappedDirection(
+                    sector.centralPlanet.x, sector.centralPlanet.y,
+                    player.x, player.y, CONFIG.SECTOR_SIZE
+                );
+                player.desiredSpeed = player.maxSpeed;
+                return;
+            }
+        }
+
         // Calculate current angle from target to player
         const currentAngle = wrappedDirection(
             this.target.x, this.target.y,
@@ -233,7 +251,11 @@ export class AutopilotSystem {
             player.desiredRotation = tangentAngle;
         }
 
-        player.desiredSpeed = player.maxSpeed * 0.7;
+        // Apply obstacle avoidance to orbit path
+        const entities = this.game.currentSector?.entities || [];
+        const avoidance = ObstacleAvoidance.getAvoidance(player, player.desiredRotation, entities);
+        player.desiredRotation = avoidance.angle;
+        player.desiredSpeed = player.maxSpeed * 0.7 * avoidance.speedMultiplier;
     }
 
     /**
@@ -269,13 +291,58 @@ export class AutopilotSystem {
         } else {
             // At correct range, slow down
             player.desiredSpeed = 0;
+            return; // No movement, no avoidance needed
         }
+
+        // Apply obstacle avoidance
+        const entities = this.game.currentSector?.entities || [];
+        const avoidance = ObstacleAvoidance.getAvoidance(player, player.desiredRotation, entities);
+        player.desiredRotation = avoidance.angle;
+        player.desiredSpeed *= avoidance.speedMultiplier;
+    }
+
+    /**
+     * Check if a position is safe (not inside planet kill zone or dense asteroid cluster)
+     * Returns { safe: true } or { safe: false, reason: string }
+     */
+    checkPositionSafety(x, y) {
+        const sector = this.game.currentSector;
+        if (!sector) return { safe: true };
+
+        // Check central planet kill zone
+        if (sector.centralPlanet) {
+            const planetDist = wrappedDistance(
+                x, y,
+                sector.centralPlanet.x, sector.centralPlanet.y,
+                CONFIG.SECTOR_SIZE
+            );
+            if (planetDist < CONFIG.CENTRAL_PLANET.minOrbitDistance) {
+                return { safe: false, reason: 'Too close to planet gravity well' };
+            }
+        }
+
+        return { safe: true };
+    }
+
+    /**
+     * Deny an order with warning beep and toast
+     */
+    denyOrder(reason) {
+        this.game.audio?.play('warning');
+        this.game.ui?.showToast(reason, 'warning');
+        this.game.ui?.log(`Order denied: ${reason}`, 'system');
     }
 
     /**
      * Approach a target
      */
     approach(target) {
+        // Safety: don't approach into planet kill zone
+        const check = this.checkPositionSafety(target.x, target.y);
+        if (!check.safe) {
+            this.denyOrder(check.reason);
+            return;
+        }
         this.command = 'approach';
         this.target = target;
         this.game.ui?.log(`Approaching ${target.name}`, 'system');
@@ -285,6 +352,11 @@ export class AutopilotSystem {
      * Approach a position in space (no target entity)
      */
     approachPosition(x, y) {
+        const check = this.checkPositionSafety(x, y);
+        if (!check.safe) {
+            this.denyOrder(check.reason);
+            return;
+        }
         this.command = 'approachPosition';
         this.targetPosition = { x, y };
         this.target = null;
@@ -295,11 +367,32 @@ export class AutopilotSystem {
      * Orbit a target at distance
      */
     orbit(target, distance = 500) {
+        // Safety: check if orbit path intersects planet kill zone
+        const orbitRadius = distance + (target.radius || 0);
+        const sector = this.game.currentSector;
+        if (sector?.centralPlanet) {
+            const targetToPlanet = wrappedDistance(
+                target.x, target.y,
+                sector.centralPlanet.x, sector.centralPlanet.y,
+                CONFIG.SECTOR_SIZE
+            );
+            // If orbit could swing inside planet safety zone
+            if (targetToPlanet - orbitRadius < CONFIG.CENTRAL_PLANET.minOrbitDistance) {
+                const playerToPlanet = wrappedDistance(
+                    this.game.player.x, this.game.player.y,
+                    sector.centralPlanet.x, sector.centralPlanet.y,
+                    CONFIG.SECTOR_SIZE
+                );
+                // Only block if the orbit ring actually gets dangerously close
+                if (targetToPlanet < CONFIG.CENTRAL_PLANET.minOrbitDistance + orbitRadius) {
+                    this.denyOrder('Orbit path too close to planet gravity well');
+                    return;
+                }
+            }
+        }
         this.command = 'orbit';
         this.target = target;
-        // Orbit from edge of target, not center
-        this.distance = distance + (target.radius || 0);
-        // Reset orbit phase when starting a new orbit (smooth transition)
+        this.distance = orbitRadius;
         if (this.game.player?.isPlayer) {
             this.game.player.orbitPhase = 0;
         }
@@ -310,9 +403,13 @@ export class AutopilotSystem {
      * Keep at range from target
      */
     keepAtRange(target, distance = 1000) {
+        const check = this.checkPositionSafety(target.x, target.y);
+        if (!check.safe) {
+            this.denyOrder(check.reason);
+            return;
+        }
         this.command = 'keepAtRange';
         this.target = target;
-        // Keep range from edge of target, not center
         this.distance = distance + (target.radius || 0);
         this.game.ui?.log(`Keeping ${distance}m from ${target.name}`, 'system');
     }
@@ -349,6 +446,14 @@ export class AutopilotSystem {
 
         if (dist < 1000) {
             this.game.ui?.log('Target too close for warp', 'system');
+            return;
+        }
+
+        // Safety: check if warp destination is near planet kill zone
+        const landingDist = (target.radius || 50) + 200;
+        const check = this.checkPositionSafety(target.x, target.y);
+        if (!check.safe) {
+            this.denyOrder(check.reason);
             return;
         }
 
@@ -432,12 +537,44 @@ export class AutopilotSystem {
             player.capacitor = 0;
         }
 
-        // Instant teleport to destination
+        // Instant teleport to destination - pick safe landing spot
         const landingDist = (this.warpTarget.radius || 50) + 200;
-        const landingAngle = Math.random() * Math.PI * 2;
+        let landingAngle = Math.random() * Math.PI * 2;
+        let landX = this.warpTarget.x + Math.cos(landingAngle) * landingDist;
+        let landY = this.warpTarget.y + Math.sin(landingAngle) * landingDist;
 
-        player.x = this.warpTarget.x + Math.cos(landingAngle) * landingDist;
-        player.y = this.warpTarget.y + Math.sin(landingAngle) * landingDist;
+        // Nudge landing away from planet and asteroids
+        const sector = this.game.currentSector;
+        for (let attempt = 0; attempt < 8; attempt++) {
+            let blocked = false;
+
+            // Check planet proximity
+            if (sector?.centralPlanet) {
+                const pDist = wrappedDistance(landX, landY,
+                    sector.centralPlanet.x, sector.centralPlanet.y, CONFIG.SECTOR_SIZE);
+                if (pDist < CONFIG.CENTRAL_PLANET.minOrbitDistance) blocked = true;
+            }
+
+            // Check asteroid proximity
+            if (!blocked && sector?.entities) {
+                for (const ent of sector.entities) {
+                    if (ent.type !== 'asteroid' || !ent.alive) continue;
+                    const aDist = wrappedDistance(landX, landY, ent.x, ent.y, CONFIG.SECTOR_SIZE);
+                    if (aDist < (ent.radius || 30) + player.radius + 80) {
+                        blocked = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!blocked) break;
+            landingAngle += Math.PI / 4;
+            landX = this.warpTarget.x + Math.cos(landingAngle) * landingDist;
+            landY = this.warpTarget.y + Math.sin(landingAngle) * landingDist;
+        }
+
+        player.x = landX;
+        player.y = landY;
         player.velocity.set(0, 0);
         player.currentSpeed = 0;
 

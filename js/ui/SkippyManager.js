@@ -365,18 +365,8 @@ export class SkippyManager {
     _duckGameMusic() {
         const audio = this.game?.audio;
         if (!audio) return;
-        // Duck OGG space music tracks
         if (audio.currentTrack && audio.trackPlaying) {
             audio.duckSpaceMusic(audio.getEffectiveTrackVolume() * 0.75, 400);
-        }
-        // Duck synth music layers
-        if (audio.musicMasterGain && audio.context) {
-            this._preDuckMusicVol = audio.musicMasterGain.gain.value;
-            audio.musicMasterGain.gain.setTargetAtTime(
-                this._preDuckMusicVol * 0.75,
-                audio.context.currentTime,
-                0.15
-            );
         }
     }
 
@@ -386,18 +376,8 @@ export class SkippyManager {
     _unduckGameMusic() {
         const audio = this.game?.audio;
         if (!audio) return;
-        // Restore OGG space music
         if (audio.currentTrack && audio.trackPlaying) {
             audio.unduckSpaceMusic(800);
-        }
-        // Restore synth music layers
-        if (audio.musicMasterGain && audio.context && this._preDuckMusicVol != null) {
-            audio.musicMasterGain.gain.setTargetAtTime(
-                this._preDuckMusicVol,
-                audio.context.currentTime,
-                0.3
-            );
-            this._preDuckMusicVol = null;
         }
     }
 

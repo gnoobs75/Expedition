@@ -1587,7 +1587,6 @@ export class AudioManager {
      */
     startMusic() {
         if (!this.initialized || this.musicStarted || !this.musicEnabled) {
-            console.log('startMusic blocked:', { initialized: this.initialized, musicStarted: this.musicStarted, musicEnabled: this.musicEnabled });
             return;
         }
 
@@ -1595,8 +1594,6 @@ export class AudioManager {
         this.musicTargetMode = 'ambient';
         this.musicStarted = true;
         this.currentModePlaylist = 'ambient';
-
-        console.log('Starting OGG music system');
         this.startSpaceMusic();
     }
 
@@ -1656,19 +1653,18 @@ export class AudioManager {
      * Play a specific track with fade-in
      */
     playTrack(src) {
-        console.log('Playing track:', src);
         const audio = new Audio(src);
         audio.volume = 0;
         this.currentTrack = audio;
 
         audio.onended = () => {
-            if (!this.trackPlaying) return;
+            if (!this.trackPlaying || this.currentTrack !== audio) return;
             this.crossfadeToNext();
         };
 
         audio.onerror = (e) => {
             console.warn('Track error:', src, e);
-            if (!this.trackPlaying) return;
+            if (!this.trackPlaying || this.currentTrack !== audio) return;
             setTimeout(() => this.crossfadeToNext(), 500);
         };
 
@@ -1687,18 +1683,24 @@ export class AudioManager {
         if (!this.trackPlaying) return;
 
         const oldTrack = this.currentTrack;
+        // Kill old track's handlers so it doesn't spawn more tracks
+        if (oldTrack) {
+            oldTrack.onended = null;
+            oldTrack.onerror = null;
+        }
+
         const nextSrc = this.getNextTrackPath();
         const newTrack = new Audio(nextSrc);
         newTrack.volume = 0;
         this.currentTrack = newTrack;
 
         newTrack.onended = () => {
-            if (!this.trackPlaying) return;
+            if (!this.trackPlaying || this.currentTrack !== newTrack) return;
             this.crossfadeToNext();
         };
 
         newTrack.onerror = () => {
-            if (!this.trackPlaying) return;
+            if (!this.trackPlaying || this.currentTrack !== newTrack) return;
             setTimeout(() => this.crossfadeToNext(), 500);
         };
 
@@ -1715,6 +1717,12 @@ export class AudioManager {
         }).catch(() => {
             // Failed to play next, keep old going
             this.currentTrack = oldTrack;
+            if (oldTrack) {
+                oldTrack.onended = () => {
+                    if (!this.trackPlaying || this.currentTrack !== oldTrack) return;
+                    this.crossfadeToNext();
+                };
+            }
         });
     }
 
@@ -1803,6 +1811,10 @@ export class AudioManager {
             // Crossfade: fade out current track, start new one from mode playlist
             if (this.trackPlaying && this.currentTrack) {
                 const oldTrack = this.currentTrack;
+                // Kill old track's handlers so it doesn't spawn more tracks
+                oldTrack.onended = null;
+                oldTrack.onerror = null;
+
                 this.shuffleTracks();
                 const nextSrc = this.getNextTrackPath();
                 const newTrack = new Audio(nextSrc);
@@ -1810,11 +1822,11 @@ export class AudioManager {
                 this.currentTrack = newTrack;
 
                 newTrack.onended = () => {
-                    if (!this.trackPlaying) return;
+                    if (!this.trackPlaying || this.currentTrack !== newTrack) return;
                     this.crossfadeToNext();
                 };
                 newTrack.onerror = () => {
-                    if (!this.trackPlaying) return;
+                    if (!this.trackPlaying || this.currentTrack !== newTrack) return;
                     setTimeout(() => this.crossfadeToNext(), 500);
                 };
 
@@ -1826,6 +1838,10 @@ export class AudioManager {
                     });
                 }).catch(() => {
                     this.currentTrack = oldTrack;
+                    oldTrack.onended = () => {
+                        if (!this.trackPlaying || this.currentTrack !== oldTrack) return;
+                        this.crossfadeToNext();
+                    };
                 });
             } else if (this.musicEnabled) {
                 this.startSpaceMusic();
@@ -1839,6 +1855,8 @@ export class AudioManager {
     stopMusic() {
         this.trackPlaying = false;
         if (this.currentTrack) {
+            this.currentTrack.onended = null;
+            this.currentTrack.onerror = null;
             this.currentTrack.pause();
             this.currentTrack.src = '';
             this.currentTrack = null;

@@ -961,12 +961,10 @@ export class SplashScreen {
             this.splashMusic = audio;
 
             const beginFade = () => {
-                console.log('Splash music playing');
                 this._fadeSplashMusic(0, this.splashMusicVolume, 2000);
             };
 
             audio.play().then(beginFade).catch(() => {
-                console.log('Splash music autoplay blocked, waiting for interaction');
                 const startOnClick = () => {
                     document.removeEventListener('click', startOnClick);
                     document.removeEventListener('keydown', startOnClick);

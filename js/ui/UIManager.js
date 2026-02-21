@@ -598,6 +598,35 @@ export class UIManager {
             }
         });
 
+        // Locked targets panel - delegated click handlers (survive innerHTML rebuilds)
+        const lockedContent = this.elements.lockedTargetsContainer?.querySelector('.locked-targets-content');
+        if (lockedContent) {
+            lockedContent.addEventListener('click', (e) => {
+                const card = e.target.closest('.locked-target-card');
+                if (!card) return;
+                const entityId = card.dataset.entityId;
+                const target = (this.game.lockedTargets || []).find(t => t?.alive && String(t.id) === entityId);
+                if (!target) return;
+                e.stopPropagation();
+                if (e.ctrlKey) {
+                    this.game.unlockTarget(target);
+                } else {
+                    this.game.setActiveLockedTarget(target);
+                }
+            });
+            lockedContent.addEventListener('contextmenu', (e) => {
+                const card = e.target.closest('.locked-target-card');
+                if (!card) return;
+                const entityId = card.dataset.entityId;
+                const target = (this.game.lockedTargets || []).find(t => t?.alive && String(t.id) === entityId);
+                if (!target) return;
+                e.preventDefault();
+                e.stopPropagation();
+                this.game.setActiveLockedTarget(target);
+                this.showContextMenu(e.clientX, e.clientY, target);
+            });
+        }
+
         // Overview row click handling (delegated)
         this.elements.overviewBody?.addEventListener('click', (e) => {
             const row = e.target.closest('tr');
@@ -1568,29 +1597,7 @@ export class UIManager {
         }
 
         contentArea.innerHTML = html;
-
-        // Add click and right-click handlers to each locked target card
-        contentArea.querySelectorAll('.locked-target-card').forEach(el => {
-            const entityId = el.dataset.entityId;
-            const target = aliveTargets.find(t => String(t.id) === entityId);
-            if (target) {
-                el.addEventListener('click', (e) => {
-                    if (e.ctrlKey) {
-                        // Ctrl+Click = unlock this target
-                        this.game.unlockTarget(target);
-                    } else {
-                        // Click = make active target
-                        this.game.setActiveLockedTarget(target);
-                    }
-                });
-                el.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.game.setActiveLockedTarget(target);
-                    this.showContextMenu(e.clientX, e.clientY, target);
-                });
-            }
-        });
+        // Click/contextmenu handlers are delegated on the container (see init)
     }
 
     /**

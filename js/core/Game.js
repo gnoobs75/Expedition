@@ -73,8 +73,9 @@ export class Game {
         this.credits = CONFIG.PLAYER_START_CREDITS;
         this.currentSector = null;
         this.dockedAt = null;
-        this.lockedTarget = null;       // Primary locked target (backward compat, synced with lockedTargets[0])
+        this.lockedTarget = null;       // Primary locked target (backward compat)
         this.lockedTargets = [];        // All locked targets (multi-lock)
+        this.activeLockedTarget = null; // Currently active locked target (weapons fire at this)
         this.selectedTarget = null;
 
         // Bookmarks (persisted)
@@ -318,6 +319,9 @@ export class Game {
                 entity.locked = false;
                 this.lockedTargets.splice(lockIdx, 1);
                 this.lockedTarget = this.lockedTargets[0] || null;
+            }
+            if (entity === this.activeLockedTarget) {
+                this.activeLockedTarget = this.lockedTargets[0] || null;
             }
             if (entity === this.selectedTarget) {
                 this.selectedTarget = null;
@@ -883,6 +887,10 @@ export class Game {
             this.lockedTargets.push(entity);
             this.lockedTarget = this.lockedTargets[0];
             entity.locked = true;
+            // Auto-set as active if no active target
+            if (!this.activeLockedTarget) {
+                this.activeLockedTarget = entity;
+            }
             this.events.emit('target:locked', entity);
             this.ui?.log(`Target locked: ${entity.name}`, 'system');
             this.audio?.play('lock-complete');
@@ -901,13 +909,31 @@ export class Game {
                 entity.locked = false;
                 this.lockedTargets.splice(idx, 1);
             }
+            // If we unlocked the active target, fall back to first remaining
+            if (entity === this.activeLockedTarget) {
+                this.activeLockedTarget = this.lockedTargets[0] || null;
+            }
         } else if (this.lockedTargets.length > 0) {
             // Unlock most recent
             const last = this.lockedTargets.pop();
             if (last) last.locked = false;
+            if (last === this.activeLockedTarget) {
+                this.activeLockedTarget = this.lockedTargets[0] || null;
+            }
         }
         this.lockedTarget = this.lockedTargets[0] || null;
         this.events.emit('target:unlocked');
+    }
+
+    /**
+     * Set the active locked target (weapons/modules fire at this one)
+     */
+    setActiveLockedTarget(entity) {
+        if (!entity || !this.lockedTargets.includes(entity)) return;
+        this.activeLockedTarget = entity;
+        this.lockedTarget = entity; // Sync backward compat
+        this.selectTarget(entity);
+        this.events.emit('target:active-changed', entity);
     }
 
     // ==========================================
@@ -975,8 +1001,8 @@ export class Game {
         const slotIds = groups[groupNum];
         if (!slotIds || slotIds.length === 0) return;
 
-        // Need at least one locked target to fire weapons at
-        const target = this.lockedTargets?.[0] || this.lockedTarget;
+        // Need an active locked target to fire weapons at
+        const target = this.activeLockedTarget || this.lockedTargets?.[0] || this.lockedTarget;
 
         for (const slotId of slotIds) {
             if (!this.player?.alive) break;
